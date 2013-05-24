@@ -1,0 +1,2 @@
+# Default to connecting to a local OpenFlow controller
+DAEMON_ARGS="-c 127.0.0.1:6633"

@@ -1,0 +1,47 @@
+###############################################################################
+#
+# OVSDriver Autogeneration Definitions.
+#
+###############################################################################
+
+cdefs: &cdefs
+- OVSDRIVER_CONFIG_INCLUDE_LOGGING:
+    doc: "Include or exclude logging."
+    default: 1
+- OVSDRIVER_CONFIG_LOG_OPTIONS_DEFAULT:
+    doc: "Default enabled log options."
+    default: AIM_LOG_OPTIONS_DEFAULT
+- OVSDRIVER_CONFIG_LOG_BITS_DEFAULT:
+    doc: "Default enabled log options."
+    default: AIM_LOG_BITS_DEFAULT
+- OVSDRIVER_CONFIG_LOG_CUSTOM_BITS_DEFAULT:
+    doc: "Default enabled custom log options."
+    default: 0
+- OVSDRIVER_CONFIG_PORTING_STDLIB:
+    doc: "Default all porting macros to use the C standard libraries."
+    default: 1
+- OVSDRIVER_CONFIG_PORTING_INCLUDE_STDLIB_HEADERS:
+    doc: "Include standard library headers for stdlib porting macros."
+    default: OVSDRIVER_CONFIG_PORTING_STDLIB
+- OVSDRIVER_CONFIG_INCLUDE_UCLI:
+    doc: "Include generic uCli support."
+    default: 0
+
+
+definitions:
+  cdefs:
+    OVSDRIVER_CONFIG_HEADER: 
+      defs: *cdefs
+      basename: ovsdriver_config
+
+  portingmacro:
+    OVSDRIVER:
+      macros:
+        - malloc
+        - free
+        - memset
+        - memcpy
+        - strncpy
+        - vsnprintf
+        - snprintf
+        - strlen

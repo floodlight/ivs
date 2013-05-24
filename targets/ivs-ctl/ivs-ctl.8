@@ -1,0 +1,44 @@
+.\"                                      Hey, EMACS: -*- nroff -*-
+.\" First parameter, NAME, should be all caps
+.\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
+.\" other parameters are allowed: see man(7), man(1)
+.TH IVS-CTL 8 "May  24, 2013"
+.\" Please adjust this date whenever revising the manpage.
+.\"
+.\" Some roff macros, for reference:
+.\" .nh        disable hyphenation
+.\" .hy        enable hyphenation
+.\" .ad l      left justify
+.\" .ad b      justify to both left and right margins
+.\" .nf        disable filling
+.\" .fi        enable filling
+.\" .br        insert line break
+.\" .sp <n>    insert n+1 empty lines
+.\" for manpage-specific macros, see man(7)
+.SH NAME
+ivs-ctl \- utility for configuring Indigo Virtual Switch
+.SH SYNOPSIS
+\fB ivs-ctl help\fR
+\fB ivs-ctl show\fR
+\fB ivs-ctl add-port\fR \fIINTERFACE\fR
+\fB ivs-ctl add-internal-port\fR \fIINTERFACE\fR
+\fB ivs-ctl del-port\fR \fIINTERFACE\fR
+.SH DESCRIPTION
+The \fBivs-ctl\fP command can be used to view and modify the \fBivs\fP virtual
+switch datapath.
+.PP
+The \fBshow\fP command outputs information and statistics about the datapath,
+including the attached ports.
+.PP
+The \fBadd-port\fP and \fBdel-port\fR commands modify the attached ports of
+the datapath. The \fIINTERFACE\fR argument must be a Linux interface name.
+.PP
+The \fBadd-internal-port\fP command creates a Linux interface connected to
+the datapath. This interface can have an IP address assigned to
+it and can generally be used like a normal netdev, but traffic to and from it
+will flow through the datapath.
+.PP
+.SH AUTHOR
+ivs was written by the Indigo community <http://www.openflowhub.org/display/Indigo>.
+.PP
+This manual page was written by Rich Lane <rlane@bigswitch.com>.

@@ -1,0 +1,3 @@
+[submodule "indigo"]
+	path = indigo
+	url = git://github.com/floodlight/indigo

@@ -1,0 +1,7 @@
+*.ex
+*.EX
+*.substvars
+files
+/ivs
+/ivs-dbg
+/*.debhelper

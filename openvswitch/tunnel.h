@@ -1,0 +1,61 @@
+/*
+ * Copyright (c) 2008, 2009, 2010, 2011 Nicira, Inc.
+ *
+ * This file is offered under your choice of two licenses: Apache 2.0 or GNU
+ * GPL 2.0 or later.  The permission statements for each of these licenses is
+ * given below.  You may license your modifications to this file under either
+ * of these licenses or both.  If you wish to license your modifications under
+ * only one of these licenses, delete the permission text for the other
+ * license.
+ *
+ * ----------------------------------------------------------------------
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ----------------------------------------------------------------------
+ */
+
+#ifndef OPENVSWITCH_TUNNEL_H
+#define OPENVSWITCH_TUNNEL_H 1
+
+#include <linux/types.h>
+
+/* OVS_VPORT_ATTR_OPTIONS attributes for tunnels.
+ *
+ * OVS_TUNNEL_ATTR_FLAGS and OVS_TUNNEL_ATTR_DST_IPV4 are required.  All other
+ * attributes are optional.
+ */
+enum {
+	OVS_TUNNEL_ATTR_UNSPEC,
+	OVS_TUNNEL_ATTR_FLAGS,    /* 32-bit TNL_F_*. */
+	OVS_TUNNEL_ATTR_DST_IPV4, /* IPv4 destination address. */
+	OVS_TUNNEL_ATTR_SRC_IPV4, /* IPv4 source address. */
+	OVS_TUNNEL_ATTR_OUT_KEY,  /* __be64 key to use on output. */
+	OVS_TUNNEL_ATTR_IN_KEY,   /* __be64 key to match on input. */
+	OVS_TUNNEL_ATTR_TOS,      /* 8-bit TOS value. */
+	OVS_TUNNEL_ATTR_TTL,      /* 8-bit TTL value. */
+	OVS_TUNNEL_ATTR_DST_PORT, /* 16-bit UDP port, used by VXLAN. */
+	__OVS_TUNNEL_ATTR_MAX
+};
+
+#define OVS_TUNNEL_ATTR_MAX (__OVS_TUNNEL_ATTR_MAX - 1)
+
+#define TNL_F_CSUM		(1 << 0) /* Checksum packets. */
+#define TNL_F_TOS_INHERIT	(1 << 1) /* Inherit ToS from inner packet. */
+#define TNL_F_TTL_INHERIT	(1 << 2) /* Inherit TTL from inner packet. */
+#define TNL_F_DF_INHERIT	(1 << 3) /* Inherit DF bit from inner packet. */
+#define TNL_F_DF_DEFAULT	(1 << 4) /* Set DF bit if inherit off or
+					  * not IP. */
+/* Bit 6 is reserved since it was previously used for Tunnel header caching. */
+#define TNL_F_PMTUD		(1 << 5) /* Enable path MTU discovery. */
+#define TNL_F_IPSEC		(1 << 7) /* Traffic is IPsec encrypted. */
+
+#endif /* openvswitch/tunnel.h */

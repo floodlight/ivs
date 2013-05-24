@@ -1,0 +1,11 @@
+standard
+
+# Extensions we support
+nicira_role
+bsn_ipmask
+
+# Indigo respects priority of exact match flows
+^flow_matches.ExactMatchPrio
+
+# OVS kernel module bug
+^pktact.DirectLlcPackets

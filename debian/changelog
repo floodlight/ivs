@@ -1,0 +1,17 @@
+ivs (0.3) unstable; urgency=low
+
+  * Changed package name.
+
+ -- Rich Lane <rlane@bigswitch.com>  Tue, 21 May 2013 11:21:36 -0700
+
+xenon (0.2) unstable; urgency=low
+
+  * Added parallel HA.
+
+ -- Rich Lane <rlane@bigswitch.com>  Tue, 09 Apr 2013 14:53:35 -0700
+
+xenon (0.1) unstable; urgency=low
+
+  * Initial Release.
+
+ -- Rich Lane <rlane@bigswitch.com>  Mon, 04 Feb 2013 12:07:19 -0800
