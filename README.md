@@ -17,9 +17,13 @@ Installation
   - Ubuntu 11.10: `sudo apt-get install libnl3-dev pkg-config python-tz`
   - Ubuntu 12.04: `sudo apt-get install libnl-3-dev libnl-genl-3-dev libnl-route-3-dev pkg-config python-tz`
 
-2. Compile IVS: `make`
+2. Clone the IVS repository: `git clone --recurse-submodules https://github.com/floodlight/ivs.git`
 
-3. Install IVS: `sudo make install DESTDIR=/`
+3. `cd ivs`
+
+4. Compile IVS: `make`
+
+5. Install IVS: `sudo make install`
 
 Packaging, including init scripts, is also available for Debian-based
 distributions in the `debian` directory.
