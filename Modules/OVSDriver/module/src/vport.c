@@ -496,7 +496,17 @@ port_desc_set(of_port_desc_t *of_port_desc, of_port_no_t of_port_num)
     of_port_desc_hw_addr_set(of_port_desc, port->mac_addr);
     of_port_desc_name_set(of_port_desc, port->ifname);
     of_port_desc_config_set(of_port_desc, port->config);
-    of_port_desc_state_set(of_port_desc, 0);
+
+    int flags;
+    if (ind_ovs_get_interface_flags(port->ifname, &flags) == 0) {
+        uint32_t state = 0;
+        if (!(flags & IFF_UP)) {
+            state |= OF_PORT_STATE_FLAG_LINK_DOWN;
+        }
+        of_port_desc_state_set(of_port_desc, state);
+    } else {
+        of_port_desc_state_set(of_port_desc, 0);
+    }
 
     uint32_t curr, advertised, supported, peer;
     ind_ovs_get_interface_features(port->ifname, &curr, &advertised,
