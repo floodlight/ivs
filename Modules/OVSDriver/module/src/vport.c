@@ -34,7 +34,9 @@
 
 struct ind_ovs_port *ind_ovs_ports[IND_OVS_MAX_PORTS];  /**< Table of all ports */
 
+static struct nl_sock *route_cache_sock;
 static struct nl_cache_mngr *route_cache_mngr;
+static struct nl_cache *link_cache;
 
 static indigo_error_t port_status_notify(of_port_no_t of_port_num, unsigned reason);
 static void port_desc_set(of_port_desc_t *of_port_desc, of_port_no_t of_port_num);
@@ -334,6 +336,8 @@ port_stats_iterator(struct nl_msg *msg, void *arg)
     assert(attrs[OVS_VPORT_ATTR_STATS]);
 
     uint32_t port_no = nla_get_u32(attrs[OVS_VPORT_ATTR_PORT_NO]);
+    char *ifname = nla_get_string(attrs[OVS_VPORT_ATTR_NAME]);
+    uint32_t vport_type = nla_get_u32(attrs[OVS_VPORT_ATTR_TYPE]);
     struct ovs_vport_stats *port_stats = nla_data(attrs[OVS_VPORT_ATTR_STATS]);
 
     of_port_stats_entry_t entry[1];
@@ -345,19 +349,52 @@ port_stats_iterator(struct nl_msg *msg, void *arg)
     }
 
     of_port_stats_entry_port_no_set(entry, port_no);
-    of_port_stats_entry_rx_packets_set(entry, port_stats->rx_packets);
-    of_port_stats_entry_tx_packets_set(entry, port_stats->tx_packets);
-    of_port_stats_entry_rx_bytes_set(entry, port_stats->rx_bytes);
-    of_port_stats_entry_tx_bytes_set(entry, port_stats->tx_bytes);
-    of_port_stats_entry_rx_dropped_set(entry, port_stats->rx_dropped);
-    of_port_stats_entry_tx_dropped_set(entry, port_stats->tx_dropped);
-    of_port_stats_entry_rx_errors_set(entry, port_stats->rx_errors);
-    of_port_stats_entry_tx_errors_set(entry, port_stats->tx_errors);
-    /* TODO get these from physical interface? */
-    of_port_stats_entry_rx_frame_err_set(entry, 0);
-    of_port_stats_entry_rx_over_err_set(entry, 0);
-    of_port_stats_entry_rx_crc_err_set(entry, 0);
-    of_port_stats_entry_collisions_set(entry, 0);
+
+    struct rtnl_link *link;
+    if ((vport_type == OVS_VPORT_TYPE_NETDEV
+        || vport_type == OVS_VPORT_TYPE_INTERNAL)
+        && (link = rtnl_link_get_by_name(link_cache, ifname))) {
+        /* Get interface stats from NETLINK_ROUTE */
+        of_port_stats_entry_rx_packets_set(entry,
+            rtnl_link_get_stat(link, RTNL_LINK_RX_PACKETS));
+        of_port_stats_entry_tx_packets_set(entry,
+            rtnl_link_get_stat(link, RTNL_LINK_TX_PACKETS));
+        of_port_stats_entry_rx_bytes_set(entry,
+            rtnl_link_get_stat(link, RTNL_LINK_RX_BYTES));
+        of_port_stats_entry_tx_bytes_set(entry,
+            rtnl_link_get_stat(link, RTNL_LINK_TX_BYTES));
+        of_port_stats_entry_rx_dropped_set(entry,
+            rtnl_link_get_stat(link, RTNL_LINK_RX_DROPPED));
+        of_port_stats_entry_tx_dropped_set(entry,
+            rtnl_link_get_stat(link, RTNL_LINK_TX_DROPPED));
+        of_port_stats_entry_rx_errors_set(entry,
+            rtnl_link_get_stat(link, RTNL_LINK_RX_ERRORS));
+        of_port_stats_entry_tx_errors_set(entry,
+            rtnl_link_get_stat(link, RTNL_LINK_TX_ERRORS));
+        of_port_stats_entry_rx_frame_err_set(entry,
+            rtnl_link_get_stat(link, RTNL_LINK_RX_FRAME_ERR));
+        of_port_stats_entry_rx_over_err_set(entry,
+            rtnl_link_get_stat(link, RTNL_LINK_RX_OVER_ERR));
+        of_port_stats_entry_rx_crc_err_set(entry,
+            rtnl_link_get_stat(link, RTNL_LINK_RX_CRC_ERR));
+        of_port_stats_entry_collisions_set(entry,
+            rtnl_link_get_stat(link, RTNL_LINK_COLLISIONS));
+        rtnl_link_put(link);
+    } else {
+        /* Use more limited stats from the datapath */
+        of_port_stats_entry_rx_packets_set(entry, port_stats->rx_packets);
+        of_port_stats_entry_tx_packets_set(entry, port_stats->tx_packets);
+        of_port_stats_entry_rx_bytes_set(entry, port_stats->rx_bytes);
+        of_port_stats_entry_tx_bytes_set(entry, port_stats->tx_bytes);
+        of_port_stats_entry_rx_dropped_set(entry, port_stats->rx_dropped);
+        of_port_stats_entry_tx_dropped_set(entry, port_stats->tx_dropped);
+        of_port_stats_entry_rx_errors_set(entry, port_stats->rx_errors);
+        of_port_stats_entry_tx_errors_set(entry, port_stats->tx_errors);
+        of_port_stats_entry_rx_frame_err_set(entry, 0);
+        of_port_stats_entry_rx_over_err_set(entry, 0);
+        of_port_stats_entry_rx_crc_err_set(entry, 0);
+        of_port_stats_entry_collisions_set(entry, 0);
+    }
 
     return NL_OK;
 }
@@ -377,6 +414,9 @@ void indigo_port_stats_get(
 
     of_port_stats_request_port_no_get(port_stats_request, &req_of_port_num);
     int dump_all = req_of_port_num == OF_PORT_DEST_NONE_BY_VERSION(ind_ovs_version);
+
+    /* Refresh statistics */
+    nl_cache_refill(route_cache_sock, link_cache);
 
     /* TODO factor this out */
     struct nl_msg *msg = nlmsg_alloc();
@@ -593,22 +633,21 @@ route_cache_mngr_socket_cb(void)
 void
 ind_ovs_port_init(void)
 {
-    struct nl_cache *cache;
-    struct nl_sock *nlsock;
     int nlerr;
 
-    nlsock = nl_socket_alloc();
-    if (nlsock == NULL) {
+    route_cache_sock = nl_socket_alloc();
+    if (route_cache_sock == NULL) {
         LOG_ERROR("nl_socket_alloc failed");
         abort();
     }
 
-    if ((nlerr = nl_cache_mngr_alloc(nlsock, NETLINK_ROUTE, 0, &route_cache_mngr)) < 0) {
+    if ((nlerr = nl_cache_mngr_alloc(route_cache_sock, NETLINK_ROUTE,
+                                     0, &route_cache_mngr)) < 0) {
         LOG_ERROR("nl_cache_mngr_alloc failed: %s", nl_geterror(nlerr));
         abort();
     }
 
-    if ((nlerr = nl_cache_mngr_add(route_cache_mngr, "route/link", link_change_cb, NULL, &cache)) < 0) {
+    if ((nlerr = nl_cache_mngr_add(route_cache_mngr, "route/link", link_change_cb, NULL, &link_cache)) < 0) {
         LOG_ERROR("nl_cache_mngr_add failed: %s", nl_geterror(nlerr));
         abort();
     }
