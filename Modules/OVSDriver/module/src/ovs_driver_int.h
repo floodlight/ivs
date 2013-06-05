@@ -116,6 +116,7 @@ struct ind_ovs_upcall_thread;
 struct ind_ovs_port {
     char ifname[128]; /* Linux network interface name */
     uint32_t dp_port_no; /* Kernel datapath port number */
+    int ifflags; /* Linux interface flags */
     of_mac_addr_t mac_addr;
     uint32_t config; /* OpenFlow config */
     uint32_t num_kflows; /* Number of kflows with this in_port */

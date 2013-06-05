@@ -214,9 +214,15 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname, of_mac_addr_t mac_addr)
         goto cleanup_port;
     }
 
-    int if_flags;
-    if (!ind_ovs_get_interface_flags(ifname, &if_flags)) {
-        (void) ind_ovs_set_interface_flags(ifname, if_flags|IFF_UP);
+    if (!ind_ovs_get_interface_flags(ifname, &port->ifflags)) {
+        /* Bring interface up if not already */
+        if (!(port->ifflags & IFF_UP)) {
+            port->ifflags |= IFF_UP;
+            (void) ind_ovs_set_interface_flags(ifname, port->ifflags);
+        }
+    } else {
+        /* Not a netdev, fake the interface flags */
+        port->ifflags = IFF_UP;
     }
 
     /* Ensure port is fully populated before publishing it. */
@@ -497,16 +503,11 @@ port_desc_set(of_port_desc_t *of_port_desc, of_port_no_t of_port_num)
     of_port_desc_name_set(of_port_desc, port->ifname);
     of_port_desc_config_set(of_port_desc, port->config);
 
-    int flags;
-    if (ind_ovs_get_interface_flags(port->ifname, &flags) == 0) {
-        uint32_t state = 0;
-        if (!(flags & IFF_UP)) {
-            state |= OF_PORT_STATE_FLAG_LINK_DOWN;
-        }
-        of_port_desc_state_set(of_port_desc, state);
-    } else {
-        of_port_desc_state_set(of_port_desc, 0);
+    uint32_t state = 0;
+    if (!(port->ifflags & IFF_UP)) {
+        state |= OF_PORT_STATE_FLAG_LINK_DOWN;
     }
+    of_port_desc_state_set(of_port_desc, state);
 
     uint32_t curr, advertised, supported, peer;
     ind_ovs_get_interface_features(port->ifname, &curr, &advertised,
@@ -553,6 +554,7 @@ link_change_cb(struct nl_cache *cache,
 {
     struct rtnl_link *link = (struct rtnl_link *) obj;
     const char *ifname = rtnl_link_get_name(link);
+    int ifflags = rtnl_link_get_flags(link);
 
     /*
      * Ignore additions/deletions, already handled by
@@ -570,6 +572,7 @@ link_change_cb(struct nl_cache *cache,
 
     LOG_VERBOSE("Sending port status change notification for interface %s", ifname);
 
+    port->ifflags = ifflags;
     port_status_notify(port->dp_port_no, OF_PORT_CHANGE_REASON_MODIFY);
 }
 
