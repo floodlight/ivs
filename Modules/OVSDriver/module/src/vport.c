@@ -24,9 +24,17 @@
 #include "indigo/of_state_manager.h"
 #include "SocketManager/socketmanager.h"
 #include <errno.h>
+#include <netlink/cache.h>
+#include <netlink/route/link.h>
+
+#ifndef _LINUX_IF_H
+/* Some versions of libnetlink include linux/if.h, which conflicts with net/if.h. */
 #include <net/if.h>
+#endif
 
 struct ind_ovs_port *ind_ovs_ports[IND_OVS_MAX_PORTS];  /**< Table of all ports */
+
+static struct nl_cache_mngr *route_cache_mngr;
 
 static indigo_error_t port_status_notify(of_port_no_t of_port_num, unsigned reason);
 static void port_desc_set(of_port_desc_t *of_port_desc, of_port_no_t of_port_num);
@@ -520,4 +528,74 @@ port_desc_set_local(of_port_desc_t *of_port_desc)
     of_port_desc_advertised_set(of_port_desc, 0);
     of_port_desc_supported_set(of_port_desc, 0);
     of_port_desc_peer_set(of_port_desc, 0);
+}
+
+/*
+ * Called by nl_cache_mngr_data_ready if a link object changed.
+ *
+ * Sends a port status message to the controller.
+ */
+static void
+link_change_cb(struct nl_cache *cache,
+               struct nl_object *obj,
+               int action,
+               void *arg)
+{
+    struct rtnl_link *link = (struct rtnl_link *) obj;
+    const char *ifname = rtnl_link_get_name(link);
+
+    /*
+     * Ignore additions/deletions, already handled by
+     * ind_ovs_handle_vport_multicast.
+     */
+    if (action != NL_ACT_CHANGE) {
+        return;
+    }
+
+    /* Ignore interfaces not connected to our datapath. */
+    struct ind_ovs_port *port = ind_ovs_port_lookup_by_name(ifname);
+    if (port == NULL) {
+        return;
+    }
+
+    LOG_VERBOSE("Sending port status change notification for interface %s", ifname);
+
+    port_status_notify(port->dp_port_no, OF_PORT_CHANGE_REASON_MODIFY);
+}
+
+static void
+route_cache_mngr_socket_cb(void)
+{
+    nl_cache_mngr_data_ready(route_cache_mngr);
+}
+
+void
+ind_ovs_port_init(void)
+{
+    struct nl_cache *cache;
+    struct nl_sock *nlsock;
+    int nlerr;
+
+    nlsock = nl_socket_alloc();
+    if (nlsock == NULL) {
+        LOG_ERROR("nl_socket_alloc failed");
+        abort();
+    }
+
+    if ((nlerr = nl_cache_mngr_alloc(nlsock, NETLINK_ROUTE, 0, &route_cache_mngr)) < 0) {
+        LOG_ERROR("nl_cache_mngr_alloc failed: %s", nl_geterror(nlerr));
+        abort();
+    }
+
+    if ((nlerr = nl_cache_mngr_add(route_cache_mngr, "route/link", link_change_cb, NULL, &cache)) < 0) {
+        LOG_ERROR("nl_cache_mngr_add failed: %s", nl_geterror(nlerr));
+        abort();
+    }
+
+    if (ind_soc_socket_register(nl_cache_mngr_get_fd(route_cache_mngr),
+                                (ind_soc_socket_ready_callback_f)route_cache_mngr_socket_cb,
+                                NULL) < 0) {
+        LOG_ERROR("failed to register socket");
+        abort();
+    }
 }

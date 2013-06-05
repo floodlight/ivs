@@ -159,8 +159,10 @@ GLOBAL_LINK_LIBS += -lpthread -lrt -lm
 
 LIBNL_CFLAGS := $(shell pkg-config --cflags libnl-3.0)
 LIBNL_CFLAGS += $(shell pkg-config --cflags --silence-errors libnl-genl-3.0)
+LIBNL_CFLAGS += $(shell pkg-config --cflags --silence-errors libnl-route-3.0)
 LIBNL_LIBS := $(shell pkg-config --libs libnl-3.0)
 LIBNL_LIBS += $(shell pkg-config --libs --silence-errors libnl-genl-3.0)
+LIBNL_LIBS += $(shell pkg-config --libs --silence-errors libnl-route-3.0)
 GLOBAL_CFLAGS += $(LIBNL_CFLAGS)
 GLOBAL_LINK_LIBS += $(LIBNL_LIBS)
 
