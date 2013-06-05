@@ -318,68 +318,65 @@ void indigo_port_modify(
     indigo_core_port_modify_callback(INDIGO_ERROR_NONE, callback_cookie);
 }
 
+static int
+port_stats_iterator(struct nl_msg *msg, void *arg)
+{
+    of_list_port_stats_entry_t *list = arg;
+
+    struct nlmsghdr *nlh = nlmsg_hdr(msg);
+    struct nlattr *attrs[OVS_VPORT_ATTR_MAX+1];
+    if (genlmsg_parse(nlh, sizeof(struct ovs_header),
+                    attrs, OVS_VPORT_ATTR_MAX,
+                    NULL) < 0) {
+        abort();
+    }
+    assert(attrs[OVS_VPORT_ATTR_PORT_NO]);
+    assert(attrs[OVS_VPORT_ATTR_STATS]);
+
+    uint32_t port_no = nla_get_u32(attrs[OVS_VPORT_ATTR_PORT_NO]);
+    struct ovs_vport_stats *port_stats = nla_data(attrs[OVS_VPORT_ATTR_STATS]);
+
+    of_port_stats_entry_t entry[1];
+    of_port_stats_entry_init(entry, ind_ovs_version, -1, 1);
+    if (of_list_port_stats_entry_append_bind(list, entry) < 0) {
+        /* TODO needs fix in indigo core */
+        LOG_ERROR("too many port stats replies");
+        return NL_STOP;
+    }
+
+    of_port_stats_entry_port_no_set(entry, port_no);
+    of_port_stats_entry_rx_packets_set(entry, port_stats->rx_packets);
+    of_port_stats_entry_tx_packets_set(entry, port_stats->tx_packets);
+    of_port_stats_entry_rx_bytes_set(entry, port_stats->rx_bytes);
+    of_port_stats_entry_tx_bytes_set(entry, port_stats->tx_bytes);
+    of_port_stats_entry_rx_dropped_set(entry, port_stats->rx_dropped);
+    of_port_stats_entry_tx_dropped_set(entry, port_stats->tx_dropped);
+    of_port_stats_entry_rx_errors_set(entry, port_stats->rx_errors);
+    of_port_stats_entry_tx_errors_set(entry, port_stats->tx_errors);
+    /* TODO get these from physical interface? */
+    of_port_stats_entry_rx_frame_err_set(entry, 0);
+    of_port_stats_entry_rx_over_err_set(entry, 0);
+    of_port_stats_entry_rx_crc_err_set(entry, 0);
+    of_port_stats_entry_collisions_set(entry, 0);
+
+    return NL_OK;
+}
+
 void indigo_port_stats_get(
     of_port_stats_request_t *port_stats_request,
     indigo_cookie_t callback_cookie)
 {
-    of_port_no_t               req_of_port_num;
-    of_port_stats_reply_t      *port_stats_reply;
-    of_version_t               version;
+    of_port_no_t req_of_port_num;
+    of_port_stats_reply_t *port_stats_reply;
 
-    version = port_stats_request->version;
-    port_stats_reply = of_port_stats_reply_new(version);
+    port_stats_reply = of_port_stats_reply_new(ind_ovs_version);
     NYI(port_stats_reply == NULL);
 
-    of_list_port_stats_entry_t list[1];
-    of_port_stats_reply_entries_bind(port_stats_reply, list);
+    of_list_port_stats_entry_t list;
+    of_port_stats_reply_entries_bind(port_stats_reply, &list);
 
     of_port_stats_request_port_no_get(port_stats_request, &req_of_port_num);
-    int dump_all = req_of_port_num == OF_PORT_DEST_NONE_BY_VERSION(version);
-
-    /* TODO clang can't handle nested functions */
-    int callback(struct nl_msg *msg, void *arg)
-    {
-        struct nlmsghdr *nlh = nlmsg_hdr(msg);
-        struct nlattr *attrs[OVS_VPORT_ATTR_MAX+1];
-        if (genlmsg_parse(nlh, sizeof(struct ovs_header),
-                        attrs, OVS_VPORT_ATTR_MAX,
-                        NULL) < 0) {
-            abort();
-        }
-        assert(attrs[OVS_VPORT_ATTR_PORT_NO]);
-        assert(attrs[OVS_VPORT_ATTR_STATS]);
-
-        uint32_t port_no = nla_get_u32(attrs[OVS_VPORT_ATTR_PORT_NO]);
-        struct ovs_vport_stats *port_stats = nla_data(attrs[OVS_VPORT_ATTR_STATS]);
-
-        if (!dump_all && port_no != req_of_port_num) {
-            return NL_OK;
-        }
-
-        of_port_stats_entry_t entry[1];
-        of_port_stats_entry_init(entry, version, -1, 1);
-        if (of_list_port_stats_entry_append_bind(list, entry) < 0) {
-            LOG_ERROR("too many port stats replies");
-            return NL_STOP;
-        }
-
-        of_port_stats_entry_port_no_set(entry, port_no);
-        of_port_stats_entry_rx_packets_set(entry, port_stats->rx_packets);
-        of_port_stats_entry_tx_packets_set(entry, port_stats->tx_packets);
-        of_port_stats_entry_rx_bytes_set(entry, port_stats->rx_bytes);
-        of_port_stats_entry_tx_bytes_set(entry, port_stats->tx_bytes);
-        of_port_stats_entry_rx_dropped_set(entry, port_stats->rx_dropped);
-        of_port_stats_entry_tx_dropped_set(entry, port_stats->tx_dropped);
-        of_port_stats_entry_rx_errors_set(entry, port_stats->rx_errors);
-        of_port_stats_entry_tx_errors_set(entry, port_stats->tx_errors);
-        /* TODO get these from physical interface? */
-        of_port_stats_entry_rx_frame_err_set(entry, 0);
-        of_port_stats_entry_rx_over_err_set(entry, 0);
-        of_port_stats_entry_rx_crc_err_set(entry, 0);
-        of_port_stats_entry_collisions_set(entry, 0);
-
-        return NL_OK;
-    }
+    int dump_all = req_of_port_num == OF_PORT_DEST_NONE_BY_VERSION(ind_ovs_version);
 
     /* TODO factor this out */
     struct nl_msg *msg = nlmsg_alloc();
@@ -392,11 +389,15 @@ void indigo_port_stats_get(
         NYI(0);
     }
 
-    /* TODO send a GET cmd if we don't need all ports */
     struct ovs_header *hdr = genlmsg_put(msg, NL_AUTO_PORT, NL_AUTO_SEQ,
                                          ovs_vport_family, sizeof(*hdr),
-                                         NLM_F_DUMP, OVS_DP_CMD_GET, OVS_VPORT_VERSION);
+                                         dump_all ? NLM_F_DUMP : 0,
+                                         OVS_VPORT_CMD_GET, OVS_VPORT_VERSION);
     hdr->dp_ifindex = ind_ovs_dp_ifindex;
+
+    if (!dump_all) {
+        nla_put_u32(msg, OVS_VPORT_ATTR_PORT_NO, req_of_port_num);
+    }
 
 #ifndef NDEBUG
     int ret =
@@ -406,7 +407,7 @@ void indigo_port_stats_get(
 
     nlmsg_free(msg);
 
-    nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, callback, NULL);
+    nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, port_stats_iterator, &list);
 
 #ifndef NDEBUG
     ret =
