@@ -42,6 +42,19 @@ ind_ovs_port_lookup(of_port_no_t port_no)
     return ind_ovs_ports[port_no];
 }
 
+struct ind_ovs_port *
+ind_ovs_port_lookup_by_name(const char *ifname)
+{
+    int i;
+    for (i = 0; i < IND_OVS_MAX_PORTS; i++) {
+        struct ind_ovs_port *port = ind_ovs_ports[i];
+        if (port && !strcmp(port->ifname, ifname)) {
+            return port;
+        }
+    }
+    return NULL;
+}
+
 /* TODO populate more fields of the port desc */
 indigo_error_t indigo_port_features_get(
     of_features_reply_t *features)
@@ -166,6 +179,7 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname, of_mac_addr_t mac_addr)
     }
 
     strncpy(port->ifname, ifname, sizeof(port->ifname));
+    port->dp_port_no = port_no;
     port->mac_addr = mac_addr;
     aim_ratelimiter_init(&port->upcall_log_limiter, 1000*1000, 5, NULL);
     aim_ratelimiter_init(&port->pktin_limiter, PORT_PKTIN_INTERVAL, PORT_PKTIN_BURST_SIZE, NULL);
@@ -221,33 +235,19 @@ cleanup_port:
     free(port);
 }
 
-int
-ind_ovs_port_find(indigo_port_name_t port_name)
-{
-    int i;
-    for (i = 0; i < IND_OVS_MAX_PORTS; i++) {
-        struct ind_ovs_port *port = ind_ovs_ports[i];
-        if (port != NULL &&
-            strncmp(port_name, port->ifname, sizeof(port->ifname))) {
-            return i;
-        }
-    }
-    return -1;
-}
-
 /*
  * ind_ovs_port_deleted will free the port struct.
  */
 indigo_error_t indigo_port_interface_remove(
     indigo_port_name_t port_name)
 {
-    int of_port = ind_ovs_port_find(port_name);
-    if (of_port < 0) {
+    struct ind_ovs_port *port = ind_ovs_port_lookup_by_name(port_name);
+    if (port == NULL) {
         return INDIGO_ERROR_NOT_FOUND;
     }
 
     struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_DEL);
-    nla_put_u32(msg, OVS_VPORT_ATTR_PORT_NO, of_port);
+    nla_put_u32(msg, OVS_VPORT_ATTR_PORT_NO, port->dp_port_no);
     return ind_ovs_transact(msg);
 }
 
