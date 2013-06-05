@@ -570,6 +570,13 @@ link_change_cb(struct nl_cache *cache,
         return;
     }
 
+    /* Log at INFO only if the interface transitioned between up/down */
+    if ((ifflags & IFF_UP) && !(port->ifflags & IFF_UP)) {
+        LOG_INFO("Interface %s state changed to up", ifname);
+    } else if (!(ifflags & IFF_UP) && (port->ifflags & IFF_UP)) {
+        LOG_INFO("Interface %s state changed to down", ifname);
+    }
+
     LOG_VERBOSE("Sending port status change notification for interface %s", ifname);
 
     port->ifflags = ifflags;
