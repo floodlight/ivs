@@ -37,6 +37,7 @@ struct ind_ovs_port *ind_ovs_ports[IND_OVS_MAX_PORTS];  /**< Table of all ports 
 static struct nl_sock *route_cache_sock;
 static struct nl_cache_mngr *route_cache_mngr;
 static struct nl_cache *link_cache;
+static struct nl_cb *netlink_callbacks;
 
 static indigo_error_t port_status_notify(of_port_no_t of_port_num, unsigned reason);
 static void port_desc_set(of_port_desc_t *of_port_desc, of_port_no_t of_port_num);
@@ -405,9 +406,13 @@ void indigo_port_stats_get(
 {
     of_port_no_t req_of_port_num;
     of_port_stats_reply_t *port_stats_reply;
+    indigo_error_t err = INDIGO_ERROR_NONE;
 
     port_stats_reply = of_port_stats_reply_new(ind_ovs_version);
-    NYI(port_stats_reply == NULL);
+    if (port_stats_reply == NULL) {
+        err = INDIGO_ERROR_RESOURCE;
+        goto out;
+    }
 
     of_list_port_stats_entry_t list;
     of_port_stats_reply_entries_bind(port_stats_reply, &list);
@@ -418,46 +423,34 @@ void indigo_port_stats_get(
     /* Refresh statistics */
     nl_cache_refill(route_cache_sock, link_cache);
 
-    /* TODO factor this out */
-    struct nl_msg *msg = nlmsg_alloc();
-    if (msg == NULL) {
-        NYI(0);
-    }
-
-    struct nl_cb *cb = nl_cb_alloc(NL_CB_DEFAULT);
-    if (cb == NULL) {
-        NYI(0);
-    }
-
-    struct ovs_header *hdr = genlmsg_put(msg, NL_AUTO_PORT, NL_AUTO_SEQ,
-                                         ovs_vport_family, sizeof(*hdr),
-                                         dump_all ? NLM_F_DUMP : 0,
-                                         OVS_VPORT_CMD_GET, OVS_VPORT_VERSION);
-    hdr->dp_ifindex = ind_ovs_dp_ifindex;
-
-    if (!dump_all) {
+    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_GET);
+    if (dump_all) {
+        nlmsg_hdr(msg)->nlmsg_flags |= NLM_F_DUMP;
+    } else {
         nla_put_u32(msg, OVS_VPORT_ATTR_PORT_NO, req_of_port_num);
     }
 
-#ifndef NDEBUG
-    int ret =
-#endif
-        nl_send_auto(ind_ovs_socket, msg);
-    NYI(ret < 0);
+    /* Ask kernel to send us one or more OVS_VPORT_CMD_NEW messages */
+    if (nl_send_auto(ind_ovs_socket, msg) < 0) {
+        err = INDIGO_ERROR_UNKNOWN;
+        goto out;
+    }
+    ind_ovs_nlmsg_freelist_free(msg);
 
-    nlmsg_free(msg);
+    /* Handle OVS_VPORT_CMD_NEW messages */
+    nl_cb_set(netlink_callbacks, NL_CB_VALID, NL_CB_CUSTOM,
+              port_stats_iterator, &list);
+    if (nl_recvmsgs(ind_ovs_socket, netlink_callbacks) < 0) {
+        err = INDIGO_ERROR_UNKNOWN;
+        goto out;
+    }
 
-    nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, port_stats_iterator, &list);
-
-#ifndef NDEBUG
-    ret =
-#endif
-        nl_recvmsgs(ind_ovs_socket, cb);
-    NYI(ret < 0);
-
-    nl_cb_put(cb);
-
-    indigo_core_port_stats_get_callback(INDIGO_ERROR_NONE, port_stats_reply, callback_cookie);
+out:
+    if (err != INDIGO_ERROR_NONE) {
+        of_port_stats_reply_delete(port_stats_reply);
+        port_stats_reply = NULL;
+    }
+    indigo_core_port_stats_get_callback(err, port_stats_reply, callback_cookie);
 }
 
 /* Currently returns an empty reply */
@@ -656,6 +649,12 @@ ind_ovs_port_init(void)
                                 (ind_soc_socket_ready_callback_f)route_cache_mngr_socket_cb,
                                 NULL) < 0) {
         LOG_ERROR("failed to register socket");
+        abort();
+    }
+
+    netlink_callbacks = nl_cb_alloc(NL_CB_DEFAULT);
+    if (netlink_callbacks == NULL) {
+        LOG_ERROR("failed to allocate netlink callbacks");
         abort();
     }
 }
