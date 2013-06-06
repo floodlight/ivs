@@ -279,6 +279,7 @@ class AutotestIVS(object):
         system("mkdir -p %s" % (testLogDir))
 
         sys.stdout.write("Running %s ... " % test)
+        sys.stdout.flush()
 
         if self.abat:
             self.abat.addTestcase(test, testLogDir)
