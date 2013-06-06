@@ -2,7 +2,7 @@ Source: ivs
 Section: net
 Priority: extra
 Maintainer: Rich Lane <rlane@bigswitch.com>
-Build-Depends: debhelper (>= 8.0.0), libnl-3-dev | libnl3-dev, libnl-genl-3-dev | libnl3-dev, pkg-config, python-tz
+Build-Depends: debhelper (>= 8.0.0), libnl-3-dev | libnl3-dev, libnl-genl-3-dev | libnl3-dev, libnl-route-3-dev | libnl3-dev, pkg-config, python-tz
 Standards-Version: 3.9.3
 Homepage: http://www.openflowhub.org/display/Indigo/Indigo+-+Open+Source+OpenFlow+Switches
 Vcs-Git: git://github.com/bigswitch/ivs

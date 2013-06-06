@@ -115,6 +115,8 @@ struct ind_ovs_upcall_thread;
  */
 struct ind_ovs_port {
     char ifname[128]; /* Linux network interface name */
+    uint32_t dp_port_no; /* Kernel datapath port number */
+    int ifflags; /* Linux interface flags */
     of_mac_addr_t mac_addr;
     uint32_t config; /* OpenFlow config */
     uint32_t num_kflows; /* Number of kflows with this in_port */
@@ -283,9 +285,11 @@ void ind_ovs_kflow_expire(void);
 void ind_ovs_kflow_module_init(void);
 
 /* Management of the port set */
+void ind_ovs_port_init();
 void ind_ovs_port_added(uint32_t port_no, const char *ifname, of_mac_addr_t mac_addr);
 void ind_ovs_port_deleted(uint32_t port_no);
 struct ind_ovs_port *ind_ovs_port_lookup(of_port_no_t port_no);
+struct ind_ovs_port *ind_ovs_port_lookup_by_name(const char *ifname);
 
 /* Interface of the upcall submodule */
 void ind_ovs_upcall_init();
