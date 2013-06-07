@@ -218,21 +218,27 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
             break;
         }
         case OF_ACTION_SET_DL_DST: {
-            NYI(!ATTR_BITMAP_TEST(current_key.populated, OVS_KEY_ATTR_ETHERNET));
+            if (!ATTR_BITMAP_TEST(current_key.populated, OVS_KEY_ATTR_ETHERNET)) {
+                break;
+            }
             ATTR_BITMAP_SET(modified_attrs, OVS_KEY_ATTR_ETHERNET);
             of_action_set_dl_dst_dl_addr_get(&of_action->set_dl_dst,
                 (of_mac_addr_t *)current_key.ethernet.eth_dst);
             break;
         }
         case OF_ACTION_SET_DL_SRC: {
-            NYI(!ATTR_BITMAP_TEST(current_key.populated, OVS_KEY_ATTR_ETHERNET));
+            if (!ATTR_BITMAP_TEST(current_key.populated, OVS_KEY_ATTR_ETHERNET)) {
+                break;
+            }
             ATTR_BITMAP_SET(modified_attrs, OVS_KEY_ATTR_ETHERNET);
             of_action_set_dl_src_dl_addr_get(&of_action->set_dl_src,
                 (of_mac_addr_t *)current_key.ethernet.eth_src);
             break;
         }
         case OF_ACTION_SET_NW_DST: {
-            NYI(!ATTR_BITMAP_TEST(current_key.populated, OVS_KEY_ATTR_IPV4));
+            if (!ATTR_BITMAP_TEST(current_key.populated, OVS_KEY_ATTR_IPV4)) {
+                break;
+            }
             ATTR_BITMAP_SET(modified_attrs, OVS_KEY_ATTR_IPV4);
             uint32_t tmp;
             of_action_set_nw_dst_nw_addr_get(&of_action->set_nw_dst, &tmp);
@@ -240,7 +246,9 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
             break;
         }
         case OF_ACTION_SET_NW_SRC: {
-            NYI(!ATTR_BITMAP_TEST(current_key.populated, OVS_KEY_ATTR_IPV4));
+            if (!ATTR_BITMAP_TEST(current_key.populated, OVS_KEY_ATTR_IPV4)) {
+                break;
+            }
             ATTR_BITMAP_SET(modified_attrs, OVS_KEY_ATTR_IPV4);
             uint32_t tmp;
             of_action_set_nw_src_nw_addr_get(&of_action->set_nw_src, &tmp);
@@ -248,7 +256,9 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
             break;
         }
         case OF_ACTION_SET_NW_TOS: {
-            NYI(!ATTR_BITMAP_TEST(current_key.populated, OVS_KEY_ATTR_IPV4));
+            if (!ATTR_BITMAP_TEST(current_key.populated, OVS_KEY_ATTR_IPV4)) {
+                break;
+            }
             ATTR_BITMAP_SET(modified_attrs, OVS_KEY_ATTR_IPV4);
             of_action_set_nw_tos_nw_tos_get(&of_action->set_nw_tos,
                 &current_key.ipv4.ipv4_tos);
@@ -265,8 +275,6 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
                 uint16_t tmp;
                 of_action_set_tp_dst_tp_port_get(&of_action->set_tp_dst, &tmp);
                 current_key.udp.udp_dst = htons(tmp);
-            } else {
-                abort();
             }
             break;
         }
@@ -281,8 +289,6 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
                 uint16_t tmp;
                 of_action_set_tp_src_tp_port_get(&of_action->set_tp_src, &tmp);
                 current_key.udp.udp_src = htons(tmp);
-            } else {
-                abort();
             }
             break;
         }
@@ -322,7 +328,9 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
             break;
         }
         case OF_ACTION_NICIRA_DEC_TTL: {
-            NYI(!ATTR_BITMAP_TEST(current_key.populated, OVS_KEY_ATTR_IPV4));
+            if (!ATTR_BITMAP_TEST(current_key.populated, OVS_KEY_ATTR_IPV4)) {
+                break;
+            }
             ATTR_BITMAP_SET(modified_attrs, OVS_KEY_ATTR_IPV4);
             if (--current_key.ipv4.ipv4_ttl == 0) {
                 goto finish;

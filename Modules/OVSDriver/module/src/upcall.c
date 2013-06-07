@@ -488,7 +488,10 @@ ind_ovs_upcall_init()
     int i, j;
     for (i = 0; i < ind_ovs_num_upcall_threads; i++) {
         struct ind_ovs_upcall_thread *thread = calloc(1, sizeof(*thread));
-        NYI(thread == NULL);
+        if (thread == NULL) {
+            LOG_ERROR("Failed to create upcall thread");
+            abort();
+        }
 
         thread->epfd = epoll_create(1);
         if (thread->epfd < 0) {
@@ -498,7 +501,10 @@ ind_ovs_upcall_init()
 
         for (j = 0; j < NUM_UPCALL_BUFFERS; j++) {
             thread->msgs[j] = nlmsg_alloc();
-            NYI(!thread->msgs[j]);
+            if (thread->msgs[j] == NULL) {
+                LOG_ERROR("Failed to allocate upcall message buffers");
+                abort();
+            }
             thread->iovecs[j].iov_base = nlmsg_hdr(thread->msgs[j]);
             thread->iovecs[j].iov_len = IND_OVS_DEFAULT_MSG_SIZE;
             thread->msgvec[j].msg_hdr.msg_iov = &thread->iovecs[j];

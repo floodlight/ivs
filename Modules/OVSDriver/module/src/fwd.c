@@ -548,8 +548,15 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
         return INDIGO_ERROR_UNKNOWN;
     }
 
-    /* Parse the reply to get the flow key */
     struct nlmsghdr *nlh = nlmsg_hdr(reply_msg);
+    if (nlh->nlmsg_type == NLMSG_ERROR) {
+        assert(nlh->nlmsg_seq == nlmsg_hdr(msg)->nlmsg_seq);
+        LOG_ERROR("Kernel failed to parse packet-out data");
+        ind_ovs_nlmsg_freelist_free(msg);
+        return INDIGO_ERROR_UNKNOWN;
+    }
+
+    /* Parse the reply to get the flow key */
     assert(nlh->nlmsg_type == ovs_packet_family);
 #ifndef NDEBUG
     struct genlmsghdr *gnlh = (void *)(nlh + 1);
