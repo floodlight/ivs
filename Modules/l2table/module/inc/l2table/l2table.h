@@ -17,7 +17,62 @@
  *
  ****************************************************************/
 
+/*
+ * l2table - Efficiently map MAC/VLAN to metadata and out port.
+ */
+
 #ifndef L2TABLE_H
 #define L2TABLE_H
+
+#include <AIM/aim.h>
+
+#define L2TABLE_MAC_LEN 6
+
+struct l2table;
+
+/**
+ * Create a l2table
+ *
+ * @param salt  Random number used to seed hash function.
+ */
+struct l2table *l2table_create(uint32_t salt);
+
+/**
+ * Destroy a l2table
+ */
+void l2table_destroy(struct l2table *t);
+
+/**
+ * Lookup a MAC/VLAN pair
+ *
+ * Returns the associated output port and metadata.
+ *
+ * Returns AIM_ERROR_NOT_FOUND if the entry does not exist.
+ */
+aim_error_t l2table_lookup(struct l2table *t,
+                           const uint8_t mac[L2TABLE_MAC_LEN],
+                           uint16_t vlan_id,
+                           uint32_t *out_port,
+                           uint32_t *metadata);
+
+/**
+ * Insert an entry
+ *
+ * Returns AIM_ERROR_PARAM if the entry already exists.
+ */
+aim_error_t l2table_insert(struct l2table *t,
+                           const uint8_t mac[L2TABLE_MAC_LEN],
+                           uint16_t vlan_id,
+                           uint32_t out_port,
+                           uint32_t metadata);
+
+/**
+ * Remove an entry
+ *
+ * Returns AIM_ERROR_NOT_FOUND if the entry does not exist.
+ */
+aim_error_t l2table_remove(struct l2table *t,
+                           const uint8_t mac[L2TABLE_MAC_LEN],
+                           uint16_t vlan_id);
 
 #endif
