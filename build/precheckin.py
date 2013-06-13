@@ -57,6 +57,7 @@ def test(name, cmd):
 build('targets/ivs')
 build('targets/ivs-ctl')
 build('targets/flowtable-benchmark')
+build('targets/l2table-benchmark')
 build('targets/upcall-throughput-benchmark')
 build('targets/upcall-latency-benchmark')
 
