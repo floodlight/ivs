@@ -17,7 +17,19 @@
 #
 ################################################################
 
-BASEDIR := $(dir $(lastword $(MAKEFILE_LIST)))
-OVSDriver_BASEDIR := $(BASEDIR)/OVSDriver
-flowtable_BASEDIR := $(BASEDIR)/flowtable
-l2table_BASEDIR := $(BASEDIR)/l2table
+###############################################################################
+#
+#  l2table Unit Testing Module Makefile
+#
+#
+#
+###############################################################################
+MODULE := l2table_utest
+NOMODULEMAKE := 1
+TEST_MODULE :=  l2table
+DEPENDMODULES := AIM murmur
+GLOBAL_CFLAGS += -DAIM_CONFIG_INCLUDE_POSIX=1
+GLOBAL_CFLAGS += -DAIM_CONFIG_INCLUDE_MAIN=1
+OS_MAKE_CONFIG_AUTOSELECT := 1
+PEDANTIC := 1
+include ../make/utestmodule.mk
