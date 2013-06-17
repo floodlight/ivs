@@ -126,7 +126,18 @@ ind_ovs_handle_bsn_set_pktin_suppression_request(of_experimenter_t *experimenter
         LOG_ERROR("Ignoring pktin_suppression request with zero timeouts");
     }
 
-    return INDIGO_ERROR_NONE;
+    of_bsn_set_pktin_suppression_reply_t *reply = of_bsn_set_pktin_suppression_reply_new(obj->version);
+    if (reply == NULL) {
+        return INDIGO_ERROR_RESOURCE;
+    }
+
+    uint32_t xid;
+    of_bsn_set_pktin_suppression_request_xid_get(obj, &xid);
+    of_bsn_set_pktin_suppression_reply_xid_set(reply, xid);
+
+    of_bsn_set_pktin_suppression_reply_status_set(reply, 0);
+
+    return indigo_cxn_send_controller_message(cxn_id, reply);
 }
 
 indigo_error_t
