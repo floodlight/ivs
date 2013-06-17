@@ -53,3 +53,4 @@ export-products
 # cscope
 cscope.files
 cscope.out
+tags
