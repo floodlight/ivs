@@ -114,7 +114,7 @@ l2table_hash__(struct l2table *t,
  * so that the probing is centralized, and the wrapper functions
  * below inline this function to specialize it.
  */
-static struct l2table_entry * __attribute__((always_inline))
+static inline struct l2table_entry *
 l2table_find_internal__(struct l2table *t,
                         const uint8_t mac[L2TABLE_MAC_LEN],
                         uint16_t vlan_id,
