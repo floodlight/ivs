@@ -26,9 +26,10 @@ else
     : Arch: ${ARCH:=i386}
 fi
 
+: Build ID: ${BUILD_ID:=devel}
+
 BASEPATH="/var/cache/pbuilder/base-${SUITE}-${ARCH}.cow"
-BUILD=$(date +'%F.%R%z')-$(git rev-parse -q --short HEAD)
-OUTDIR=$(readlink -m "pkg/$SUITE-$ARCH/$BUILD")
+OUTDIR=$(readlink -m "pkg/$SUITE-$ARCH/$BUILD_ID")
 
 if [ ! -d ${BASEPATH} ]; then
     sudo cowbuilder --create \
@@ -59,6 +60,6 @@ pdebuild --pbuilder cowbuilder \
 cd -
 rm -rf "$COPY"
 git log > "$OUTDIR/gitlog.txt"
-touch "$OUTDIR/build-$BUILD"
+touch "$OUTDIR/build-$BUILD_ID"
 
 ln -snf $(basename $OUTDIR) $OUTDIR/../latest
