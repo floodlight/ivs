@@ -210,11 +210,33 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
     list_push(&flow->kflows, &kflow->flow_links);
 }
 
+/* Check whether pkt_key is contained within flow_key/flow_mask */
+static bool
+cfr_match__(const struct ind_ovs_cfr *flow_key,
+            const struct ind_ovs_cfr *flow_mask,
+            const struct ind_ovs_cfr *pkt_key)
+{
+    uint64_t *f = (uint64_t *)flow_key;
+    uint64_t *m = (uint64_t *)flow_mask;
+    uint64_t *p = (uint64_t *)pkt_key;
+    int i;
+
+    for (i = 0; i < sizeof(*flow_key)/sizeof(*f); i++) {
+        if ((p[i] & m[i]) != f[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 /*
  * Invalidate all kflows that overlap the given match.
  */
 void
-ind_ovs_kflow_invalidate_overlap(of_match_t *match, uint16_t priority)
+ind_ovs_kflow_invalidate_overlap(const struct ind_ovs_cfr *flow_fields,
+                                 const struct ind_ovs_cfr *flow_masks,
+                                 uint16_t priority)
 {
     struct list_links *cur, *next;
     LIST_FOREACH_SAFE(&ind_ovs_kflows, cur, next) {
@@ -222,11 +244,13 @@ ind_ovs_kflow_invalidate_overlap(of_match_t *match, uint16_t priority)
         if (kflow->priority >= priority) {
             continue;
         }
+
         struct ind_ovs_parsed_key pkey;
         ind_ovs_parse_key(kflow->key, &pkey);
-        of_match_t kflow_match;
-        ind_ovs_key_to_match(&pkey, &kflow_match);
-        if (of_match_more_specific(&kflow_match, match)) {
+        struct ind_ovs_cfr kflow_fields;
+        ind_ovs_key_to_cfr(&pkey, &kflow_fields);
+
+        if (cfr_match__(flow_fields, flow_masks, &kflow_fields)) {
             LOG_VERBOSE("invalidating kflow (overlap)");
             ind_ovs_kflow_invalidate(kflow);
         }
