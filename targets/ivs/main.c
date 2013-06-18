@@ -52,6 +52,10 @@ AIM_LOG_STRUCT_DEFINE(
                       0
                       );
 
+#ifndef BUILD_ID
+#define BUILD_ID devel
+#endif
+
 static const char *program_version = "ivs 0.3";
 
 static ind_soc_config_t soc_cfg;
@@ -193,11 +197,7 @@ parse_options(int argc, char **argv)
             break;
 
         case OPT_VERSION:
-            printf("%s", program_version);
-#ifdef BUILD_ID
-            printf(" (%s)", AIM_STRINGIFY(BUILD_ID));
-#endif
-            printf("\n");
+            printf("%s (%s)\n", program_version, AIM_STRINGIFY(BUILD_ID));
             exit(0);
             break;
 
@@ -303,7 +303,7 @@ aim_main(int argc, char* argv[])
         aim_log_pvs_set_all(aim_pvs_syslog_open("ivs", LOG_NDELAY, LOG_DAEMON));
     }
 
-    AIM_LOG_MSG("Starting %s (%s)", program_version, AIM_STRINGIFY(GIT_REVISION));
+    AIM_LOG_MSG("Starting %s (%s)", program_version, AIM_STRINGIFY(BUILD_ID));
 
     /* Initialize all modules */
 
