@@ -23,6 +23,8 @@ cd "$ROOTDIR"
 ./build/setup.sh
 ./build/precheckin.py
 
+export BUILD_ID=$(date +'%F.%R%z')-$(git rev-parse -q --short HEAD)
+
 ARCHS="i386 amd64"
 SUITES="oneiric precise"
 for ARCH in $ARCHS; do

@@ -41,7 +41,6 @@
 #include <arpa/inet.h>
 #include <signal.h>
 #include <sys/eventfd.h>
-#include "git_revision.h"
 
 #define AIM_LOG_MODULE_NAME ivs
 #include <AIM/aim_log.h>
@@ -194,7 +193,11 @@ parse_options(int argc, char **argv)
             break;
 
         case OPT_VERSION:
-            printf("%s (%s)\n", program_version, AIM_STRINGIFY(GIT_REVISION));
+            printf("%s", program_version);
+#ifdef BUILD_ID
+            printf(" (%s)", AIM_STRINGIFY(BUILD_ID));
+#endif
+            printf("\n");
             exit(0);
             break;
 

@@ -166,8 +166,10 @@ LIBNL_LIBS += $(shell pkg-config --libs --silence-errors libnl-route-3.0)
 GLOBAL_CFLAGS += $(LIBNL_CFLAGS)
 GLOBAL_LINK_LIBS += $(LIBNL_LIBS)
 
+ifdef BUILD_ID
+GLOBAL_CFLAGS += "-DBUILD_ID=$(BUILD_ID)"
+endif
+
 
 ucli:
 	$(INDIGO)/Tools/uclihandlers.py ucli.c
-
-$(shell (echo -n '#define GIT_REVISION '; git rev-parse -q --short HEAD) > git_revision.h)
