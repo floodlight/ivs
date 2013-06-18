@@ -75,28 +75,6 @@ ind_ovs_destroy_datapath(void)
     return ind_ovs_transact(msg);
 }
 
-static int
-ind_ovs_create_tunnel_port(void)
-{
-    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_NEW);
-    nla_put_u32(msg, OVS_VPORT_ATTR_TYPE, OVS_VPORT_TYPE_FT_GRE);
-    nla_put_string(msg, OVS_VPORT_ATTR_NAME, "tun-gre");
-    nla_put_u32(msg, OVS_VPORT_ATTR_PORT_NO, IND_OVS_TUN_GRE_PORT_NO);
-    nla_put_u32(msg, OVS_VPORT_ATTR_UPCALL_PID, 0);
-    return ind_ovs_transact(msg);
-}
-
-static int
-ind_ovs_create_tunnel_loopback_port(void)
-{
-    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_NEW);
-    nla_put_u32(msg, OVS_VPORT_ATTR_TYPE, OVS_VPORT_TYPE_INTERNAL);
-    nla_put_string(msg, OVS_VPORT_ATTR_NAME, "tun-loopback");
-    nla_put_u32(msg, OVS_VPORT_ATTR_PORT_NO, IND_OVS_TUN_LOOPBACK_PORT_NO);
-    nla_put_u32(msg, OVS_VPORT_ATTR_UPCALL_PID, 0);
-    return ind_ovs_transact(msg);
-}
-
 /*
  * Generate a DPID.
  *
@@ -204,14 +182,6 @@ ind_ovs_init(const char *datapath_name)
         return ret;
     }
 
-    if ((ret = ind_ovs_create_tunnel_port()) != 0) {
-        LOG_WARN("failed to create tunnel port");
-    }
-
-    if ((ret = ind_ovs_create_tunnel_loopback_port()) != 0) {
-        LOG_WARN("failed to create tunnel loopback port");
-    }
-
     if ((ret = ind_soc_timer_event_register(
         (ind_soc_timer_callback_f)ind_ovs_kflow_expire, NULL, 2345)) != 0) {
         LOG_ERROR("failed to create timer");
@@ -234,4 +204,44 @@ ind_ovs_finish(void)
     ind_ovs_fwd_finish();
     (void) ind_ovs_destroy_datapath();
     ind_ovs_nlmsg_freelist_finish();
+}
+
+static indigo_error_t
+ind_ovs_create_tunnel_port(void)
+{
+    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_NEW);
+    nla_put_u32(msg, OVS_VPORT_ATTR_TYPE, OVS_VPORT_TYPE_FT_GRE);
+    nla_put_string(msg, OVS_VPORT_ATTR_NAME, "tun-gre");
+    nla_put_u32(msg, OVS_VPORT_ATTR_PORT_NO, IND_OVS_TUN_GRE_PORT_NO);
+    nla_put_u32(msg, OVS_VPORT_ATTR_UPCALL_PID, 0);
+    return ind_ovs_transact(msg);
+}
+
+static indigo_error_t
+ind_ovs_create_tunnel_loopback_port(void)
+{
+    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_NEW);
+    nla_put_u32(msg, OVS_VPORT_ATTR_TYPE, OVS_VPORT_TYPE_INTERNAL);
+    nla_put_string(msg, OVS_VPORT_ATTR_NAME, "tun-loopback");
+    nla_put_u32(msg, OVS_VPORT_ATTR_PORT_NO, IND_OVS_TUN_LOOPBACK_PORT_NO);
+    nla_put_u32(msg, OVS_VPORT_ATTR_UPCALL_PID, 0);
+    return ind_ovs_transact(msg);
+}
+
+indigo_error_t
+ind_ovs_tunnel_init(void)
+{
+    indigo_error_t err;
+
+    if ((err = ind_ovs_create_tunnel_port()) != 0) {
+        LOG_ERROR("Failed to create tun-gre port");
+        return err;
+    }
+
+    if ((err = ind_ovs_create_tunnel_loopback_port()) != 0) {
+        LOG_ERROR("Failed to create tun-loopback loopback port");
+        return err;
+    }
+
+    return INDIGO_ERROR_NONE;
 }
