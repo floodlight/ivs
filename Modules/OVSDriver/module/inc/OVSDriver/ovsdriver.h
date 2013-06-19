@@ -23,4 +23,6 @@
 indigo_error_t ind_ovs_init(const char *datapath_name);
 void ind_ovs_finish(void);
 
+indigo_error_t ind_ovs_tunnel_init(void);
+
 #endif
