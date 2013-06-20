@@ -10,7 +10,7 @@ platform][1], which provides a common core for many physical and virtual switche
 
 [1]: http://www.projectfloodlight.org/indigo/
 
-Installation
+Building IVS
 ------------
 
 1. Install required dependencies:
@@ -23,10 +23,25 @@ Installation
 
 4. Compile IVS: `make`
 
-5. Install IVS: `sudo make install`
+5. The IVS daemon and ivs-ctl utility will be written to
+   `targets/ivs/build/gcc-local/bin/ivs` and
+   `targets/ivs-ctl/build/gcc-local/bin/ivs-ctl` respectively. They can be run
+   directly from the build directory.
 
-Packaging, including init scripts, is also available for Debian-based
-distributions in the `debian` directory.
+Building Debian Packages
+------------------------
+
+Packaging, including init scripts, is available for Debian-based
+distributions in the `debian` directory. If using git we recommend
+git-buildpackage.
+
+When building packages for multiple architectures and distributions we use the
+`build/build-debian-packages.sh` script. This script uses the cowbuilder
+package to create a chroot for the target distribution and build the package
+inside it. The `SUITE` and `ARCH` environment variables are used to determine
+the target distribution. For example:
+
+    SUITE=oneiric ARCH=i386 ./build/build-debian-packages.sh
 
 Usage
 -----
