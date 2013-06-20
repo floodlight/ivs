@@ -27,8 +27,8 @@
 #include <linux/if_packet.h>
 #include "indigo/types.h"
 #include "murmur/murmur.h"
-#include "PortManager/portmanager.h"
 #include "SocketManager/socketmanager.h"
+#include "indigo/of_state_manager.h"
 
 static int ind_ovs_create_datapath(const char *name);
 static int ind_ovs_destroy_datapath(void);
