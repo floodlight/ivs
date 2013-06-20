@@ -71,3 +71,7 @@ Contributing
 ------------
 
 Please fork the repository on GitHub and open a pull request.
+
+You might be interested in the INTERNALS.md document in this repository which
+describes the layout of the source code and includes other details relevant to
+developers.
