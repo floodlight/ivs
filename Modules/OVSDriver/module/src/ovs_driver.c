@@ -18,6 +18,7 @@
  ****************************************************************/
 
 #include "ovs_driver_int.h"
+#include "OVSDriver/ovsdriver_config.h"
 #include <stdlib.h>
 #include <assert.h>
 #include <net/if.h>
@@ -32,6 +33,13 @@
 
 static int ind_ovs_create_datapath(const char *name);
 static int ind_ovs_destroy_datapath(void);
+
+/* Log module "ovsdriver" */
+AIM_LOG_STRUCT_DEFINE(
+    OVSDRIVER_CONFIG_LOG_OPTIONS_DEFAULT,
+    OVSDRIVER_CONFIG_LOG_BITS_DEFAULT,
+    NULL, /* Custom log map */
+    OVSDRIVER_CONFIG_LOG_CUSTOM_BITS_DEFAULT);
 
 int ind_ovs_dp_ifindex = 0;
 struct nl_sock *ind_ovs_socket;
@@ -244,4 +252,11 @@ ind_ovs_tunnel_init(void)
     }
 
     return INDIGO_ERROR_NONE;
+}
+
+/* Called by AIM's main() before the real main(). */
+void
+__ovsdriver_module_init__(void)
+{
+    AIM_LOG_STRUCT_REGISTER();
 }
