@@ -14,8 +14,8 @@ Building IVS
 ------------
 
 1. Install required dependencies:
-  - Ubuntu 11.10: `sudo apt-get install libnl3-dev pkg-config python-tz`
-  - Ubuntu 12.04: `sudo apt-get install libnl-3-dev libnl-genl-3-dev libnl-route-3-dev pkg-config python-tz`
+  - Ubuntu 11.10: `sudo apt-get install libnl3-dev pkg-config python-tz libpcap-dev`
+  - Ubuntu 12.04: `sudo apt-get install libnl-3-dev libnl-genl-3-dev libnl-route-3-dev pkg-config python-tz libpcap-dev`
 
 2. Clone the IVS repository: `git clone --recurse-submodules https://github.com/floodlight/ivs.git`
 
