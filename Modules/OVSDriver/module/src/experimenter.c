@@ -18,6 +18,7 @@
  ****************************************************************/
 
 #include "ovs_driver_int.h"
+#include <indigo/of_state_manager.h>
 #include <ifaddrs.h>
 #include <netinet/in.h>
 #include <linux/if_packet.h>

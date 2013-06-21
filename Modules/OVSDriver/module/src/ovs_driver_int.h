@@ -21,7 +21,6 @@
 #define OVS_DRIVER_INT_H
 
 
-#include "ovs_driver.h"
 #include "ovsdriver_log.h"
 #include <AIM/aim_list.h>
 #include <netlink/genl/genl.h>
@@ -32,8 +31,6 @@
 #include "indigo/types.h"
 #include "openvswitch.h"
 #include "tunnel.h"
-#include "PortManager/portmanager.h"
-#include "Forwarding/forwarding.h"
 #include "AIM/aim_rl.h"
 #include "AIM/aim_utils.h"
 #include "flowtable/flowtable.h"
