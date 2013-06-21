@@ -45,6 +45,11 @@ if [ -d ".git" ]; then
     done
 fi
 
+if ! which pcap-config &> /dev/null; then
+    echo "Installing libpcap-dev"
+    $APT_GET install libpcap-dev
+fi
+
 if ! python -c 'import pcap' &> /dev/null; then
     echo "Installing python-pypcap"
     $APT_GET install python-pypcap
