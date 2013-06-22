@@ -33,7 +33,7 @@ struct flowtable_generic {
 };
 
 /*
- * An entry in a flowtable generic.
+ * An entry in a generic flowtable.
  *
  * flowtable_generic_entry will be removed if the flow_cnt reaches zero.
  */
@@ -112,13 +112,13 @@ flowtable_generic_insert(struct flowtable_generic *ftg, struct flowtable_entry *
     /* If not present, then create a new flowtable and insert flowmask hash table */
     struct flowtable *ft = flowtable_create(&fte->mask);
     if(ft == NULL) {
-        AIM_LOG_ERROR("no memory for flowtable !!");
+        AIM_LOG_ERROR("Failed to allocate flowtable");
         return;
     }
 
     struct flowtable_generic_entry *ftge_new = calloc(1, sizeof(*ftge_new));
     if(ftge_new == NULL) {
-        AIM_LOG_ERROR("no memory for flowtable generic entry !!");
+        AIM_LOG_ERROR("Failed to allocate generic flowtable entry");
         free(ft);
         return;
     }
@@ -153,10 +153,10 @@ flowtable_generic_remove(struct flowtable_generic *ftg, struct flowtable_entry *
         cur_ftge->flow_cnt--;
         list_remove(&fte->links);
 
-        /* If no flow are present then destroy the flow table and
+        /* If no flows are present then destroy the flow table and
            free the flowtable_genric entry */
         if(!cur_ftge->flow_cnt) {
-            free(cur_ftge->ft);
+            flowtable_destroy(cur_ftge->ft);
             list_remove(&cur_ftge->links);
             free(cur_ftge);
         }

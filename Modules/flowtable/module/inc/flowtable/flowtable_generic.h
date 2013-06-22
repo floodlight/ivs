@@ -18,18 +18,19 @@
  ****************************************************************/
 
 /*
- * Hash-based flowtable generic.
+ * Hash-based generic flowtable
  *
- * Key for the flowtable generic hash table is the mask of the flow entry.
- * Insertion of the new flow entry need fist level look up in the flowtable
- * generic and second lookup in the flowtable hash.
+ * Key for generic flowtable hash is mask of the flow entry.
+ * Insertion of a new flow entry need first level look up in the
+ * generic flowtable and second lookup in the flowtable hash.
  *
- * In caseof match on flow key, highest priority flow table entry from all
- * the flowtables will be returned.
+ * In case of matching on a flow key, highest priority flowtable
+ * entry from all the flowtables will be returned.
  */
 
 #ifndef FLOWTABLE_GENERIC_H
 #define FLOWTABLE_GENERIC_H
+
 #include "flowtable/flowtable.h"
 #include <AIM/aim_list.h>
 #include <stdbool.h>
@@ -37,7 +38,7 @@
 struct flowtable_generic;
 
 /*
- * Create a flowtable generic.
+ * Create a generic flowtable.
  */
 struct flowtable_generic *flowtable_generic_create();
 
