@@ -20,16 +20,12 @@
 /*
  * Hash-based flowtable generic.
  *
- * The struct flowtable_key is used for both fields and masks. This
- * is abstract to ease code organization, but typically it is a
- * reinterpreted struct ind_ovs_cfr.
+ * Key for the flowtable generic hash table is the mask of the flow entry.
+ * Insertion of the new flow entry need fist level look up in the flowtable
+ * generic and second lookup in the flowtable hash.
  *
- * The 'hash mask', which defines which portions of the key are used for
- * hashing, is set when the flowtable is created.
- *
- * Flows that are not at least as specific as the hash mask go into the
- * wildcard bucket, which must be searched as well as the relevant hash
- * bucket.
+ * In caseof match on flow key, highest priority flow table entry from all
+ * the flowtables will be returned.
  */
 
 #ifndef FLOWTABLE_GENERIC_H
@@ -42,9 +38,6 @@ struct flowtable_generic;
 
 /*
  * Create a flowtable generic.
- *
- * @param hash_mask The portion of the key to use for hashing. Flow masks that
- *                  are less specific than this use linear-search.
  */
 struct flowtable_generic *flowtable_generic_create();
 
@@ -71,6 +64,6 @@ void flowtable_generic_remove(struct flowtable_generic *ftg, struct flowtable_en
  * @param key Fields from the packet.
  */
 struct flowtable_entry *flowtable_generic_match(struct flowtable_generic *ftg,
-                                        const struct flowtable_key *key);
+                                                const struct flowtable_key *key);
 
 #endif

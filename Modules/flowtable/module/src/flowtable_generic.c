@@ -21,6 +21,9 @@
 #include "flowtable/flowtable.h"
 #include "flowtable/flowtable_generic.h"
 #include "murmur/murmur.h"
+#include "flowtable_log.h"
+
+#define FLOWTABLE_GENERIC_BUCKETS 32
 
 /*
  * flowtable_generic hash with flowtable_entry mask as key
@@ -109,11 +112,13 @@ flowtable_generic_insert(struct flowtable_generic *ftg, struct flowtable_entry *
     /* If not present, then create a new flowtable and insert flowmask hash table */
     struct flowtable *ft = flowtable_create(&fte->mask);
     if(ft == NULL) {
+        AIM_LOG_ERROR("no memory for flowtable !!");
         return;
     }
 
     struct flowtable_generic_entry *ftge_new = calloc(1, sizeof(*ftge_new));
     if(ftge_new == NULL) {
+        AIM_LOG_ERROR("no memory for flowtable generic entry !!");
         free(ft);
         return;
     }
@@ -156,9 +161,6 @@ flowtable_generic_remove(struct flowtable_generic *ftg, struct flowtable_entry *
             free(cur_ftge);
         }
     }
-    else {
-        //assert
-    }
 
     return;
 }
@@ -174,6 +176,7 @@ flowtable_generic_match(struct flowtable_generic *ftg,
     struct flowtable_entry *new_found = NULL;
     int i = 0;
 
+    /* Check all the flowtables for the flow table entry with highest priority */
     for(i = 0; i < FLOWTABLE_GENERIC_BUCKETS; i++) {
         LIST_FOREACH(&ftg->generic_buckets[i], cur) {
             cur_ftge = container_of(cur, links, struct flowtable_generic_entry);

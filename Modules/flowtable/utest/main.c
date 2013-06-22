@@ -52,6 +52,22 @@ make_flow(uint64_t key_pattern, uint64_t mask_pattern, uint16_t priority)
     return fte;
 }
 
+/* make_generic_key and make_generic_flow are used to generate
+   unique flow mask, key combinations to test flowtable generic hash table */
+static struct flowtable_key
+make_generic_key(uint64_t pattern)
+{
+    return make_key(pattern << 32);
+}
+
+static struct flowtable_entry
+make_generic_flow(uint64_t key_pattern, uint64_t mask_pattern, uint16_t priority)
+{
+    const int max_unique_masks = 1000;
+    return make_flow(key_pattern << 32,
+                     ((uint64_t)~0 << 32)|(mask_pattern % max_unique_masks), priority);
+}
+
 static void
 test_basic(void)
 {
@@ -241,7 +257,6 @@ static void
 test_flowtable_generic_collisions(void)
 {
     const int n = 16384 * 3;
-    const int max_unique_masks = 1000;
     struct flowtable_generic *ftg = flowtable_generic_create();
 
     struct flowtable_entry *ftes = calloc(n, sizeof(*ftes));
@@ -252,22 +267,22 @@ test_flowtable_generic_collisions(void)
 
     /* Add entries */
     for (i = 0; i < n; i++) {
-        P = make_key((uint64_t)i << 32);
+        P = make_generic_key(i);
         assert(flowtable_generic_match(ftg, &P) == NULL);
-        ftes[i] = make_flow((uint64_t)i << 32, ((uint64_t)~0 << 32)|(i%max_unique_masks), 1000);
+        ftes[i] = make_generic_flow(i, i, 1000);
         flowtable_generic_insert(ftg, &ftes[i]);
         assert(flowtable_generic_match(ftg, &P) == &ftes[i]);
     }
 
     /* Match on overfull table */
     for (i = 0; i < n; i++) {
-        P = make_key((uint64_t)i << 32);
+        P = make_generic_key(i);
         assert(flowtable_generic_match(ftg, &P) == &ftes[i]);
     }
 
     /* Remove entries */
     for (i = 0; i < n; i++) {
-        P = make_key((uint64_t)i << 32);
+        P = make_generic_key(i);
         assert(flowtable_generic_match(ftg, &P) == &ftes[i]);
         flowtable_generic_remove(ftg, &ftes[i]);
         assert(flowtable_generic_match(ftg, &P) == NULL);
