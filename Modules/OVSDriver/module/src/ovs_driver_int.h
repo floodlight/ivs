@@ -128,6 +128,31 @@ struct ind_ovs_port {
 };
 
 /*
+ * X-macro representation of the OVS key (nlattr type, key field, type).
+ */
+#define OVS_KEY_FIELDS \
+    field(OVS_KEY_ATTR_PRIORITY,  priority,  uint32_t) \
+    field(OVS_KEY_ATTR_IN_PORT,   in_port,   uint32_t) \
+    field(OVS_KEY_ATTR_ETHERNET,  ethernet,  struct ovs_key_ethernet) \
+    field(OVS_KEY_ATTR_VLAN,      vlan,      uint16_t) \
+    field(OVS_KEY_ATTR_ETHERTYPE, ethertype, uint16_t) \
+    field(OVS_KEY_ATTR_IPV4,      ipv4,      struct ovs_key_ipv4) \
+    field(OVS_KEY_ATTR_IPV6,      ipv6,      struct ovs_key_ipv6) \
+    field(OVS_KEY_ATTR_TCP,       tcp,       struct ovs_key_tcp) \
+    field(OVS_KEY_ATTR_UDP,       udp,       struct ovs_key_udp) \
+    field(OVS_KEY_ATTR_ICMP,      icmp,      struct ovs_key_icmp) \
+    field(OVS_KEY_ATTR_ICMPV6,    icmpv6,    struct ovs_key_icmpv6) \
+    field(OVS_KEY_ATTR_ARP,       arp,       struct ovs_key_arp) \
+    field(OVS_KEY_ATTR_ND,        nd,        struct ovs_key_nd)
+
+#define OVS_TUNNEL_KEY_FIELDS \
+    field(OVS_TUNNEL_KEY_ATTR_ID,       id,       uint64_t) \
+    field(OVS_TUNNEL_KEY_ATTR_IPV4_SRC, ipv4_src, uint32_t) \
+    field(OVS_TUNNEL_KEY_ATTR_IPV4_DST, ipv4_dst, uint32_t) \
+    field(OVS_TUNNEL_KEY_ATTR_TOS,      tos,      uint8_t) \
+    field(OVS_TUNNEL_KEY_ATTR_TTL,      ttl,      uint8_t)
+
+/*
  * Efficient representation of the OVS flow key.
  *
  * This is used only as a temporary object which is easier to work with
