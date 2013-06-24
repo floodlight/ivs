@@ -214,7 +214,7 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
     flowtable_insert(ind_ovs_ft, &flow->fte);
     ind_ovs_fwd_write_unlock();
 
-    ind_ovs_kflow_invalidate_overlap(&of_match, flow->fte.priority);
+    ind_ovs_kflow_invalidate_overlap(&fields, &masks, flow->fte.priority);
 
     ++active_count;
 
