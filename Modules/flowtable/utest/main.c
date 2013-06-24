@@ -22,6 +22,7 @@
 #include <string.h>
 #include <AIM/aim.h>
 #include <flowtable/flowtable.h>
+#include <flowtable/flowtable_generic.h>
 #include <assert.h>
 
 uint32_t ind_ovs_salt = 42;
@@ -49,6 +50,22 @@ make_flow(uint64_t key_pattern, uint64_t mask_pattern, uint16_t priority)
     mask = make_key(mask_pattern);
     flowtable_entry_init(&fte, &key, &mask, priority);
     return fte;
+}
+
+/* make_generic_key and make_generic_flow are used to generate
+   unique flow mask, key combinations to test flowtable generic hash table */
+static struct flowtable_key
+make_generic_key(uint64_t pattern)
+{
+    return make_key(pattern << 32);
+}
+
+static struct flowtable_entry
+make_generic_flow(uint64_t key_pattern, uint64_t mask_pattern, uint16_t priority)
+{
+    const int max_unique_masks = 1000;
+    return make_flow(key_pattern << 32,
+                     ((uint64_t)~0 << 32)|(mask_pattern % max_unique_masks), priority);
 }
 
 static void
@@ -163,6 +180,119 @@ test_collisions(void)
     free(ftes);
 }
 
+static void
+test_flowtable_generic_basic(void)
+{
+    struct flowtable_generic *ftg = flowtable_generic_create();
+
+    struct flowtable_entry A, B, C, *match;
+    struct flowtable_key P;
+
+    /* Exact match, normal priority */
+    A = make_flow(0x12345678, ~0, 1000);
+    flowtable_generic_insert(ftg, &A);
+
+    /* Exact match, low priority */
+    B = make_flow(0x12345678, ~0, 0);
+    flowtable_generic_insert(ftg, &B);
+
+    /* Wildcarded, low priority */
+    C = make_flow(0x00005678, 0x0000ffff, 0);
+    flowtable_generic_insert(ftg, &C);
+
+    /* Should match A */
+    P = make_key(0x12345678);
+    match = flowtable_generic_match(ftg, &P);
+    assert(match == &A);
+
+    /* Should match C */
+    P = make_key(0x22345678);
+    match = flowtable_generic_match(ftg, &P);
+    assert(match == &C);
+
+    /* Should not match anything */
+    P = make_key(0x12345679);
+    match = flowtable_generic_match(ftg, &P);
+    assert(match == NULL);
+
+    flowtable_generic_remove(ftg, &A);
+    flowtable_generic_remove(ftg, &B);
+    flowtable_generic_remove(ftg, &C);
+
+    flowtable_generic_destroy(ftg);
+}
+
+/*
+ * Higher priority entries in the wildcard bucket take precedence over
+ * matches from a hash bucket.
+ */
+static void
+test_flowtable_generic_wildcard_priority(void)
+{
+    struct flowtable_generic *ftg = flowtable_generic_create();
+
+    struct flowtable_entry A, B, *match;
+    struct flowtable_key P;
+
+    /* Exact match, normal priority */
+    A = make_flow(0x12345678, ~0, 1000);
+    flowtable_generic_insert(ftg, &A);
+
+    /* Wildcarded, high priority */
+    B = make_flow(0x00005678, 0x0000ffff, 2000);
+    flowtable_generic_insert(ftg, &B);
+
+    /* Should match B */
+    P = make_key(0x22345678);
+    match = flowtable_generic_match(ftg, &P);
+    assert(match == &B);
+
+    flowtable_generic_destroy(ftg);
+}
+
+/*
+ * Overfill the table and ensure everything can still be matched.
+ */
+static void
+test_flowtable_generic_collisions(void)
+{
+    const int n = 16384 * 3;
+    struct flowtable_generic *ftg = flowtable_generic_create();
+
+    struct flowtable_entry *ftes = calloc(n, sizeof(*ftes));
+    assert(ftes);
+
+    int i;
+    struct flowtable_key P;
+
+    /* Add entries */
+    for (i = 0; i < n; i++) {
+        P = make_generic_key(i);
+        assert(flowtable_generic_match(ftg, &P) == NULL);
+        ftes[i] = make_generic_flow(i, i, 1000);
+        flowtable_generic_insert(ftg, &ftes[i]);
+        assert(flowtable_generic_match(ftg, &P) == &ftes[i]);
+    }
+
+    /* Match on overfull table */
+    for (i = 0; i < n; i++) {
+        P = make_generic_key(i);
+        assert(flowtable_generic_match(ftg, &P) == &ftes[i]);
+    }
+
+    /* Remove entries */
+    for (i = 0; i < n; i++) {
+        P = make_generic_key(i);
+        assert(flowtable_generic_match(ftg, &P) == &ftes[i]);
+        flowtable_generic_remove(ftg, &ftes[i]);
+        assert(flowtable_generic_match(ftg, &P) == NULL);
+    }
+
+    flowtable_generic_destroy(ftg);
+
+    free(ftes);
+}
+
 int aim_main(int argc, char* argv[])
 {
     (void) argc;
@@ -171,6 +301,10 @@ int aim_main(int argc, char* argv[])
     test_basic();
     test_wildcard_priority();
     test_collisions();
+
+    test_flowtable_generic_basic();
+    test_flowtable_generic_wildcard_priority();
+    test_flowtable_generic_collisions();
 
     return 0;
 }
