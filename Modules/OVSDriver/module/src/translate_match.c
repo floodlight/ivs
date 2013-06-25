@@ -27,6 +27,7 @@
 #include <byteswap.h>
 #include <linux/if_ether.h>
 
+/* Recursive (for encap) helper for ind_ovs_parse_key */
 static void
 ind_ovs_parse_key__(struct nlattr *key, struct ind_ovs_parsed_key *pkey)
 {
@@ -79,6 +80,7 @@ ind_ovs_parse_key(struct nlattr *key, struct ind_ovs_parsed_key *pkey)
     assert(ATTR_BITMAP_TEST(pkey->populated, OVS_KEY_ATTR_ETHERNET));
 }
 
+/* Should only be used when creating the match for a packet-in */
 void
 ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey,
                      of_match_t *match)
