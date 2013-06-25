@@ -28,6 +28,7 @@
 
 static indigo_error_t sys2indigoerr(int err);
 
+#ifndef IND_OVS_NLMSG_MEMLEAK_DBG
 /*
  * Allocating and freeing nlmsgs consumes a significant amount of CPU.
  * We know we'll never need more than a few nlmsgs at a time, so
@@ -36,6 +37,7 @@ static indigo_error_t sys2indigoerr(int err);
  */
 #define IND_OVS_NLMSG_FREELIST_SIZE 8
 static struct nl_msg *ind_ovs_nlmsg_freelist[IND_OVS_NLMSG_FREELIST_SIZE];
+#endif /* IND_OVS_NLMSG_MEMLEAK_DBG */
 
 uint32_t
 get_entropy(void)
@@ -256,6 +258,7 @@ ind_ovs_recv_nlmsg(struct nl_sock *sk)
 void
 ind_ovs_nlmsg_freelist_init(void)
 {
+#ifndef IND_OVS_NLMSG_MEMLEAK_DBG
     int i;
     for (i = 0; i < IND_OVS_NLMSG_FREELIST_SIZE; i++) {
         struct nl_msg *msg = nlmsg_alloc();
@@ -265,11 +268,13 @@ ind_ovs_nlmsg_freelist_init(void)
         }
         ind_ovs_nlmsg_freelist[i] = msg;
     }
+#endif /* IND_OVS_NLMSG_MEMLEAK_DBG */
 }
 
 void
 ind_ovs_nlmsg_freelist_finish(void)
 {
+#ifndef IND_OVS_NLMSG_MEMLEAK_DBG
     int i;
     for (i = 0; i < IND_OVS_NLMSG_FREELIST_SIZE; i++) {
         struct nl_msg *msg = ind_ovs_nlmsg_freelist[i];
@@ -278,11 +283,18 @@ ind_ovs_nlmsg_freelist_finish(void)
             ind_ovs_nlmsg_freelist[i] = NULL;
         }
     }
+#endif /* IND_OVS_NLMSG_MEMLEAK_DBG */
 }
 
 struct nl_msg *
 ind_ovs_nlmsg_freelist_alloc(void)
 {
+#ifdef IND_OVS_NLMSG_MEMLEAK_DBG
+    struct nl_msg *msg = nlmsg_alloc();
+    if (msg != NULL) {
+        return msg;
+    }
+#else  /* IND_OVS_NLMSG_MEMLEAK_DBG */
     int i;
     for (i = 0; i < IND_OVS_NLMSG_FREELIST_SIZE; i++) {
         struct nl_msg *msg = ind_ovs_nlmsg_freelist[i];
@@ -291,6 +303,7 @@ ind_ovs_nlmsg_freelist_alloc(void)
             return msg;
         }
     }
+#endif /* IND_OVS_NLMSG_MEMLEAK_DBG */
 
     LOG_ERROR("Failed to allocate nlmsg, consider increasing IND_OVS_NLMSG_FREELIST_SIZE");
     abort();
@@ -299,6 +312,7 @@ ind_ovs_nlmsg_freelist_alloc(void)
 void
 ind_ovs_nlmsg_freelist_free(struct nl_msg *msg)
 {
+#ifndef IND_OVS_NLMSG_MEMLEAK_DBG
     int i;
     for (i = 0; i < IND_OVS_NLMSG_FREELIST_SIZE; i++) {
         if (ind_ovs_nlmsg_freelist[i] == NULL) {
@@ -307,6 +321,7 @@ ind_ovs_nlmsg_freelist_free(struct nl_msg *msg)
             return;
         }
     }
+#endif /* IND_OVS_NLMSG_MEMLEAK_DBG */
 
     nlmsg_free(msg);
 }

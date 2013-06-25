@@ -342,6 +342,8 @@ ind_ovs_handle_packet_table(struct ind_ovs_upcall_thread *thread,
     if (nla_len(actions) > 0) {
         nl_send_auto(port->notify_socket, reply);
     }
+
+    ind_ovs_nlmsg_freelist_free(reply);
 }
 
 static void
