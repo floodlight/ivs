@@ -10,6 +10,11 @@ platform][1], which provides a common core for many physical and virtual switche
 
 [1]: http://www.projectfloodlight.org/indigo/
 
+This README contains documentation to help you get started using IVS. For full
+documentation, see the [IVS][2] pages at Project Floodlight.
+
+[2]: https://docs.projectfloodlight.org/display/indigodocs/Indigo+Virtual+Switch+Documentation
+
 Building IVS
 ------------
 
