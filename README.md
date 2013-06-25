@@ -51,11 +51,11 @@ the target distribution. For example:
 Usage
 -----
 
-You'll need an OpenFlow controller to use IVS. We suggest [Floodlight][2],
+You'll need an OpenFlow controller to use IVS. We suggest [Floodlight][3],
 which should work out of the box. Follow your controller's instructions
 to get it running and note down its IP address.
 
-[2]: http://www.projectfloodlight.org/floodlight/
+[3]: http://www.projectfloodlight.org/floodlight/
 
 Now you just need to run the IVS daemon. You'll need to tell it the IP address
 of the controller (-c) and the initial set of network interfaces to connect (-i).
