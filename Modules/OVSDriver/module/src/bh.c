@@ -163,7 +163,7 @@ ind_ovs_bh_run()
 
             /* Lookup the flow in the userspace flowtable. */
             struct flowtable_entry *fte =
-                flowtable_match(ind_ovs_ft, (struct flowtable_key *)&cfr);
+                flowtable_generic_match(ind_ovs_ftg, (struct flowtable_key *)&cfr);
             if (fte != NULL) {
                 struct ind_ovs_flow *flow = container_of(fte, fte, struct ind_ovs_flow);
                 if (ind_ovs_kflow_add(flow, key, actions) < 0) {
