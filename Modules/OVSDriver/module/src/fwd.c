@@ -553,6 +553,7 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
         assert(nlh->nlmsg_seq == nlmsg_hdr(msg)->nlmsg_seq);
         LOG_ERROR("Kernel failed to parse packet-out data");
         ind_ovs_nlmsg_freelist_free(msg);
+        ind_ovs_nlmsg_freelist_free(reply_msg);
         return INDIGO_ERROR_UNKNOWN;
     }
 
