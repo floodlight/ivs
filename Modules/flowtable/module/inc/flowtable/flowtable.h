@@ -72,13 +72,8 @@ struct flowtable_entry {
     uint16_t priority;
 };
 
-/*
- * Create a flowtable.
- *
- * @param hash_mask The portion of the key to use for hashing. Flows that
- *                  are less specific than this use linear-search.
- */
-struct flowtable *flowtable_create(const struct flowtable_key *hash_mask);
+/* Create a flowtable */
+struct flowtable *flowtable_create();
 
 /*
  * Destroy a flowtable.

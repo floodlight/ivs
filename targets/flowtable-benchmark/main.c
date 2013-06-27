@@ -79,7 +79,7 @@ benchmark_iteration(void)
     int i, j;
 
     struct flowtable_entry *ftes = calloc(num_flows, sizeof(*ftes));
-    struct flowtable *ft = flowtable_create(&l2_mask);
+    struct flowtable *ft = flowtable_create();
 
     for (i = 0; i < num_flows; i++) {
         struct flowtable_key key;
