@@ -22,7 +22,6 @@
 #include <string.h>
 #include <AIM/aim.h>
 #include <flowtable/flowtable.h>
-#include <flowtable/flowtable_generic.h>
 #include <assert.h>
 
 uint32_t ind_ovs_salt = 42;
@@ -71,8 +70,7 @@ make_generic_flow(uint64_t key_pattern, uint64_t mask_pattern, uint16_t priority
 static void
 test_basic(void)
 {
-    struct flowtable_key hash_mask = make_key(~0);
-    struct flowtable *ft = flowtable_create(&hash_mask);
+    struct flowtable *ft = flowtable_create();
 
     struct flowtable_entry A, B, C, *match;
     struct flowtable_key P;
@@ -114,8 +112,7 @@ test_basic(void)
 static void
 test_wildcard_priority(void)
 {
-    struct flowtable_key hash_mask = make_key(~0);
-    struct flowtable *ft = flowtable_create(&hash_mask);
+    struct flowtable *ft = flowtable_create();
 
     struct flowtable_entry A, B, *match;
     struct flowtable_key P;
@@ -143,8 +140,7 @@ static void
 test_collisions(void)
 {
     const int n = 16384 * 3;
-    struct flowtable_key hash_mask = make_key(~0);
-    struct flowtable *ft = flowtable_create(&hash_mask);
+    struct flowtable *ft = flowtable_create();
 
     struct flowtable_entry *ftes = calloc(n, sizeof(*ftes));
     assert(ftes);
@@ -183,43 +179,43 @@ test_collisions(void)
 static void
 test_flowtable_generic_basic(void)
 {
-    struct flowtable_generic *ftg = flowtable_generic_create();
+    struct flowtable *ftg = flowtable_create();
 
     struct flowtable_entry A, B, C, *match;
     struct flowtable_key P;
 
     /* Exact match, normal priority */
     A = make_flow(0x12345678, ~0, 1000);
-    flowtable_generic_insert(ftg, &A);
+    flowtable_insert(ftg, &A);
 
     /* Exact match, low priority */
     B = make_flow(0x12345678, ~0, 0);
-    flowtable_generic_insert(ftg, &B);
+    flowtable_insert(ftg, &B);
 
     /* Wildcarded, low priority */
     C = make_flow(0x00005678, 0x0000ffff, 0);
-    flowtable_generic_insert(ftg, &C);
+    flowtable_insert(ftg, &C);
 
     /* Should match A */
     P = make_key(0x12345678);
-    match = flowtable_generic_match(ftg, &P);
+    match = flowtable_match(ftg, &P);
     assert(match == &A);
 
     /* Should match C */
     P = make_key(0x22345678);
-    match = flowtable_generic_match(ftg, &P);
+    match = flowtable_match(ftg, &P);
     assert(match == &C);
 
     /* Should not match anything */
     P = make_key(0x12345679);
-    match = flowtable_generic_match(ftg, &P);
+    match = flowtable_match(ftg, &P);
     assert(match == NULL);
 
-    flowtable_generic_remove(ftg, &A);
-    flowtable_generic_remove(ftg, &B);
-    flowtable_generic_remove(ftg, &C);
+    flowtable_remove(ftg, &A);
+    flowtable_remove(ftg, &B);
+    flowtable_remove(ftg, &C);
 
-    flowtable_generic_destroy(ftg);
+    flowtable_destroy(ftg);
 }
 
 /*
@@ -229,25 +225,25 @@ test_flowtable_generic_basic(void)
 static void
 test_flowtable_generic_wildcard_priority(void)
 {
-    struct flowtable_generic *ftg = flowtable_generic_create();
+    struct flowtable *ftg = flowtable_create();
 
     struct flowtable_entry A, B, *match;
     struct flowtable_key P;
 
     /* Exact match, normal priority */
     A = make_flow(0x12345678, ~0, 1000);
-    flowtable_generic_insert(ftg, &A);
+    flowtable_insert(ftg, &A);
 
     /* Wildcarded, high priority */
     B = make_flow(0x00005678, 0x0000ffff, 2000);
-    flowtable_generic_insert(ftg, &B);
+    flowtable_insert(ftg, &B);
 
     /* Should match B */
     P = make_key(0x22345678);
-    match = flowtable_generic_match(ftg, &P);
+    match = flowtable_match(ftg, &P);
     assert(match == &B);
 
-    flowtable_generic_destroy(ftg);
+    flowtable_destroy(ftg);
 }
 
 /*
@@ -257,7 +253,7 @@ static void
 test_flowtable_generic_collisions(void)
 {
     const int n = 16384 * 3;
-    struct flowtable_generic *ftg = flowtable_generic_create();
+    struct flowtable *ftg = flowtable_create();
 
     struct flowtable_entry *ftes = calloc(n, sizeof(*ftes));
     assert(ftes);
@@ -268,27 +264,27 @@ test_flowtable_generic_collisions(void)
     /* Add entries */
     for (i = 0; i < n; i++) {
         P = make_generic_key(i);
-        assert(flowtable_generic_match(ftg, &P) == NULL);
+        assert(flowtable_match(ftg, &P) == NULL);
         ftes[i] = make_generic_flow(i, i, 1000);
-        flowtable_generic_insert(ftg, &ftes[i]);
-        assert(flowtable_generic_match(ftg, &P) == &ftes[i]);
+        flowtable_insert(ftg, &ftes[i]);
+        assert(flowtable_match(ftg, &P) == &ftes[i]);
     }
 
     /* Match on overfull table */
     for (i = 0; i < n; i++) {
         P = make_generic_key(i);
-        assert(flowtable_generic_match(ftg, &P) == &ftes[i]);
+        assert(flowtable_match(ftg, &P) == &ftes[i]);
     }
 
     /* Remove entries */
     for (i = 0; i < n; i++) {
         P = make_generic_key(i);
-        assert(flowtable_generic_match(ftg, &P) == &ftes[i]);
-        flowtable_generic_remove(ftg, &ftes[i]);
-        assert(flowtable_generic_match(ftg, &P) == NULL);
+        assert(flowtable_match(ftg, &P) == &ftes[i]);
+        flowtable_remove(ftg, &ftes[i]);
+        assert(flowtable_match(ftg, &P) == NULL);
     }
 
-    flowtable_generic_destroy(ftg);
+    flowtable_destroy(ftg);
 
     free(ftes);
 }

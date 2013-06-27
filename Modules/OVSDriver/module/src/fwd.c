@@ -31,7 +31,7 @@
 #include <pthread.h>
 #include <errno.h>
 
-struct flowtable_generic *ind_ovs_ftg;
+struct flowtable *ind_ovs_ft;
 
 static struct list_head ind_ovs_flow_id_buckets[64];
 
@@ -211,7 +211,7 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
     list_push(flow_id_bucket, &flow->flow_id_links);
 
     ind_ovs_fwd_write_lock();
-    flowtable_generic_insert(ind_ovs_ftg, &flow->fte);
+    flowtable_insert(ind_ovs_ft, &flow->fte);
     ind_ovs_fwd_write_unlock();
 
     ind_ovs_kflow_invalidate_overlap(&fields, &masks, flow->fte.priority);
@@ -293,7 +293,7 @@ indigo_fwd_flow_delete(indigo_cookie_t flow_id,
     }
 
     ind_ovs_fwd_write_lock();
-    flowtable_generic_remove(ind_ovs_ftg, &flow->fte);
+    flowtable_remove(ind_ovs_ft, &flow->fte);
     ind_ovs_fwd_write_unlock();
 
     ind_ovs_flow_invalidate_kflows(flow);
@@ -482,7 +482,7 @@ ind_ovs_lookup_flow(const struct ind_ovs_parsed_key *pkey,
 
     ++lookup_count;
 
-    fte = flowtable_generic_match(ind_ovs_ftg, (struct flowtable_key *)&cfr);
+    fte = flowtable_match(ind_ovs_ft, (struct flowtable_key *)&cfr);
     if (fte == NULL) {
         return INDIGO_ERROR_NOT_FOUND;
     }
@@ -634,8 +634,8 @@ ind_ovs_fwd_init(void)
     memset(&hash_mask, 0, sizeof(hash_mask));
     memset(&hash_mask.dl_dst, 0xff, sizeof(&hash_mask.dl_dst));
     memset(&hash_mask.dl_src, 0xff, sizeof(&hash_mask.dl_src));
-    ind_ovs_ftg = flowtable_generic_create();
-    if (!ind_ovs_ftg) {
+    ind_ovs_ft = flowtable_create();
+    if (!ind_ovs_ft) {
         return INDIGO_ERROR_RESOURCE;
     }
 
@@ -665,7 +665,7 @@ ind_ovs_fwd_finish(void)
     /* Hold this forever. */
     ind_ovs_fwd_write_lock();
 
-    flowtable_generic_destroy(ind_ovs_ftg);
+    flowtable_destroy(ind_ovs_ft);
 
     /* Free all the flows */
     for (i = 0; i < ARRAY_SIZE(ind_ovs_flow_id_buckets); i++) {

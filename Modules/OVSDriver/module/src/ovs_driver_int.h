@@ -34,7 +34,6 @@
 #include "AIM/aim_rl.h"
 #include "AIM/aim_utils.h"
 #include "flowtable/flowtable.h"
-#include "flowtable/flowtable_generic.h"
 
 #define IND_OVS_MAX_PORTS 1024
 
@@ -401,7 +400,7 @@ extern int ind_ovs_version;
 /*
  * Generic Flowtable. Protected by ind_ovs_fwd_{read,write}_{lock,unlock}.
  */
-extern struct flowtable_generic *ind_ovs_ftg;
+extern struct flowtable *ind_ovs_ft;
 
 /*
  * Configuration for the bsn_pktin_suppression extension.
