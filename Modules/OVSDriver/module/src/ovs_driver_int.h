@@ -398,7 +398,7 @@ extern uint32_t ind_ovs_salt;
 extern int ind_ovs_version;
 
 /*
- * Generic Flowtable. Protected by ind_ovs_fwd_{read,write}_{lock,unlock}.
+ * Flowtable. Protected by ind_ovs_fwd_{read,write}_{lock,unlock}.
  */
 extern struct flowtable *ind_ovs_ft;
 

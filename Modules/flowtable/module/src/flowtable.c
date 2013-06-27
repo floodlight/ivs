@@ -22,35 +22,35 @@
 #include "murmur/murmur.h"
 #include "flowtable_log.h"
 
-#define FLOWTABLE_GENERIC_BUCKETS 32
-#define FLOWTABLE_BUCKETS 16384
+#define FLOWTABLE_BUCKETS 32
+#define FLOWTABLE_SPECIFIC_BUCKETS 16384
 
 /*
- * Generic flowtable hash with flowtable_entry mask as key
+ * flowtable hash with flow entry mask as key
  */
 struct flowtable {
-    struct list_head generic_buckets[FLOWTABLE_GENERIC_BUCKETS];
+    struct list_head buckets[FLOWTABLE_BUCKETS];
 };
 
 /*
- * An entry in a generic flowtable.
+ * An entry in a flowtable.
  *
- * flowtable_generic_entry will be removed if the flow_cnt reaches zero.
+ * flowtable_specific will be removed if the flow_cnt reaches zero.
  */
-struct flowtable_generic_entry {
+struct flowtable_specific {
     struct list_links links;
     struct flowtable_key flow_mask;
-    struct list_head specific_buckets[FLOWTABLE_BUCKETS];
-    uint32_t flow_cnt;  /* Number of flow entries in all specific_buckets */
+    struct list_head buckets[FLOWTABLE_SPECIFIC_BUCKETS];
+    uint32_t flow_cnt;  /* Number of flow entries in specific flowtable*/
 };
 
-static struct list_head *flowtable_generic_bucket(struct flowtable *ft,
-                                                  const struct flowtable_key *mask);
-static struct list_head *flowtable_specific_bucket(struct flowtable_generic_entry *ftge,
+static struct list_head *flowtable_bucket(struct flowtable *ft,
+                                          const struct flowtable_key *mask);
+static struct list_head *flowtable_specific_bucket(struct flowtable_specific *fts,
                                                     const struct flowtable_key *key);
-static void flowtable_specific_insert(struct flowtable_generic_entry *ftge,
+static void flowtable_specific_insert(struct flowtable_specific *fts,
                                       struct flowtable_entry *new_fte);
-static struct flowtable_entry *flowtable_specific_match(struct flowtable_generic_entry *ftge,
+static struct flowtable_entry *flowtable_specific_match(struct flowtable_specific *fts,
                                                          const struct flowtable_key *key);
 static bool match(const struct flowtable_key *flow_key,
                   const struct flowtable_key *flow_mask,
@@ -71,8 +71,8 @@ flowtable_create()
     }
 
     int i;
-    for (i = 0; i < FLOWTABLE_GENERIC_BUCKETS; i++) {
-        list_init(&ft->generic_buckets[i]);
+    for (i = 0; i < FLOWTABLE_BUCKETS; i++) {
+        list_init(&ft->buckets[i]);
     }
 
     return ft;
@@ -85,12 +85,12 @@ flowtable_destroy(struct flowtable *ft)
     struct list_links *cur;
     int i;
 
-    for(i = 0; i < FLOWTABLE_GENERIC_BUCKETS; i++) {
-        while((cur = list_pop(&ft->generic_buckets[i])) != NULL) {
-            struct flowtable_generic_entry *cur_ftge =
-                container_of(cur, links, struct flowtable_generic_entry);
+    for(i = 0; i < FLOWTABLE_BUCKETS; i++) {
+        while((cur = list_pop(&ft->buckets[i])) != NULL) {
+            struct flowtable_specific *cur_fts =
+                container_of(cur, links, struct flowtable_specific);
 
-            free(cur_ftge);
+            free(cur_fts);
         }
     }
 
@@ -115,37 +115,37 @@ void
 flowtable_insert(struct flowtable *ft, struct flowtable_entry *fte)
 {
     struct list_links *cur;
-    struct list_head *ft_bucket = flowtable_generic_bucket(ft, &fte->mask);
+    struct list_head *ft_bucket = flowtable_bucket(ft, &fte->mask);
 
-    /* Check if generic flow table entry is present for the new flow entry mask */
+    /* Check if flow table entry is present for the new flow entry mask */
     LIST_FOREACH(ft_bucket, cur) {
-        struct flowtable_generic_entry *cur_ftge =
-            container_of(cur, links, struct flowtable_generic_entry);
-        if (memcmp(&cur_ftge->flow_mask, &fte->mask, sizeof(struct flowtable_key)) == 0) {
+        struct flowtable_specific *cur_fts =
+            container_of(cur, links, struct flowtable_specific);
+        if (memcmp(&cur_fts->flow_mask, &fte->mask, sizeof(struct flowtable_key)) == 0) {
             /* If present, insert the new flow entry */
-            flowtable_specific_insert(cur_ftge, fte);
-            cur_ftge->flow_cnt++;
+            flowtable_specific_insert(cur_fts, fte);
+            cur_fts->flow_cnt++;
             return;
         }
     }
 
-    /* If not present, then create a generic flow table entry */
-    struct flowtable_generic_entry *new_ftge = calloc(1, sizeof(*new_ftge));
-    if(new_ftge == NULL) {
-        AIM_LOG_ERROR("Failed to allocate generic flowtable entry");
+    /* If not present, then create a specific flowtable */
+    struct flowtable_specific *new_fts = calloc(1, sizeof(*new_fts));
+    if(new_fts == NULL) {
+        AIM_LOG_ERROR("Failed to allocate specific flowtable");
         return;
     }
 
     int i;
-    for (i = 0; i < FLOWTABLE_BUCKETS; i++) {
-        list_init(&new_ftge->specific_buckets[i]);
+    for (i = 0; i < FLOWTABLE_SPECIFIC_BUCKETS; i++) {
+        list_init(&new_fts->buckets[i]);
     }
 
-    new_ftge->flow_mask = fte->mask;
-    flowtable_specific_insert(new_ftge, fte);
-    new_ftge->flow_cnt = 1;
+    new_fts->flow_mask = fte->mask;
+    flowtable_specific_insert(new_fts, fte);
+    new_fts->flow_cnt = 1;
 
-    list_push(ft_bucket, &new_ftge->links);
+    list_push(ft_bucket, &new_fts->links);
     return;
 }
 
@@ -154,26 +154,26 @@ void
 flowtable_remove(struct flowtable *ft, struct flowtable_entry *fte)
 {
     struct list_links *cur;
-    struct flowtable_generic_entry *cur_ftge = NULL;
-    struct list_head *bucket = flowtable_generic_bucket(ft, &fte->mask);
+    struct flowtable_specific *cur_fts = NULL;
+    struct list_head *bucket = flowtable_bucket(ft, &fte->mask);
 
-    /* Find the generic flow table entry to update the flow_cnt */
+    /* Find the flow table entry to update the flow_cnt */
     LIST_FOREACH(bucket, cur) {
-        cur_ftge = container_of(cur, links, struct flowtable_generic_entry);
-        if (memcmp(&cur_ftge->flow_mask, &fte->mask, sizeof(struct flowtable_key)) == 0) {
+        cur_fts = container_of(cur, links, struct flowtable_specific);
+        if (memcmp(&cur_fts->flow_mask, &fte->mask, sizeof(struct flowtable_key)) == 0) {
             break;
         }
-        cur_ftge = NULL;
+        cur_fts = NULL;
     }
 
-    if(cur_ftge) {
-        cur_ftge->flow_cnt--;
+    if(cur_fts) {
+        cur_fts->flow_cnt--;
         list_remove(&fte->links);
 
-        /* If no flows are present then free the generic flowtable entry */
-        if(!cur_ftge->flow_cnt) {
-            list_remove(&cur_ftge->links);
-            free(cur_ftge);
+        /* If no flows are present then free the specific flowtable */
+        if(!cur_fts->flow_cnt) {
+            list_remove(&cur_fts->links);
+            free(cur_fts);
         }
     }
 
@@ -184,17 +184,17 @@ flowtable_remove(struct flowtable *ft, struct flowtable_entry *fte)
 struct flowtable_entry *
 flowtable_match(struct flowtable *ft, const struct flowtable_key *key)
 {
-    struct flowtable_generic_entry *cur_ftge = NULL;
+    struct flowtable_specific *cur_fts = NULL;
     struct list_links *cur = NULL;
     struct flowtable_entry *found = NULL;
     struct flowtable_entry *new_found = NULL;
     int i = 0;
 
     /* Check all the specific flowtables for the flow entry with highest priority */
-    for(i = 0; i < FLOWTABLE_GENERIC_BUCKETS; i++) {
-        LIST_FOREACH(&ft->generic_buckets[i], cur) {
-            cur_ftge = container_of(cur, links, struct flowtable_generic_entry);
-            new_found = flowtable_specific_match(cur_ftge, key);
+    for(i = 0; i < FLOWTABLE_BUCKETS; i++) {
+        LIST_FOREACH(&ft->buckets[i], cur) {
+            cur_fts = container_of(cur, links, struct flowtable_specific);
+            new_found = flowtable_specific_match(cur_fts, key);
 
             if(new_found != NULL) {
                 if(found == NULL) {
@@ -212,43 +212,43 @@ flowtable_match(struct flowtable *ft, const struct flowtable_key *key)
 }
 
 /*
- * Return the generic flowtable bucket for the given flow entry mask
+ * Return the flowtable bucket for the given flow entry mask
  */
 static struct list_head *
-flowtable_generic_bucket(struct flowtable *ft, const struct flowtable_key *mask)
+flowtable_bucket(struct flowtable *ft, const struct flowtable_key *mask)
 {
     struct flowtable_key hash_key;
     memcpy(&hash_key, mask, sizeof(struct flowtable_key));
     uint32_t hash = murmur_hash(&hash_key, sizeof(hash_key), ind_ovs_salt);
-    return &ft->generic_buckets[hash % FLOWTABLE_GENERIC_BUCKETS];
+    return &ft->buckets[hash % FLOWTABLE_BUCKETS];
 }
 
 /*
  * Return the bucket where flow entry should be added in specific flow hash table
  */
 static struct list_head *
-flowtable_specific_bucket(struct flowtable_generic_entry *ftge,
+flowtable_specific_bucket(struct flowtable_specific *fts,
                           const struct flowtable_key *key)
 {
     struct flowtable_key masked_key;
     int i;
     for (i = 0; i < FLOWTABLE_KEY_SIZE/8; i++) {
-        masked_key.data[i] = key->data[i] & ftge->flow_mask.data[i];
+        masked_key.data[i] = key->data[i] & fts->flow_mask.data[i];
     }
 
     uint32_t hash = murmur_hash(&masked_key, sizeof(masked_key), ind_ovs_salt);
-    return &ftge->specific_buckets[hash % FLOWTABLE_BUCKETS];
+    return &fts->buckets[hash % FLOWTABLE_SPECIFIC_BUCKETS];
 }
 
 /*
  * Insert the flowtable entry in the specific flow hash table
  */
 static void
-flowtable_specific_insert(struct flowtable_generic_entry *ftge,
+flowtable_specific_insert(struct flowtable_specific *fts,
                           struct flowtable_entry *new_fte)
 {
     struct list_links *cur;
-    struct list_head *bucket = flowtable_specific_bucket(ftge, &new_fte->key);
+    struct list_head *bucket = flowtable_specific_bucket(fts, &new_fte->key);
 
     LIST_FOREACH(bucket, cur) {
         struct flowtable_entry *cur_fte = container_of(cur, links, struct flowtable_entry);
@@ -265,15 +265,15 @@ flowtable_specific_insert(struct flowtable_generic_entry *ftge,
  * Find the flow in the specific flow hashtable
  */
 static struct flowtable_entry *
-flowtable_specific_match(struct flowtable_generic_entry *ftge, const struct flowtable_key *key)
+flowtable_specific_match(struct flowtable_specific *fts, const struct flowtable_key *key)
 {
     struct list_links *cur = NULL;
-    struct list_head *bucket= flowtable_specific_bucket(ftge, key);
+    struct list_head *bucket= flowtable_specific_bucket(fts, key);
 
     LIST_FOREACH(bucket, cur) {
         struct flowtable_entry *fte =
             container_of(cur, links, struct flowtable_entry);
-        if (match(&fte->key, &ftge->flow_mask, key)) {
+        if (match(&fte->key, &fts->flow_mask, key)) {
             return fte;
         }
     }
