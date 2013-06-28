@@ -112,6 +112,7 @@ flowtable_destroy(struct flowtable *ft)
         }
     }
 
+    free(ft->fts_list);
     free(ft);
     return;
 }
@@ -326,15 +327,14 @@ flowtable_specific_list_add(struct flowtable *ft, struct flowtable_specific *fts
 {
     /* If list is full, allocate twice the size of current list */
     if(ft->fts_list_cnt >= ft->fts_list_size) {
-        struct flowtable_specific **new_fts_list = calloc(2*ft->fts_list_size, sizeof(ft->fts_list));
+        struct flowtable_specific **new_fts_list =
+            realloc(ft->fts_list, 2*ft->fts_list_size*(sizeof(ft->fts_list[0])));
 
         if(new_fts_list == NULL) {
-            AIM_LOG_ERROR("Failed to allocate specific flowtable list");
+            AIM_LOG_ERROR("Failed to allocate more specific flowtable list");
             return;
         }
 
-        memcpy(new_fts_list, ft->fts_list, (ft->fts_list_size * sizeof(ft->fts_list)));
-        free(ft->fts_list);
         ft->fts_list = new_fts_list;
         ft->fts_list_size *= 2;
     }
