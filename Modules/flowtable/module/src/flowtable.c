@@ -324,7 +324,7 @@ match(const struct flowtable_key *flow_key,
 static void
 flowtable_specific_list_add(struct flowtable *ft, struct flowtable_specific *fts)
 {
-    /* If list is full allocate twise the size of current list */
+    /* If list is full, allocate twice the size of current list */
     if(ft->fts_list_cnt >= ft->fts_list_size) {
         struct flowtable_specific **new_fts_list = calloc(2*ft->fts_list_size, sizeof(ft->fts_list));
 
