@@ -221,6 +221,11 @@ add_port(const char *datapath, const char *interface)
 static void
 add_internal_port(const char *datapath, const char *interface)
 {
+    if (strlen(interface) > IFNAMSIZ) {
+        fprintf(stderr, "Failed: Interface name too long\n");
+        exit(1);
+    }
+
     unsigned int dp_ifindex = if_nametoindex(datapath);
     if (dp_ifindex == 0) {
         fprintf(stderr, "Failed: no such datapath '%s'\n", datapath);
