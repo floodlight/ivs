@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH IVS 8 "June 18, 2013"
+.TH IVS 8 "June 27, 2013"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -44,6 +44,9 @@ Add a network interface.
 .TP
 \fB\-c \fIhost\fB[:\fIport\fR], \fB--controller \fIhost\fB[:\fIport\fR]
 Add a controller connection. \fIport\fR defaults to 6633.
+.TP
+\fB\-l \fIhost\fB[:\fIport\fR], \fB--listen \fIhost\fB[:\fIport\fR]
+Add a listening socket (for dpctl). \fIport\fR defaults to 6634.
 .TP
 \fB--dpid \fIdpid\fR
 Set the datapath ID. \fIdpid\fR should be 16 hex digits.

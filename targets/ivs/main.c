@@ -74,6 +74,7 @@ static enum loglevel {
 } loglevel = LOGLEVEL_DEFAULT;
 
 static biglist_t *controllers = NULL;
+static biglist_t *listeners = NULL;
 static biglist_t *interfaces = NULL;
 static uint64_t dpid = 0;
 static int use_syslog = 0;
@@ -82,7 +83,9 @@ static char *datapath_name = "indigo";
 static char *config_filename = NULL;
 
 static int
-parse_controller(const char *str, indigo_cxn_protocol_params_t *_proto)
+parse_controller(const char *str,
+                 indigo_cxn_protocol_params_t *_proto,
+                 int default_port)
 {
     char buf[128];
     char *strtok_state = NULL;
@@ -108,7 +111,7 @@ parse_controller(const char *str, indigo_cxn_protocol_params_t *_proto)
 
     port_str = strtok_r(NULL, ":/", &strtok_state);
     if (port_str == NULL) {
-        proto->controller_port = OF_TCP_PORT;
+        proto->controller_port = default_port;
     } else {
         char *endptr;
         long port = strtol(port_str, &endptr, 0);
@@ -148,6 +151,7 @@ parse_options(int argc, char **argv)
             {"trace",       no_argument,       0,  't' },
             {"interface",   required_argument, 0,  'i' },
             {"controller",  required_argument, 0,  'c' },
+            {"listen",      required_argument, 0,  'l' },
             {"dpid",        required_argument, 0,  OPT_DPID },
             {"syslog",      no_argument,       0,  OPT_SYSLOG },
             {"tunnel",      no_argument,       0,  OPT_TUNNEL },
@@ -177,6 +181,10 @@ parse_options(int argc, char **argv)
 
         case 'c':
             controllers = biglist_append(controllers, optarg);
+            break;
+
+        case 'l':
+            listeners = biglist_append(listeners, optarg);
             break;
 
         case 'i':
@@ -221,6 +229,7 @@ parse_options(int argc, char **argv)
             printf("  -v, --verbose               Verbose logging\n");
             printf("  -t, --trace                 Very verbose logging\n");
             printf("  -c, --controller=IP:PORT    Connect to a controller at startup\n");
+            printf("  -l, --listen=IP:PORT        Listen for dpctl connections\n");
             printf("  -i, --interface=INTERFACE   Attach a network interface at startup\n");
             //printf("  -f, --config-file=FILE      Read a configuration file\n");
             //printf("  --name=NAME                 Set the name of the kernel datapath (default indigo)\n");
@@ -402,7 +411,7 @@ aim_main(int argc, char* argv[])
             AIM_LOG_MSG("Adding controller %s", str);
 
             indigo_cxn_protocol_params_t proto;
-            if (parse_controller(str, &proto) < 0) {
+            if (parse_controller(str, &proto, OF_TCP_PORT) < 0) {
                 AIM_LOG_FATAL("Failed to parse controller string '%s'", str);
                 return 1;
             }
@@ -419,6 +428,36 @@ aim_main(int argc, char* argv[])
             indigo_cxn_id_t cxn_id;
             if (indigo_cxn_connection_add(&proto, &config, &cxn_id) < 0) {
                 AIM_LOG_FATAL("Failed to add controller %s", str);
+                return 1;
+            }
+        }
+    }
+
+    /* Add listening sockets from command line */
+    {
+        biglist_t *element;
+        char *str;
+        BIGLIST_FOREACH_DATA(element, listeners, char *, str) {
+            AIM_LOG_MSG("Adding listener %s", str);
+
+            indigo_cxn_protocol_params_t proto;
+            if (parse_controller(str, &proto, 6634) < 0) {
+                AIM_LOG_FATAL("Failed to parse listener string '%s'", str);
+                return 1;
+            }
+
+            indigo_cxn_config_params_t config = {
+                .version = OF_VERSION_1_0,
+                .cxn_priority = 0,
+                .local = 1,
+                .listen = 1,
+                .periodic_echo_ms = 0,
+                .reset_echo_count = 0,
+            };
+
+            indigo_cxn_id_t cxn_id;
+            if (indigo_cxn_connection_add(&proto, &config, &cxn_id) < 0) {
+                AIM_LOG_FATAL("Failed to add listener %s", str);
                 return 1;
             }
         }
