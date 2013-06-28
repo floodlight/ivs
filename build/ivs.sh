@@ -21,4 +21,4 @@
 ROOT=$(dirname $(readlink -f $0))/..
 sudo "$ROOT/build/veth_setup.sh"
 export INDIGO_BENCHMARK=1 # disable ratelimiters
-sudo -E "$ROOT/targets/ivs/build/gcc-local/bin/ivs" -i veth0 -i veth2 -i veth4 -i veth6 -c 127.0.0.1 "$@"
+sudo -E "$ROOT/targets/ivs/build/gcc-local/bin/ivs" -i veth0 -i veth2 -i veth4 -i veth6 -c 127.0.0.1 -l 127.0.0.1:6634 "$@"
