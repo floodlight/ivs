@@ -101,7 +101,6 @@ include $(BUILDER)/dependmodules.mk
 # specified above:
 #
 BINARY := ivs
-$(BINARY)_POST_BUILD = sudo setcap cap_net_raw=eip "$(BINARY_DIR)/$(BINARY)" || true
 
 # 
 # This binary is going to link against every library we've included thus far.
