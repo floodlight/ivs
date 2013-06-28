@@ -26,13 +26,6 @@
 #define FLOWTABLE_SPECIFIC_BUCKETS 16384
 
 /*
- * flowtable hash with flow entry mask as key
- */
-struct flowtable {
-    struct list_head buckets[FLOWTABLE_BUCKETS];
-};
-
-/*
  * An entry in a flowtable.
  *
  * flowtable_specific will be removed if the flow_cnt reaches zero.
@@ -43,6 +36,18 @@ struct flowtable_specific {
     struct list_head buckets[FLOWTABLE_SPECIFIC_BUCKETS];
     uint32_t flow_cnt;  /* Number of flow entries in specific flowtable*/
 };
+
+/*
+ * flowtable hash with flow entry mask as key
+ */
+struct flowtable {
+    struct list_head buckets[FLOWTABLE_BUCKETS];
+    struct flowtable_specific **fts_list;
+    uint32_t fts_list_size;
+    uint32_t fts_list_cnt;
+};
+
+struct list_head flowtable_specific_list;
 
 static struct list_head *flowtable_bucket(struct flowtable *ft,
                                           const struct flowtable_key *mask);
@@ -55,6 +60,8 @@ static struct flowtable_entry *flowtable_specific_match(struct flowtable_specifi
 static bool match(const struct flowtable_key *flow_key,
                   const struct flowtable_key *flow_mask,
                   const struct flowtable_key *pkt_key);
+static void flowtable_specific_list_add(struct flowtable *ft, struct flowtable_specific *fts);
+static void flowtable_specific_list_del(struct flowtable *ft, struct flowtable_specific *fts);
 
 /*
  * HACK need a random number to prevent hash collision attacks.
@@ -67,6 +74,17 @@ flowtable_create()
 {
     struct flowtable *ft = malloc(sizeof(*ft));
     if (ft == NULL) {
+        AIM_LOG_ERROR("Failed to allocate flowtable");
+        return NULL;
+    }
+
+    ft->fts_list_size = FLOWTABLE_BUCKETS;
+    ft->fts_list_cnt  = 0;
+    ft->fts_list = calloc(ft->fts_list_size, sizeof(ft->fts_list));
+
+    if(ft->fts_list == NULL) {
+        free(ft);
+        AIM_LOG_ERROR("Failed to allocate specific flowtable list");
         return NULL;
     }
 
@@ -94,6 +112,7 @@ flowtable_destroy(struct flowtable *ft)
         }
     }
 
+    free(ft->fts_list);
     free(ft);
     return;
 }
@@ -144,6 +163,7 @@ flowtable_insert(struct flowtable *ft, struct flowtable_entry *fte)
     new_fts->flow_mask = fte->mask;
     flowtable_specific_insert(new_fts, fte);
     new_fts->flow_cnt = 1;
+    flowtable_specific_list_add(ft, new_fts);
 
     list_push(ft_bucket, &new_fts->links);
     return;
@@ -173,6 +193,7 @@ flowtable_remove(struct flowtable *ft, struct flowtable_entry *fte)
         /* If no flows are present then free the specific flowtable */
         if(!cur_fts->flow_cnt) {
             list_remove(&cur_fts->links);
+            flowtable_specific_list_del(ft, cur_fts);
             free(cur_fts);
         }
     }
@@ -184,26 +205,21 @@ flowtable_remove(struct flowtable *ft, struct flowtable_entry *fte)
 struct flowtable_entry *
 flowtable_match(struct flowtable *ft, const struct flowtable_key *key)
 {
-    struct flowtable_specific *cur_fts = NULL;
-    struct list_links *cur = NULL;
     struct flowtable_entry *found = NULL;
     struct flowtable_entry *new_found = NULL;
-    int i = 0;
+    uint32_t i = 0;
 
     /* Check all the specific flowtables for the flow entry with highest priority */
-    for(i = 0; i < FLOWTABLE_BUCKETS; i++) {
-        LIST_FOREACH(&ft->buckets[i], cur) {
-            cur_fts = container_of(cur, links, struct flowtable_specific);
-            new_found = flowtable_specific_match(cur_fts, key);
+    for(i = 0; i < ft->fts_list_cnt; i++) {
+        new_found = flowtable_specific_match(ft->fts_list[i], key);
 
-            if(new_found != NULL) {
-                if(found == NULL) {
-                    found = new_found;
-                    continue;
-                }
-                else if(found->priority < new_found->priority){
-                    found = new_found;
-                }
+        if(new_found != NULL) {
+            if(found == NULL) {
+                found = new_found;
+                continue;
+            }
+            else if(found->priority < new_found->priority){
+                found = new_found;
             }
         }
     }
@@ -303,4 +319,43 @@ match(const struct flowtable_key *flow_key,
     }
 
     return true;
+}
+
+/* Add new specific flowtable to the list */
+static void
+flowtable_specific_list_add(struct flowtable *ft, struct flowtable_specific *fts)
+{
+    /* If list is full, allocate twice the size of current list */
+    if(ft->fts_list_cnt >= ft->fts_list_size) {
+        struct flowtable_specific **new_fts_list =
+            realloc(ft->fts_list, 2*ft->fts_list_size*(sizeof(ft->fts_list[0])));
+
+        if(new_fts_list == NULL) {
+            AIM_LOG_ERROR("Failed to allocate more specific flowtable list");
+            return;
+        }
+
+        ft->fts_list = new_fts_list;
+        ft->fts_list_size *= 2;
+    }
+
+    ft->fts_list[ft->fts_list_cnt++] = fts;
+    return;
+}
+
+/* Delete specific flowtable from list */
+static void
+flowtable_specific_list_del(struct flowtable *ft, struct flowtable_specific *fts)
+{
+    uint32_t i;
+    for(i = 0; (i < ft->fts_list_cnt) && (ft->fts_list[i] != fts); i++);
+
+    if(i >= ft->fts_list_cnt) {
+        AIM_LOG_ERROR("Specific flow table not found in the list");
+        return;
+    }
+
+    ft->fts_list[i] = ft->fts_list[--ft->fts_list_cnt];
+    ft->fts_list[ft->fts_list_cnt] = NULL;
+    return;
 }
