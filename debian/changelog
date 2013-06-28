@@ -1,3 +1,9 @@
+ivs (0.4) unstable; urgency=low
+
+  * New upstream version.
+
+ -- Rich Lane <rlane@bigswitch.com>  Fri, 28 Jun 2013 13:58:12 -0700
+
 ivs (0.3) unstable; urgency=low
 
   * Changed package name.

@@ -56,7 +56,7 @@ AIM_LOG_STRUCT_DEFINE(
 #define BUILD_ID devel
 #endif
 
-static const char *program_version = "ivs 0.3";
+static const char *program_version = "ivs 0.4";
 
 static ind_soc_config_t soc_cfg;
 static ind_cxn_config_t cxn_cfg;
