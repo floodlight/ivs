@@ -111,7 +111,7 @@ struct ind_ovs_upcall_thread;
  * Stored in the ind_ovs_ports array.
  */
 struct ind_ovs_port {
-    char ifname[128]; /* Linux network interface name */
+    char ifname[IFNAMSIZ]; /* Linux network interface name */
     uint32_t dp_port_no; /* Kernel datapath port number */
     int ifflags; /* Linux interface flags */
     of_mac_addr_t mac_addr;
