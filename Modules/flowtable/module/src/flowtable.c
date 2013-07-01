@@ -58,7 +58,7 @@ static void flowtable_specific_insert(struct flowtable_specific *fts,
                                       struct flowtable_entry *new_fte);
 static struct flowtable_entry *flowtable_specific_match(struct flowtable_specific *fts,
                                                         const struct flowtable_key *key,
-                                                        const uint16_t max_priority);
+                                                        const uint16_t cur_priority);
 static bool match(const struct flowtable_key *flow_key,
                   const struct flowtable_key *flow_mask,
                   const struct flowtable_key *pkt_key);
@@ -287,7 +287,7 @@ flowtable_specific_insert(struct flowtable_specific *fts,
 static struct flowtable_entry *
 flowtable_specific_match(struct flowtable_specific *fts,
                          const struct flowtable_key *key,
-                         const uint16_t max_priority)
+                         const uint16_t cur_priority)
 {
     struct list_links *cur = NULL;
     struct list_head *bucket= flowtable_specific_bucket(fts, key);
@@ -296,7 +296,7 @@ flowtable_specific_match(struct flowtable_specific *fts,
         struct flowtable_entry *fte =
             container_of(cur, links, struct flowtable_entry);
 
-        if(max_priority > fte->priority) {
+        if(cur_priority > fte->priority) {
             return NULL;
         }
 
