@@ -35,7 +35,7 @@ struct flowtable_specific {
     struct flowtable_key flow_mask;
     struct list_head buckets[FLOWTABLE_SPECIFIC_BUCKETS];
     uint32_t flow_cnt;  /* Number of flow entries in specific flowtable*/
-    uint32_t fts_priority;  /* Priority of the flow that has highest priority */
+    uint32_t max_priority;  /* Priority of the flow that has highest priority */
 };
 
 /*
@@ -58,7 +58,7 @@ static void flowtable_specific_insert(struct flowtable_specific *fts,
                                       struct flowtable_entry *new_fte);
 static struct flowtable_entry *flowtable_specific_match(struct flowtable_specific *fts,
                                                         const struct flowtable_key *key,
-                                                        const uint16_t best_priority_sofar);
+                                                        const uint16_t max_priority);
 static bool match(const struct flowtable_key *flow_key,
                   const struct flowtable_key *flow_mask,
                   const struct flowtable_key *pkt_key);
@@ -147,8 +147,8 @@ flowtable_insert(struct flowtable *ft, struct flowtable_entry *fte)
             flowtable_specific_insert(cur_fts, fte);
             cur_fts->flow_cnt++;
 
-            if(fte->priority > cur_fts->fts_priority)
-                cur_fts->fts_priority = fte->priority;
+            if(fte->priority > cur_fts->max_priority)
+                cur_fts->max_priority = fte->priority;
             return;
         }
     }
@@ -165,7 +165,7 @@ flowtable_insert(struct flowtable *ft, struct flowtable_entry *fte)
         list_init(&new_fts->buckets[i]);
     }
 
-    new_fts->fts_priority = fte->priority;
+    new_fts->max_priority = fte->priority;
     new_fts->flow_mask = fte->mask;
     flowtable_specific_insert(new_fts, fte);
     new_fts->flow_cnt = 1;
@@ -217,20 +217,14 @@ flowtable_match(struct flowtable *ft, const struct flowtable_key *key)
 
     /* Check all the specific flowtables for the flow entry with highest priority */
     for(i = 0; i < ft->fts_list_cnt; i++) {
-        if(found && (found->priority > ft->fts_list[i]->fts_priority)) {
+        if(found && (found->priority > ft->fts_list[i]->max_priority)) {
             continue;
         }
 
         new_found = flowtable_specific_match(ft->fts_list[i], key, (found ? found->priority : 0));
 
         if(new_found != NULL) {
-            if(found == NULL) {
-                found = new_found;
-                continue;
-            }
-            else if(found->priority < new_found->priority){
-                found = new_found;
-            }
+            found = new_found;
         }
     }
 
@@ -293,7 +287,7 @@ flowtable_specific_insert(struct flowtable_specific *fts,
 static struct flowtable_entry *
 flowtable_specific_match(struct flowtable_specific *fts,
                          const struct flowtable_key *key,
-                         const uint16_t best_priority_sofar)
+                         const uint16_t max_priority)
 {
     struct list_links *cur = NULL;
     struct list_head *bucket= flowtable_specific_bucket(fts, key);
@@ -302,7 +296,7 @@ flowtable_specific_match(struct flowtable_specific *fts,
         struct flowtable_entry *fte =
             container_of(cur, links, struct flowtable_entry);
 
-        if(best_priority_sofar > fte->priority) {
+        if(max_priority > fte->priority) {
             return NULL;
         }
 
