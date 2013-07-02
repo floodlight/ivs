@@ -19,8 +19,8 @@ Building IVS
 ------------
 
 1. Install required dependencies:
-  - Ubuntu 11.10: `sudo apt-get install libnl3-dev pkg-config python-tz libpcap-dev`
-  - Ubuntu 12.04: `sudo apt-get install libnl-3-dev libnl-genl-3-dev libnl-route-3-dev pkg-config python-tz libpcap-dev`
+  - Ubuntu 11.10: `sudo apt-get install libnl3-dev pkg-config python-tz libpcap-dev openvswitch-datapath-dkms`
+  - Ubuntu 12.04: `sudo apt-get install libnl-3-dev libnl-genl-3-dev libnl-route-3-dev pkg-config python-tz libpcap-dev openvswitch-datapath-dkms`
 
 2. Clone the IVS repository: `git clone --recurse-submodules https://github.com/floodlight/ivs.git`
 
@@ -56,6 +56,8 @@ which should work out of the box. Follow your controller's instructions
 to get it running and note down its IP address.
 
 [3]: http://www.projectfloodlight.org/floodlight/
+
+The openvswitch kernel module must be loaded: `modprobe openvswitch`.
 
 Now you just need to run the IVS daemon. You'll need to tell it the IP address
 of the controller (-c) and the initial set of network interfaces to connect (-i).
