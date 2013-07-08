@@ -315,7 +315,8 @@ struct ind_ovs_port *ind_ovs_port_lookup(of_port_no_t port_no);
 struct ind_ovs_port *ind_ovs_port_lookup_by_name(const char *ifname);
 
 /* Interface of the upcall submodule */
-void ind_ovs_upcall_init();
+void ind_ovs_upcall_init(void);
+void ind_ovs_upcall_finish(void);
 void ind_ovs_upcall_register(struct ind_ovs_port *port);
 void ind_ovs_upcall_unregister(struct ind_ovs_port *port);
 void ind_ovs_upcall_quiesce(struct ind_ovs_port *port);
