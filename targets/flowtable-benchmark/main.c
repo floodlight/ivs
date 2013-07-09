@@ -38,15 +38,6 @@ const int num_flows = 20000;
 const int num_lookups_per_flow = 5;
 const int max_unique_masks = 8;
 
-const struct flowtable_key l2_mask = {
-    .data = {
-        0xffffffffffffffff,
-        0x00000000ffffffff,
-        0x0000000000000000,
-        0x0000000000000000,
-    }
-};
-
 uint32_t ind_ovs_salt = 42;
 
 uint64_t total_elapsed = 0;
@@ -60,8 +51,10 @@ monotonic_ns(void)
 }
 
 static void
-make_random_mask(struct flowtable_key *mask, const struct flowtable_key *l2_mask)
+make_random_mask(struct flowtable_key *mask)
 {
+    mask->data[0] = 0xffffffffffffffff;
+    mask->data[1] = 0x00000000ffffffff;
     mask->data[FLOWTABLE_KEY_SIZE/8-1] = random()%max_unique_masks;
 }
 
@@ -90,8 +83,8 @@ benchmark_iteration(void)
 
     for (i = 0; i < num_flows; i++) {
         struct flowtable_key key, mask;
-        make_random_key(&key, &l2_mask);
-        make_random_mask(&mask, &l2_mask);
+        make_random_mask(&mask);
+        make_random_key(&key, &mask);
         flowtable_entry_init(&ftes[i], &key, &mask, i % 4);
         flowtable_insert(ft, &ftes[i]);
     }
