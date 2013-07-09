@@ -36,6 +36,7 @@
 const int num_iters = 100;
 const int num_flows = 20000;
 const int num_lookups_per_flow = 5;
+const int max_unique_masks = 8;
 
 const struct flowtable_key l2_mask = {
     .data = {
@@ -56,6 +57,12 @@ monotonic_ns(void)
     struct timespec tp;
     clock_gettime(CLOCK_MONOTONIC, &tp);
     return ((uint64_t)tp.tv_sec * 1000*1000*1000) + tp.tv_nsec;
+}
+
+static void
+make_random_mask(struct flowtable_key *mask, const struct flowtable_key *l2_mask)
+{
+    mask->data[FLOWTABLE_KEY_SIZE/8-1] = random()%max_unique_masks;
 }
 
 static void
@@ -82,9 +89,10 @@ benchmark_iteration(void)
     struct flowtable *ft = flowtable_create();
 
     for (i = 0; i < num_flows; i++) {
-        struct flowtable_key key;
+        struct flowtable_key key, mask;
         make_random_key(&key, &l2_mask);
-        flowtable_entry_init(&ftes[i], &key, &l2_mask, i % 4);
+        make_random_mask(&mask, &l2_mask);
+        flowtable_entry_init(&ftes[i], &key, &mask, i % 4);
         flowtable_insert(ft, &ftes[i]);
     }
 
