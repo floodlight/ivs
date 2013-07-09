@@ -397,7 +397,7 @@ ind_ovs_get_interface_features(const char *ifname,
                                uint32_t *supported, uint32_t *peer,
                                int version)
 {
-    struct ethtool_cmd ecmd;
+    struct ethtool_cmd ecmd = { 0 };
 
     *curr = 0;
     *advertised = 0;

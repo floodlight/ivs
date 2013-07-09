@@ -43,6 +43,7 @@
 
 struct ind_ovs_upcall_thread {
     pthread_t pthread;
+    volatile bool finished;
 
     /* Epoll set containing all upcall netlink sockets assigned to this thread */
     int epfd;
@@ -94,10 +95,11 @@ ind_ovs_upcall_thread_main(void *arg)
 {
     struct ind_ovs_upcall_thread *thread = arg;
 
-    while (1) {
+    while (!thread->finished) {
         struct epoll_event events[128];
         thread->log_upcalls = aim_log_enabled(AIM_LOG_STRUCT_POINTER, AIM_LOG_FLAG_VERBOSE);
-        int n = epoll_wait(thread->epfd, events, ARRAY_SIZE(events), -1);
+        int n = epoll_wait(thread->epfd, events, ARRAY_SIZE(events),
+                           1000 /* check finished flag once per second */);
         if (n < 0 && errno != EINTR) {
             LOG_ERROR("epoll_wait failed: %s", strerror(errno));
             abort();
@@ -108,6 +110,8 @@ ind_ovs_upcall_thread_main(void *arg)
             }
         }
     }
+
+    return NULL;
 }
 
 static void
@@ -472,7 +476,7 @@ ind_ovs_upcall_seen_key(struct ind_ovs_upcall_thread *thread,
 }
 
 void
-ind_ovs_upcall_init()
+ind_ovs_upcall_init(void)
 {
     ind_ovs_num_upcall_threads = DEFAULT_NUM_UPCALL_THREADS;
     char *s = getenv("INDIGO_THREADS");
@@ -524,5 +528,29 @@ ind_ovs_upcall_init()
         pthread_setname_np(thread->pthread, threadname);
 
         ind_ovs_upcall_threads[i] = thread;
+    }
+}
+
+void
+ind_ovs_upcall_finish(void)
+{
+    int i, j;
+
+    for (i = 0; i < ind_ovs_num_upcall_threads; i++) {
+        struct ind_ovs_upcall_thread *thread = ind_ovs_upcall_threads[i];
+        thread->finished = true;
+    }
+
+    __sync_synchronize();
+
+    for (i = 0; i < ind_ovs_num_upcall_threads; i++) {
+        struct ind_ovs_upcall_thread *thread = ind_ovs_upcall_threads[i];
+        pthread_join(thread->pthread, NULL);
+        close(thread->epfd);
+        for (j = 0; j < NUM_UPCALL_BUFFERS; j++) {
+            nlmsg_free(thread->msgs[j]);
+        }
+        free(thread);
+        ind_ovs_upcall_threads[i] = NULL;
     }
 }

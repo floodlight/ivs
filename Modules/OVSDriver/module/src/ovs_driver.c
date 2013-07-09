@@ -210,6 +210,8 @@ void
 ind_ovs_finish(void)
 {
     ind_ovs_fwd_finish();
+    ind_ovs_port_finish();
+    ind_ovs_upcall_finish();
     (void) ind_ovs_destroy_datapath();
     ind_ovs_nlmsg_freelist_finish();
 }

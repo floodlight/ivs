@@ -658,3 +658,11 @@ ind_ovs_port_init(void)
         abort();
     }
 }
+
+void
+ind_ovs_port_finish(void)
+{
+        ind_soc_socket_unregister(nl_cache_mngr_get_fd(route_cache_mngr));
+        nl_cache_mngr_free(route_cache_mngr);
+        nl_socket_free(route_cache_sock);
+}
