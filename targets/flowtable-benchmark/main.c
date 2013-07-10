@@ -53,6 +53,7 @@ monotonic_ns(void)
 static void
 make_random_mask(struct flowtable_key *mask)
 {
+    memset(mask, 0, sizeof(*mask));
     mask->data[0] = 0xffffffffffffffff;
     mask->data[1] = 0x00000000ffffffff;
     mask->data[FLOWTABLE_KEY_SIZE/8-1] = random()%max_unique_masks;
