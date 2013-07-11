@@ -56,6 +56,11 @@ AIM_LOG_STRUCT_DEFINE(
 #define BUILD_ID devel
 #endif
 
+static int
+ivs_loci_logger(loci_log_level_t level,
+                const char *fname, const char *file, int line,
+                const char *format, ...);
+
 static const char *program_version = "ivs 0.4";
 
 static ind_soc_config_t soc_cfg;
@@ -294,6 +299,8 @@ aim_main(int argc, char* argv[])
 {
     AIM_LOG_STRUCT_REGISTER();
 
+    loci_logger = ivs_loci_logger;
+
     core_cfg.expire_flows = 1;
     core_cfg.stats_check_ms = 900;
     core_cfg.disconnected_mode = INDIGO_CORE_DISCONNECTED_MODE_STICKY;
@@ -521,3 +528,37 @@ aim_main(int argc, char* argv[])
     return 0;
 }
 
+static int
+ivs_loci_logger(loci_log_level_t level,
+                const char *fname, const char *file, int line,
+                const char *format, ...)
+{
+    int log_flag;
+    switch (level) {
+    case LOCI_LOG_LEVEL_TRACE:
+        log_flag = AIM_LOG_FLAG_TRACE;
+        break;
+    case LOCI_LOG_LEVEL_VERBOSE:
+        log_flag = AIM_LOG_FLAG_VERBOSE;
+        break;
+    case LOCI_LOG_LEVEL_INFO:
+        log_flag = AIM_LOG_FLAG_INFO;
+        break;
+    case LOCI_LOG_LEVEL_WARN:
+        log_flag = AIM_LOG_FLAG_WARN;
+        break;
+    case LOCI_LOG_LEVEL_ERROR:
+        log_flag = AIM_LOG_FLAG_ERROR;
+        break;
+    default:
+        log_flag = AIM_LOG_FLAG_MSG;
+        break;
+    }
+
+    va_list ap;
+    va_start(ap, format);
+    aim_log_vcommon(&AIM_LOG_STRUCT, log_flag, NULL, 0, fname, file, line, format, ap);
+    va_end(ap);
+
+    return 0;
+}
