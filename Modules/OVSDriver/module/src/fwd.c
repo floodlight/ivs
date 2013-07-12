@@ -60,42 +60,44 @@ indigo_fwd_forwarding_features_get(of_features_reply_t *features)
 {
     uint32_t capabilities = 0, actions = 0;
 
-    OF_CAPABILITIES_FLAG_FLOW_STATS_SET(capabilities, ind_ovs_version);
-    OF_CAPABILITIES_FLAG_TABLE_STATS_SET(capabilities, ind_ovs_version);
-    OF_CAPABILITIES_FLAG_PORT_STATS_SET(capabilities, ind_ovs_version);
-    OF_CAPABILITIES_FLAG_QUEUE_STATS_SET(capabilities, ind_ovs_version);
-    OF_CAPABILITIES_FLAG_ARP_MATCH_IP_SET(capabilities, ind_ovs_version);
-
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_OUTPUT_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_SET_VLAN_VID_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_SET_VLAN_PCP_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_STRIP_VLAN_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_SET_DL_SRC_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_SET_DL_DST_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_SET_NW_SRC_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_SET_NW_DST_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_SET_NW_TOS_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_SET_TP_SRC_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_SET_TP_DST_BY_VERSION(ind_ovs_version));
-#if 0
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_ENQUEUE_BY_VERSION(ind_ovs_version));
-#endif
-
     of_features_reply_n_tables_set(features, 1);
+
+    OF_CAPABILITIES_FLAG_FLOW_STATS_SET(capabilities, features->version);
+    OF_CAPABILITIES_FLAG_TABLE_STATS_SET(capabilities, features->version);
+    OF_CAPABILITIES_FLAG_PORT_STATS_SET(capabilities, features->version);
+    OF_CAPABILITIES_FLAG_QUEUE_STATS_SET(capabilities, features->version);
+    OF_CAPABILITIES_FLAG_ARP_MATCH_IP_SET(capabilities, features->version);
     of_features_reply_capabilities_set(features, capabilities);
-    of_features_reply_actions_set(features, actions);
+
+    if (features->version < OF_VERSION_1_3) {
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_OUTPUT_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_SET_VLAN_VID_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_SET_VLAN_PCP_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_STRIP_VLAN_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_SET_DL_SRC_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_SET_DL_DST_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_SET_NW_SRC_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_SET_NW_DST_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_SET_NW_TOS_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_SET_TP_SRC_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_SET_TP_DST_BY_VERSION(features->version));
+#if 0
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_ENQUEUE_BY_VERSION(features->version));
+#endif
+        of_features_reply_actions_set(features, actions);
+    }
 
     return (INDIGO_ERROR_NONE);
 }

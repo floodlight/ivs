@@ -74,7 +74,11 @@ indigo_error_t indigo_port_features_get(
     of_list_port_desc_t *of_list_port_desc = 0;
     of_port_desc_t      *of_port_desc      = 0;
 
-    if ((of_port_desc = of_port_desc_new(ind_ovs_version)) == 0) {
+    if (features->version >= OF_VERSION_1_3) {
+        return INDIGO_ERROR_NONE;
+    }
+
+    if ((of_port_desc = of_port_desc_new(features->version)) == 0) {
         LOG_ERROR("of_port_desc_new() failed");
         result = INDIGO_ERROR_UNKNOWN;
         goto done;
