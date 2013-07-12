@@ -198,7 +198,20 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
                          (struct flowtable_key *)&masks,
                          priority);
 
-    of_list_action = of_flow_add_actions_get(flow_add);
+    if (flow_add->version == OF_VERSION_1_0) {
+        of_list_action = of_flow_add_actions_get(flow_add);
+    } else {
+        of_list_instruction_t insts;
+        of_instruction_t inst;
+        of_flow_add_instructions_bind(flow_add, &insts);
+
+        if (of_list_instruction_first(&insts, &inst) == 0) {
+            if (inst.header.object_id == OF_INSTRUCTION_APPLY_ACTIONS) {
+                of_list_action = of_instruction_apply_actions_actions_get(&inst.apply_actions);
+            }
+        }
+    }
+
     if (of_list_action == NULL) {
         result = INDIGO_ERROR_UNKNOWN;
         goto done;
