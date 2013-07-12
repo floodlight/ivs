@@ -256,7 +256,7 @@ void
 ind_ovs_match_to_cfr(const of_match_t *match,
                      struct ind_ovs_cfr *fields, struct ind_ovs_cfr *masks)
 {
-    assert(match->version == OF_VERSION_1_0);
+    /* TODO support OF 1.1+ match fields */
 
     memset(fields, 0, sizeof(*fields));
     memset(masks, 0, sizeof(*masks));
