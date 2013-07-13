@@ -62,6 +62,8 @@ static ind_soc_config_t soc_cfg;
 static ind_cxn_config_t cxn_cfg;
 static ind_core_config_t core_cfg;
 
+extern int ind_ovs_version;
+
 static int sighup_eventfd;
 static int sigterm_eventfd;
 
@@ -73,6 +75,16 @@ static enum loglevel {
     LOGLEVEL_TRACE
 } loglevel = LOGLEVEL_DEFAULT;
 
+static struct of_version {
+    const char *name;
+    int wire_version;
+} of_versions[] = {
+    { "1.0", 1 },
+    { "1.1", 2 },
+    { "1.2", 3 },
+    { "1.3", 4 },
+};
+
 static biglist_t *controllers = NULL;
 static biglist_t *listeners = NULL;
 static biglist_t *interfaces = NULL;
@@ -81,6 +93,7 @@ static int use_syslog = 0;
 static int enable_tunnel = 0;
 static char *datapath_name = "indigo";
 static char *config_filename = NULL;
+static char *openflow_version = NULL;
 
 static int
 parse_controller(const char *str,
@@ -129,6 +142,19 @@ parse_controller(const char *str,
     return 0;
 }
 
+static int
+parse_of_version(const char *name)
+{
+    int i;
+    for (i = 0; i < 4; i++) {
+        if (!strcmp(of_versions[i].name, name)) {
+            return of_versions[i].wire_version;
+        }
+    }
+    AIM_LOG_ERROR("Invalid OpenFlow version \"%s\"", name);
+    return -1;
+}
+
 static void
 parse_options(int argc, char **argv)
 {
@@ -161,10 +187,11 @@ parse_options(int argc, char **argv)
             {"name",        required_argument, 0,  OPT_NAME },
             {"max-flows",   required_argument, 0,  OPT_MAX_FLOWS },
             {"config-file", required_argument, 0,  'f' },
+            {"openflow-version", required_argument, 0, 'V' },
             {0,             0,                 0,  0 }
         };
 
-        int c = getopt_long(argc, argv, "vtl:i:c:f:h",
+        int c = getopt_long(argc, argv, "vtl:i:c:f:hV:",
                             long_options, &option_index);
         if (c == -1) {
             break;
@@ -193,6 +220,10 @@ parse_options(int argc, char **argv)
 
         case 'f':
             config_filename = optarg;
+            break;
+
+        case 'V':
+            openflow_version = optarg;
             break;
 
         case OPT_NAME:
@@ -322,6 +353,13 @@ aim_main(int argc, char* argv[])
 
     AIM_LOG_MSG("Starting %s (%s)", program_version, AIM_STRINGIFY(BUILD_ID));
 
+    if (openflow_version != NULL) {
+        ind_ovs_version = parse_of_version(openflow_version);
+        if (ind_ovs_version == -1) {
+            return 1;
+        }
+    }
+
     /* Initialize all modules */
 
     if (ind_soc_init(&soc_cfg) < 0) {
@@ -417,7 +455,7 @@ aim_main(int argc, char* argv[])
             }
 
             indigo_cxn_config_params_t config = {
-                .version = OF_VERSION_1_0,
+                .version = ind_ovs_version,
                 .cxn_priority = 0,
                 .local = 0,
                 .listen = 0,
@@ -447,7 +485,7 @@ aim_main(int argc, char* argv[])
             }
 
             indigo_cxn_config_params_t config = {
-                .version = OF_VERSION_1_0,
+                .version = ind_ovs_version,
                 .cxn_priority = 0,
                 .local = 1,
                 .listen = 1,
