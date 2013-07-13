@@ -416,9 +416,13 @@ indigo_fwd_table_stats_get(of_table_stats_request_t *table_stats_request,
     of_table_stats_request_xid_get(table_stats_request, &xid);
     of_table_stats_reply_xid_set(table_stats_reply, xid);
     of_table_stats_entry_table_id_set(entry, 0);
-    of_table_stats_entry_name_set(entry, "Table 0");
-    of_table_stats_entry_wildcards_set(entry, 0x3fffff); /* All wildcards */
-    of_table_stats_entry_max_entries_set(entry, 16384);
+    if (version < OF_VERSION_1_3) {
+        of_table_stats_entry_name_set(entry, "Table 0");
+        of_table_stats_entry_max_entries_set(entry, 16384);
+    }
+    if (version < OF_VERSION_1_2) {
+        of_table_stats_entry_wildcards_set(entry, 0x3fffff); /* All wildcards */
+    }
     of_table_stats_entry_active_count_set(entry, active_count);
     of_table_stats_entry_lookup_count_set(entry, lookup_count + dp_stats.n_hit);
     of_table_stats_entry_matched_count_set(entry, matched_count + dp_stats.n_hit);
