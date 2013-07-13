@@ -473,9 +473,23 @@ ind_fwd_pkt_in(of_port_no_t in_port,
     }
 
     of_packet_in_total_len_set(of_packet_in, len);
-    of_packet_in_in_port_set(of_packet_in, in_port);
     of_packet_in_reason_set(of_packet_in, reason);
     of_packet_in_buffer_id_set(of_packet_in, OF_BUFFER_ID_NO_BUFFER);
+
+    if (ind_ovs_version < OF_VERSION_1_2) {
+        of_packet_in_in_port_set(of_packet_in, in_port);
+    } else {
+        if (LOXI_FAILURE(of_packet_in_match_set(of_packet_in, match))) {
+            LOG_ERROR("Failed to write match to packet-in message");
+            of_packet_in_delete(of_packet_in);
+            return INDIGO_ERROR_UNKNOWN;
+        }
+    }
+
+    if (ind_ovs_version >= OF_VERSION_1_3) {
+        of_packet_in_cookie_set(of_packet_in, 0xffffffffffffffff);
+    }
+
     if (LOXI_FAILURE(of_packet_in_data_set(of_packet_in, &of_octets))) {
         LOG_ERROR("Failed to write packet data to packet-in message");
         of_packet_in_delete(of_packet_in);
