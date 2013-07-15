@@ -74,7 +74,11 @@ indigo_error_t indigo_port_features_get(
     of_list_port_desc_t *of_list_port_desc = 0;
     of_port_desc_t      *of_port_desc      = 0;
 
-    if ((of_port_desc = of_port_desc_new(ind_ovs_version)) == 0) {
+    if (features->version >= OF_VERSION_1_3) {
+        return INDIGO_ERROR_NONE;
+    }
+
+    if ((of_port_desc = of_port_desc_new(features->version)) == 0) {
         LOG_ERROR("of_port_desc_new() failed");
         result = INDIGO_ERROR_UNKNOWN;
         goto done;
@@ -342,7 +346,7 @@ port_stats_iterator(struct nl_msg *msg, void *arg)
     struct ovs_vport_stats *port_stats = nla_data(attrs[OVS_VPORT_ATTR_STATS]);
 
     of_port_stats_entry_t entry[1];
-    of_port_stats_entry_init(entry, ind_ovs_version, -1, 1);
+    of_port_stats_entry_init(entry, list->version, -1, 1);
     if (of_list_port_stats_entry_append_bind(list, entry) < 0) {
         /* TODO needs fix in indigo core */
         LOG_ERROR("too many port stats replies");
@@ -408,7 +412,7 @@ void indigo_port_stats_get(
     of_port_stats_reply_t *port_stats_reply;
     indigo_error_t err = INDIGO_ERROR_NONE;
 
-    port_stats_reply = of_port_stats_reply_new(ind_ovs_version);
+    port_stats_reply = of_port_stats_reply_new(port_stats_request->version);
     if (port_stats_reply == NULL) {
         err = INDIGO_ERROR_RESOURCE;
         goto out;
@@ -418,7 +422,7 @@ void indigo_port_stats_get(
     of_port_stats_reply_entries_bind(port_stats_reply, &list);
 
     of_port_stats_request_port_no_get(port_stats_request, &req_of_port_num);
-    int dump_all = req_of_port_num == OF_PORT_DEST_NONE_BY_VERSION(ind_ovs_version);
+    int dump_all = req_of_port_num == OF_PORT_DEST_NONE_BY_VERSION(port_stats_request->version);
 
     /* Refresh statistics */
     nl_cache_refill(route_cache_sock, link_cache);
@@ -475,7 +479,7 @@ void indigo_port_queue_stats_get(
     of_queue_stats_request_t *queue_stats_request,
     indigo_cookie_t callback_cookie)
 {
-    of_queue_stats_reply_t *queue_stats_reply = of_queue_stats_reply_new(ind_ovs_version);
+    of_queue_stats_reply_t *queue_stats_reply = of_queue_stats_reply_new(queue_stats_request->version);
     if (queue_stats_reply == NULL) {
         indigo_core_queue_stats_get_callback(INDIGO_ERROR_RESOURCE, NULL, callback_cookie);
         return;

@@ -60,42 +60,44 @@ indigo_fwd_forwarding_features_get(of_features_reply_t *features)
 {
     uint32_t capabilities = 0, actions = 0;
 
-    OF_CAPABILITIES_FLAG_FLOW_STATS_SET(capabilities, ind_ovs_version);
-    OF_CAPABILITIES_FLAG_TABLE_STATS_SET(capabilities, ind_ovs_version);
-    OF_CAPABILITIES_FLAG_PORT_STATS_SET(capabilities, ind_ovs_version);
-    OF_CAPABILITIES_FLAG_QUEUE_STATS_SET(capabilities, ind_ovs_version);
-    OF_CAPABILITIES_FLAG_ARP_MATCH_IP_SET(capabilities, ind_ovs_version);
-
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_OUTPUT_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_SET_VLAN_VID_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_SET_VLAN_PCP_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_STRIP_VLAN_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_SET_DL_SRC_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_SET_DL_DST_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_SET_NW_SRC_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_SET_NW_DST_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_SET_NW_TOS_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_SET_TP_SRC_BY_VERSION(ind_ovs_version));
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_SET_TP_DST_BY_VERSION(ind_ovs_version));
-#if 0
-    OF_FLAG_ENUM_SET(actions,
-        OF_ACTION_TYPE_ENQUEUE_BY_VERSION(ind_ovs_version));
-#endif
-
     of_features_reply_n_tables_set(features, 1);
+
+    OF_CAPABILITIES_FLAG_FLOW_STATS_SET(capabilities, features->version);
+    OF_CAPABILITIES_FLAG_TABLE_STATS_SET(capabilities, features->version);
+    OF_CAPABILITIES_FLAG_PORT_STATS_SET(capabilities, features->version);
+    OF_CAPABILITIES_FLAG_QUEUE_STATS_SET(capabilities, features->version);
+    OF_CAPABILITIES_FLAG_ARP_MATCH_IP_SET(capabilities, features->version);
     of_features_reply_capabilities_set(features, capabilities);
-    of_features_reply_actions_set(features, actions);
+
+    if (features->version < OF_VERSION_1_3) {
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_OUTPUT_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_SET_VLAN_VID_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_SET_VLAN_PCP_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_STRIP_VLAN_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_SET_DL_SRC_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_SET_DL_DST_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_SET_NW_SRC_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_SET_NW_DST_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_SET_NW_TOS_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_SET_TP_SRC_BY_VERSION(features->version));
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_SET_TP_DST_BY_VERSION(features->version));
+#if 0
+        OF_FLAG_ENUM_SET(actions,
+            OF_ACTION_TYPE_ENQUEUE_BY_VERSION(features->version));
+#endif
+        of_features_reply_actions_set(features, actions);
+    }
 
     return (INDIGO_ERROR_NONE);
 }
@@ -414,9 +416,13 @@ indigo_fwd_table_stats_get(of_table_stats_request_t *table_stats_request,
     of_table_stats_request_xid_get(table_stats_request, &xid);
     of_table_stats_reply_xid_set(table_stats_reply, xid);
     of_table_stats_entry_table_id_set(entry, 0);
-    of_table_stats_entry_name_set(entry, "Table 0");
-    of_table_stats_entry_wildcards_set(entry, 0x3fffff); /* All wildcards */
-    of_table_stats_entry_max_entries_set(entry, 16384);
+    if (version < OF_VERSION_1_3) {
+        of_table_stats_entry_name_set(entry, "Table 0");
+        of_table_stats_entry_max_entries_set(entry, 16384);
+    }
+    if (version < OF_VERSION_1_2) {
+        of_table_stats_entry_wildcards_set(entry, 0x3fffff); /* All wildcards */
+    }
     of_table_stats_entry_active_count_set(entry, active_count);
     of_table_stats_entry_lookup_count_set(entry, lookup_count + dp_stats.n_hit);
     of_table_stats_entry_matched_count_set(entry, matched_count + dp_stats.n_hit);
@@ -467,9 +473,23 @@ ind_fwd_pkt_in(of_port_no_t in_port,
     }
 
     of_packet_in_total_len_set(of_packet_in, len);
-    of_packet_in_in_port_set(of_packet_in, in_port);
     of_packet_in_reason_set(of_packet_in, reason);
     of_packet_in_buffer_id_set(of_packet_in, OF_BUFFER_ID_NO_BUFFER);
+
+    if (ind_ovs_version < OF_VERSION_1_2) {
+        of_packet_in_in_port_set(of_packet_in, in_port);
+    } else {
+        if (LOXI_FAILURE(of_packet_in_match_set(of_packet_in, match))) {
+            LOG_ERROR("Failed to write match to packet-in message");
+            of_packet_in_delete(of_packet_in);
+            return INDIGO_ERROR_UNKNOWN;
+        }
+    }
+
+    if (ind_ovs_version >= OF_VERSION_1_3) {
+        of_packet_in_cookie_set(of_packet_in, 0xffffffffffffffff);
+    }
+
     if (LOXI_FAILURE(of_packet_in_data_set(of_packet_in, &of_octets))) {
         LOG_ERROR("Failed to write packet data to packet-in message");
         of_packet_in_delete(of_packet_in);
