@@ -202,7 +202,8 @@ struct ind_ovs_cfr {
     uint8_t dl_src[6];          /* Ethernet source address. */
     uint16_t in_port;           /* Input switch port. */
     uint16_t dl_type;           /* Ethernet frame type. */
-    uint16_t dl_vlan;           /* VLAN id and priority, same as wire format. */
+    uint16_t dl_vlan;           /* VLAN id and priority, same as wire format
+                                   plus CFI bit set if tag present. */
     uint8_t nw_tos;             /* IPv4 DSCP. */
     uint8_t nw_proto;           /* IP protocol. */
     uint32_t nw_src;            /* IP source address. */
