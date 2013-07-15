@@ -192,6 +192,13 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
     struct ind_ovs_cfr fields, masks;
     ind_ovs_match_to_cfr(&of_match, &fields, &masks);
 
+#ifndef NDEBUG
+    LOG_VERBOSE("New flow fields:");
+    ind_ovs_dump_cfr(&fields);
+    LOG_VERBOSE("New flow masks:");
+    ind_ovs_dump_cfr(&masks);
+#endif
+
     uint16_t priority;
     of_flow_add_priority_get(flow_add, &priority);
 
@@ -512,6 +519,11 @@ ind_ovs_lookup_flow(const struct ind_ovs_parsed_key *pkey,
     struct flowtable_entry *fte;
     struct ind_ovs_cfr cfr;
     ind_ovs_key_to_cfr(pkey, &cfr);
+
+#ifndef NDEBUG
+    LOG_VERBOSE("Looking up flow:");
+    ind_ovs_dump_cfr(&cfr);
+#endif
 
     ++lookup_count;
 

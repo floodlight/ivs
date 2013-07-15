@@ -458,3 +458,27 @@ ind_ovs_dump_key(const struct nlattr *key)
     ind_ovs_dump_nested(key, ind_ovs_dump_key_attr);
     indent--;
 }
+
+/* Not a Netlink message, but uses some of the dump helpers */
+void
+ind_ovs_dump_cfr(const struct ind_ovs_cfr *cfr)
+{
+    if (!aim_log_fid_get(AIM_LOG_STRUCT_POINTER, AIM_LOG_FLAG_VERBOSE)) {
+        /* Exit early if we wouldn't log anything */
+        return;
+    }
+
+    indent++;
+    output("dl_dst="FORMAT_MAC, VALUE_MAC(cfr->dl_dst));
+    output("dl_src="FORMAT_MAC, VALUE_MAC(cfr->dl_src));
+    output("in_port=%u", cfr->in_port);
+    output("dl_type=0x%04x", ntohs(cfr->dl_type));
+    output("dl_vlan=0x%04x", ntohs(cfr->dl_vlan));
+    output("nw_tos=0x%x", cfr->nw_tos);
+    output("nw_proto=0x%x", cfr->nw_proto);
+    output("nw_src="FORMAT_IPV4, VALUE_IPV4((uint8_t *)&cfr->nw_src));
+    output("nw_dst="FORMAT_IPV4, VALUE_IPV4((uint8_t *)&cfr->nw_dst));
+    output("tp_src=%u", cfr->tp_src);
+    output("tp_dst=%u", cfr->tp_dst);
+    indent--;
+}
