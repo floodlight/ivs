@@ -100,6 +100,9 @@
 #define VLAN_VID(tci) ((tci) & 0xfff)
 #define VLAN_PCP(tci) ((tci) >> 13)
 
+/* Same as VLAN_TCI above except the vid includes the CFI bit */
+#define VLAN_TCI_WITH_CFI(vid, pcp) ( (((pcp) & 0x7) << 13) | ((vid) & 0x1fff) )
+
 
 /* Internal datastructures */
 

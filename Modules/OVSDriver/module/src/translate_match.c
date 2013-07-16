@@ -276,18 +276,26 @@ ind_ovs_match_to_cfr(const of_match_t *match,
     masks->dl_type = htons(match->masks.eth_type);
 
     /* vlan & pcp are combined, with CFI bit indicating tagged */
-    if (match->masks.vlan_vid == 0) {
-        /* wildcarded */
-        fields->dl_vlan = 0;
-        masks->dl_vlan = 0;
-    } else if (match->fields.vlan_vid == (uint16_t)-1) {
-        /* untagged */
-        fields->dl_vlan = 0;
-        masks->dl_vlan = 0xffff;
+    if (match->version == OF_VERSION_1_0) {
+        if (match->masks.vlan_vid == 0) {
+            /* wildcarded */
+            fields->dl_vlan = 0;
+            masks->dl_vlan = 0;
+        } else if (match->fields.vlan_vid == (uint16_t)-1) {
+            /* untagged */
+            fields->dl_vlan = 0;
+            masks->dl_vlan = 0xffff;
+        } else {
+            /* tagged */
+            fields->dl_vlan = htons(VLAN_CFI_BIT | VLAN_TCI(match->fields.vlan_vid, match->fields.vlan_pcp));
+            masks->dl_vlan = htons(VLAN_CFI_BIT | VLAN_TCI(match->masks.vlan_vid, match->masks.vlan_pcp));
+        }
+    } else if (match->version == OF_VERSION_1_1) {
+        NYI(0);
     } else {
-        /* tagged */
-        fields->dl_vlan = htons(VLAN_CFI_BIT | VLAN_TCI(match->fields.vlan_vid, match->fields.vlan_pcp));
-        masks->dl_vlan = htons(VLAN_CFI_BIT | VLAN_TCI(match->masks.vlan_vid, match->masks.vlan_pcp));
+        /* CFI bit indicating 'present' is included in the VID match field */
+        fields->dl_vlan = htons(VLAN_TCI_WITH_CFI(match->fields.vlan_vid, match->fields.vlan_pcp));
+        masks->dl_vlan = htons(VLAN_TCI_WITH_CFI(match->masks.vlan_vid, match->masks.vlan_pcp));
     }
 
     fields->nw_tos = match->fields.ip_dscp & 0xFC;
