@@ -313,15 +313,25 @@ ind_ovs_match_to_cfr(const of_match_t *match,
     masks->nw_src = htonl(match->masks.ipv4_src);
     masks->nw_dst = htonl(match->masks.ipv4_dst);
 
-    /* subsequent fields are type dependent */
-    if (match->fields.eth_type == ETH_P_IP) {
-        if (match->fields.ip_proto == IPPROTO_TCP
-            || match->fields.ip_proto == IPPROTO_UDP
-            || match->fields.ip_proto == IPPROTO_ICMP) {
-            fields->tp_src = htons(match->fields.tcp_src);
-            fields->tp_dst = htons(match->fields.tcp_dst);
-            masks->tp_src = htons(match->masks.tcp_src);
-            masks->tp_dst = htons(match->masks.tcp_dst);
+    if (match->version < OF_VERSION_1_2) {
+        fields->tp_src = htons(match->fields.tcp_src);
+        fields->tp_dst = htons(match->fields.tcp_dst);
+        masks->tp_src = htons(match->masks.tcp_src);
+        masks->tp_dst = htons(match->masks.tcp_dst);
+    } else {
+        /* subsequent fields are type dependent */
+        if (match->fields.eth_type == ETH_P_IP) {
+            if (match->fields.ip_proto == IPPROTO_TCP) {
+                fields->tp_src = htons(match->fields.tcp_src);
+                fields->tp_dst = htons(match->fields.tcp_dst);
+                masks->tp_src = htons(match->masks.tcp_src);
+                masks->tp_dst = htons(match->masks.tcp_dst);
+            } else if (match->fields.ip_proto == IPPROTO_UDP) {
+                fields->tp_src = htons(match->fields.udp_src);
+                fields->tp_dst = htons(match->fields.udp_dst);
+                masks->tp_src = htons(match->masks.udp_src);
+                masks->tp_dst = htons(match->masks.udp_dst);
+            }
         }
     }
 
