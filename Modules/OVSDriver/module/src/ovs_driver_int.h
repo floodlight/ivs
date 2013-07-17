@@ -100,6 +100,9 @@
 #define VLAN_VID(tci) ((tci) & 0xfff)
 #define VLAN_PCP(tci) ((tci) >> 13)
 
+/* Same as VLAN_TCI above except the vid includes the CFI bit */
+#define VLAN_TCI_WITH_CFI(vid, pcp) ( (((pcp) & 0x7) << 13) | ((vid) & 0x1fff) )
+
 
 /* Internal datastructures */
 
@@ -202,7 +205,8 @@ struct ind_ovs_cfr {
     uint8_t dl_src[6];          /* Ethernet source address. */
     uint16_t in_port;           /* Input switch port. */
     uint16_t dl_type;           /* Ethernet frame type. */
-    uint16_t dl_vlan;           /* VLAN id and priority, same as wire format. */
+    uint16_t dl_vlan;           /* VLAN id and priority, same as wire format
+                                   plus CFI bit set if tag present. */
     uint8_t nw_tos;             /* IPv4 DSCP. */
     uint8_t nw_proto;           /* IP protocol. */
     uint32_t nw_src;            /* IP source address. */

@@ -215,9 +215,9 @@ ind_ovs_key_to_cfr(const struct ind_ovs_parsed_key *pkey,
     }
 
     if (ATTR_BITMAP_TEST(pkey->populated, OVS_KEY_ATTR_VLAN)) {
-        cfr->dl_vlan = pkey->vlan;
+        cfr->dl_vlan = pkey->vlan | htons(VLAN_CFI_BIT);
     } else {
-        cfr->dl_vlan = VLAN_CFI_BIT;
+        cfr->dl_vlan = 0;
     }
 
     if (ATTR_BITMAP_TEST(pkey->populated, OVS_KEY_ATTR_IPV4)) {
@@ -275,14 +275,27 @@ ind_ovs_match_to_cfr(const of_match_t *match,
     fields->dl_type = htons(match->fields.eth_type);
     masks->dl_type = htons(match->masks.eth_type);
 
-    /* vlan & pcp are combined, with a bit indicating untagged */
-    uint16_t vlan = (match->fields.vlan_vid & match->masks.vlan_vid);
-    if (vlan == (uint16_t)-1) {
-        fields->dl_vlan = VLAN_CFI_BIT;
-        masks->dl_vlan = 0xffff;
+    /* vlan & pcp are combined, with CFI bit indicating tagged */
+    if (match->version == OF_VERSION_1_0) {
+        if (match->masks.vlan_vid == 0) {
+            /* wildcarded */
+            fields->dl_vlan = 0;
+            masks->dl_vlan = 0;
+        } else if (match->fields.vlan_vid == (uint16_t)-1) {
+            /* untagged */
+            fields->dl_vlan = 0;
+            masks->dl_vlan = 0xffff;
+        } else {
+            /* tagged */
+            fields->dl_vlan = htons(VLAN_CFI_BIT | VLAN_TCI(match->fields.vlan_vid, match->fields.vlan_pcp));
+            masks->dl_vlan = htons(VLAN_CFI_BIT | VLAN_TCI(match->masks.vlan_vid, match->masks.vlan_pcp));
+        }
+    } else if (match->version == OF_VERSION_1_1) {
+        NYI(0);
     } else {
-        fields->dl_vlan = htons(VLAN_TCI(match->fields.vlan_vid, match->fields.vlan_pcp));
-        masks->dl_vlan = htons(VLAN_TCI(match->masks.vlan_vid, match->masks.vlan_pcp));
+        /* CFI bit indicating 'present' is included in the VID match field */
+        fields->dl_vlan = htons(VLAN_TCI_WITH_CFI(match->fields.vlan_vid, match->fields.vlan_pcp));
+        masks->dl_vlan = htons(VLAN_TCI_WITH_CFI(match->masks.vlan_vid, match->masks.vlan_pcp));
     }
 
     fields->nw_tos = match->fields.ip_dscp & 0xFC;
