@@ -298,11 +298,17 @@ ind_ovs_match_to_cfr(const of_match_t *match,
         masks->dl_vlan = htons(VLAN_TCI_WITH_CFI(match->masks.vlan_vid, match->masks.vlan_pcp));
     }
 
-    fields->nw_tos = match->fields.ip_dscp & 0xFC;
+    if (match->version < OF_VERSION_1_2) {
+        fields->nw_tos = match->fields.ip_dscp & 0xFC;
+        masks->nw_tos = match->masks.ip_dscp & 0xFC;
+    } else {
+        fields->nw_tos = ((match->fields.ip_dscp & 0x3f) << 2) | (match->fields.ip_ecn & 0x3);
+        masks->nw_tos = ((match->masks.ip_dscp & 0x3f) << 2) | (match->masks.ip_ecn & 0x3);
+    }
+
     fields->nw_proto = match->fields.ip_proto;
     fields->nw_src = htonl(match->fields.ipv4_src);
     fields->nw_dst = htonl(match->fields.ipv4_dst);
-    masks->nw_tos = match->masks.ip_dscp & 0xFC;
     masks->nw_proto = match->masks.ip_proto;
     masks->nw_src = htonl(match->masks.ipv4_src);
     masks->nw_dst = htonl(match->masks.ipv4_dst);
