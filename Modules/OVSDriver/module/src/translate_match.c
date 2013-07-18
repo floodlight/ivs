@@ -252,6 +252,9 @@ ind_ovs_key_to_cfr(const struct ind_ovs_parsed_key *pkey,
     } else if (ATTR_BITMAP_TEST(pkey->populated, OVS_KEY_ATTR_ICMP)) {
         cfr->tp_src = pkey->icmp.icmp_type << 8;
         cfr->tp_dst = pkey->icmp.icmp_code << 8;
+    } else if (ATTR_BITMAP_TEST(pkey->populated, OVS_KEY_ATTR_ICMPV6)) {
+        cfr->tp_src = pkey->icmpv6.icmpv6_type << 8;
+        cfr->tp_dst = pkey->icmpv6.icmpv6_code << 8;
     } else {
         cfr->tp_src = 0;
         cfr->tp_dst = 0;
@@ -354,6 +357,11 @@ ind_ovs_match_to_cfr(const of_match_t *match,
                 fields->tp_dst = htons(match->fields.icmpv4_code);
                 masks->tp_src = htons(match->masks.icmpv4_type);
                 masks->tp_dst = htons(match->masks.icmpv4_code);
+            } else if (match->fields.ip_proto == IPPROTO_ICMPV6) {
+                fields->tp_src = htons(match->fields.icmpv6_type);
+                fields->tp_dst = htons(match->fields.icmpv6_code);
+                masks->tp_src = htons(match->masks.icmpv6_type);
+                masks->tp_dst = htons(match->masks.icmpv6_code);
             }
         } else if (match->fields.eth_type == ETH_P_ARP) {
             fields->nw_proto = match->fields.arp_op & 0xff;
