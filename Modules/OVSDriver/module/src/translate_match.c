@@ -338,6 +338,11 @@ ind_ovs_match_to_cfr(const of_match_t *match,
                 fields->tp_dst = htons(match->fields.udp_dst);
                 masks->tp_src = htons(match->masks.udp_src);
                 masks->tp_dst = htons(match->masks.udp_dst);
+            } else if (match->fields.ip_proto == IPPROTO_ICMP) {
+                fields->tp_src = htons(match->fields.icmpv4_type);
+                fields->tp_dst = htons(match->fields.icmpv4_code);
+                masks->tp_src = htons(match->masks.icmpv4_type);
+                masks->tp_dst = htons(match->masks.icmpv4_code);
             }
         }
     }
