@@ -480,5 +480,12 @@ ind_ovs_dump_cfr(const struct ind_ovs_cfr *cfr)
     output("nw_dst="FORMAT_IPV4, VALUE_IPV4((uint8_t *)&cfr->nw_dst));
     output("tp_src=%u", cfr->tp_src);
     output("tp_dst=%u", cfr->tp_dst);
+
+    char src[INET6_ADDRSTRLEN], dst[INET6_ADDRSTRLEN];
+    inet_ntop(AF_INET6, cfr->ipv6_src, src, INET6_ADDRSTRLEN);
+    inet_ntop(AF_INET6, cfr->ipv6_dst, dst, INET6_ADDRSTRLEN);
+    output("ipv6_src=%s", src);
+    output("ipv6_dst=%s", dst);
+
     indent--;
 }
