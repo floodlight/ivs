@@ -299,21 +299,17 @@ ind_ovs_match_to_cfr(const of_match_t *match,
     }
 
     if (match->version < OF_VERSION_1_2) {
+        fields->nw_proto = match->fields.ip_proto;
+        masks->nw_proto = match->masks.ip_proto;
+
         fields->nw_tos = match->fields.ip_dscp & 0xFC;
         masks->nw_tos = match->masks.ip_dscp & 0xFC;
-    } else {
-        fields->nw_tos = ((match->fields.ip_dscp & 0x3f) << 2) | (match->fields.ip_ecn & 0x3);
-        masks->nw_tos = ((match->masks.ip_dscp & 0x3f) << 2) | (match->masks.ip_ecn & 0x3);
-    }
 
-    fields->nw_proto = match->fields.ip_proto;
-    fields->nw_src = htonl(match->fields.ipv4_src);
-    fields->nw_dst = htonl(match->fields.ipv4_dst);
-    masks->nw_proto = match->masks.ip_proto;
-    masks->nw_src = htonl(match->masks.ipv4_src);
-    masks->nw_dst = htonl(match->masks.ipv4_dst);
+        fields->nw_src = htonl(match->fields.ipv4_src);
+        fields->nw_dst = htonl(match->fields.ipv4_dst);
+        masks->nw_src = htonl(match->masks.ipv4_src);
+        masks->nw_dst = htonl(match->masks.ipv4_dst);
 
-    if (match->version < OF_VERSION_1_2) {
         fields->tp_src = htons(match->fields.tcp_src);
         fields->tp_dst = htons(match->fields.tcp_dst);
         masks->tp_src = htons(match->masks.tcp_src);
@@ -321,6 +317,17 @@ ind_ovs_match_to_cfr(const of_match_t *match,
     } else {
         /* subsequent fields are type dependent */
         if (match->fields.eth_type == ETH_P_IP) {
+            fields->nw_proto = match->fields.ip_proto;
+            masks->nw_proto = match->masks.ip_proto;
+
+            fields->nw_tos = ((match->fields.ip_dscp & 0x3f) << 2) | (match->fields.ip_ecn & 0x3);
+            masks->nw_tos = ((match->masks.ip_dscp & 0x3f) << 2) | (match->masks.ip_ecn & 0x3);
+
+            fields->nw_src = htonl(match->fields.ipv4_src);
+            fields->nw_dst = htonl(match->fields.ipv4_dst);
+            masks->nw_src = htonl(match->masks.ipv4_src);
+            masks->nw_dst = htonl(match->masks.ipv4_dst);
+
             if (match->fields.ip_proto == IPPROTO_TCP) {
                 fields->tp_src = htons(match->fields.tcp_src);
                 fields->tp_dst = htons(match->fields.tcp_dst);
