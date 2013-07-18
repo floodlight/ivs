@@ -344,6 +344,14 @@ ind_ovs_match_to_cfr(const of_match_t *match,
                 masks->tp_src = htons(match->masks.icmpv4_type);
                 masks->tp_dst = htons(match->masks.icmpv4_code);
             }
+        } else if (match->fields.eth_type == ETH_P_ARP) {
+            fields->nw_proto = match->fields.arp_op & 0xff;
+            masks->nw_proto = match->masks.arp_op & 0xff;
+
+            fields->nw_src = htonl(match->fields.arp_spa);
+            fields->nw_dst = htonl(match->fields.arp_tpa);
+            masks->nw_src = htonl(match->masks.arp_spa);
+            masks->nw_dst = htonl(match->masks.arp_tpa);
         }
     }
 
