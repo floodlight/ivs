@@ -213,9 +213,11 @@ struct ind_ovs_cfr {
     uint32_t nw_dst;            /* IP destination address. */
     uint16_t tp_src;            /* TCP/UDP source port. */
     uint16_t tp_dst;            /* TCP/UDP destination port. */
+    uint32_t ipv6_src[4];       /* IPv6 source address. */
+    uint32_t ipv6_dst[4];       /* IPv6 destination address. */
 } __attribute__ ((aligned (8)));
 
-AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == 4*8);
+AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == 8*8);
 AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == FLOWTABLE_KEY_SIZE);
 
 /*

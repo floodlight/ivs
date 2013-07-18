@@ -220,6 +220,9 @@ ind_ovs_key_to_cfr(const struct ind_ovs_parsed_key *pkey,
         cfr->dl_vlan = 0;
     }
 
+    memset(cfr->ipv6_src, 0, sizeof(cfr->ipv6_src));
+    memset(cfr->ipv6_dst, 0, sizeof(cfr->ipv6_dst));
+
     if (ATTR_BITMAP_TEST(pkey->populated, OVS_KEY_ATTR_IPV4)) {
         cfr->nw_tos = pkey->ipv4.ipv4_tos;
         cfr->nw_proto = pkey->ipv4.ipv4_proto;
@@ -228,8 +231,10 @@ ind_ovs_key_to_cfr(const struct ind_ovs_parsed_key *pkey,
     } else if (ATTR_BITMAP_TEST(pkey->populated, OVS_KEY_ATTR_IPV6)) {
         cfr->nw_tos = pkey->ipv6.ipv6_tclass;
         cfr->nw_proto = pkey->ipv6.ipv6_proto;
-        cfr->nw_src = 0; /* TODO */
-        cfr->nw_dst = 0; /* TODO */
+        memcpy(&cfr->ipv6_src, &pkey->ipv6.ipv6_src, OF_IPV6_BYTES);
+        memcpy(&cfr->ipv6_dst, &pkey->ipv6.ipv6_dst, OF_IPV6_BYTES);
+        cfr->nw_src = 0;
+        cfr->nw_dst = 0;
         /* TODO flow label */
     } else if (ATTR_BITMAP_TEST(pkey->populated, OVS_KEY_ATTR_ARP)) {
         cfr->nw_tos = 0;
@@ -339,7 +344,10 @@ ind_ovs_match_to_cfr(const of_match_t *match,
                 masks->nw_src = htonl(match->masks.ipv4_src);
                 masks->nw_dst = htonl(match->masks.ipv4_dst);
             } else if (match->fields.eth_type == ETH_P_IPV6) {
-                /* TODO */
+                memcpy(&fields->ipv6_src, &match->fields.ipv6_src, OF_IPV6_BYTES);
+                memcpy(&fields->ipv6_dst, &match->fields.ipv6_dst, OF_IPV6_BYTES);
+                memcpy(&masks->ipv6_src, &match->masks.ipv6_src, OF_IPV6_BYTES);
+                memcpy(&masks->ipv6_dst, &match->masks.ipv6_dst, OF_IPV6_BYTES);
             }
 
             if (match->fields.ip_proto == IPPROTO_TCP) {
