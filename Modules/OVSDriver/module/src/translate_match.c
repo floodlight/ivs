@@ -220,11 +220,22 @@ ind_ovs_key_to_cfr(const struct ind_ovs_parsed_key *pkey,
         cfr->dl_vlan = 0;
     }
 
+    memset(cfr->ipv6_src, 0, sizeof(cfr->ipv6_src));
+    memset(cfr->ipv6_dst, 0, sizeof(cfr->ipv6_dst));
+
     if (ATTR_BITMAP_TEST(pkey->populated, OVS_KEY_ATTR_IPV4)) {
         cfr->nw_tos = pkey->ipv4.ipv4_tos;
         cfr->nw_proto = pkey->ipv4.ipv4_proto;
         cfr->nw_src = pkey->ipv4.ipv4_src;
         cfr->nw_dst = pkey->ipv4.ipv4_dst;
+    } else if (ATTR_BITMAP_TEST(pkey->populated, OVS_KEY_ATTR_IPV6)) {
+        cfr->nw_tos = pkey->ipv6.ipv6_tclass;
+        cfr->nw_proto = pkey->ipv6.ipv6_proto;
+        memcpy(&cfr->ipv6_src, &pkey->ipv6.ipv6_src, OF_IPV6_BYTES);
+        memcpy(&cfr->ipv6_dst, &pkey->ipv6.ipv6_dst, OF_IPV6_BYTES);
+        cfr->nw_src = 0;
+        cfr->nw_dst = 0;
+        /* TODO flow label */
     } else if (ATTR_BITMAP_TEST(pkey->populated, OVS_KEY_ATTR_ARP)) {
         cfr->nw_tos = 0;
         cfr->nw_proto = ntohs(pkey->arp.arp_op) & 0xFF;
@@ -246,6 +257,9 @@ ind_ovs_key_to_cfr(const struct ind_ovs_parsed_key *pkey,
     } else if (ATTR_BITMAP_TEST(pkey->populated, OVS_KEY_ATTR_ICMP)) {
         cfr->tp_src = pkey->icmp.icmp_type << 8;
         cfr->tp_dst = pkey->icmp.icmp_code << 8;
+    } else if (ATTR_BITMAP_TEST(pkey->populated, OVS_KEY_ATTR_ICMPV6)) {
+        cfr->tp_src = pkey->icmpv6.icmpv6_type << 8;
+        cfr->tp_dst = pkey->icmpv6.icmpv6_code << 8;
     } else {
         cfr->tp_src = 0;
         cfr->tp_dst = 0;
@@ -298,24 +312,73 @@ ind_ovs_match_to_cfr(const of_match_t *match,
         masks->dl_vlan = htons(VLAN_TCI_WITH_CFI(match->masks.vlan_vid, match->masks.vlan_pcp));
     }
 
-    fields->nw_tos = match->fields.ip_dscp & 0xFC;
-    fields->nw_proto = match->fields.ip_proto;
-    fields->nw_src = htonl(match->fields.ipv4_src);
-    fields->nw_dst = htonl(match->fields.ipv4_dst);
-    masks->nw_tos = match->masks.ip_dscp & 0xFC;
-    masks->nw_proto = match->masks.ip_proto;
-    masks->nw_src = htonl(match->masks.ipv4_src);
-    masks->nw_dst = htonl(match->masks.ipv4_dst);
+    if (match->version < OF_VERSION_1_2) {
+        fields->nw_proto = match->fields.ip_proto;
+        masks->nw_proto = match->masks.ip_proto;
 
-    /* subsequent fields are type dependent */
-    if (match->fields.eth_type == ETH_P_IP) {
-        if (match->fields.ip_proto == IPPROTO_TCP
-            || match->fields.ip_proto == IPPROTO_UDP
-            || match->fields.ip_proto == IPPROTO_ICMP) {
-            fields->tp_src = htons(match->fields.tcp_src);
-            fields->tp_dst = htons(match->fields.tcp_dst);
-            masks->tp_src = htons(match->masks.tcp_src);
-            masks->tp_dst = htons(match->masks.tcp_dst);
+        fields->nw_tos = match->fields.ip_dscp & 0xFC;
+        masks->nw_tos = match->masks.ip_dscp & 0xFC;
+
+        fields->nw_src = htonl(match->fields.ipv4_src);
+        fields->nw_dst = htonl(match->fields.ipv4_dst);
+        masks->nw_src = htonl(match->masks.ipv4_src);
+        masks->nw_dst = htonl(match->masks.ipv4_dst);
+
+        fields->tp_src = htons(match->fields.tcp_src);
+        fields->tp_dst = htons(match->fields.tcp_dst);
+        masks->tp_src = htons(match->masks.tcp_src);
+        masks->tp_dst = htons(match->masks.tcp_dst);
+    } else {
+        /* subsequent fields are type dependent */
+        if (match->fields.eth_type == ETH_P_IP
+            || match->fields.eth_type == ETH_P_IPV6) {
+            fields->nw_proto = match->fields.ip_proto;
+            masks->nw_proto = match->masks.ip_proto;
+
+            fields->nw_tos = ((match->fields.ip_dscp & 0x3f) << 2) | (match->fields.ip_ecn & 0x3);
+            masks->nw_tos = ((match->masks.ip_dscp & 0x3f) << 2) | (match->masks.ip_ecn & 0x3);
+
+            if (match->fields.eth_type == ETH_P_IP) {
+                fields->nw_src = htonl(match->fields.ipv4_src);
+                fields->nw_dst = htonl(match->fields.ipv4_dst);
+                masks->nw_src = htonl(match->masks.ipv4_src);
+                masks->nw_dst = htonl(match->masks.ipv4_dst);
+            } else if (match->fields.eth_type == ETH_P_IPV6) {
+                memcpy(&fields->ipv6_src, &match->fields.ipv6_src, OF_IPV6_BYTES);
+                memcpy(&fields->ipv6_dst, &match->fields.ipv6_dst, OF_IPV6_BYTES);
+                memcpy(&masks->ipv6_src, &match->masks.ipv6_src, OF_IPV6_BYTES);
+                memcpy(&masks->ipv6_dst, &match->masks.ipv6_dst, OF_IPV6_BYTES);
+            }
+
+            if (match->fields.ip_proto == IPPROTO_TCP) {
+                fields->tp_src = htons(match->fields.tcp_src);
+                fields->tp_dst = htons(match->fields.tcp_dst);
+                masks->tp_src = htons(match->masks.tcp_src);
+                masks->tp_dst = htons(match->masks.tcp_dst);
+            } else if (match->fields.ip_proto == IPPROTO_UDP) {
+                fields->tp_src = htons(match->fields.udp_src);
+                fields->tp_dst = htons(match->fields.udp_dst);
+                masks->tp_src = htons(match->masks.udp_src);
+                masks->tp_dst = htons(match->masks.udp_dst);
+            } else if (match->fields.ip_proto == IPPROTO_ICMP) {
+                fields->tp_src = htons(match->fields.icmpv4_type);
+                fields->tp_dst = htons(match->fields.icmpv4_code);
+                masks->tp_src = htons(match->masks.icmpv4_type);
+                masks->tp_dst = htons(match->masks.icmpv4_code);
+            } else if (match->fields.ip_proto == IPPROTO_ICMPV6) {
+                fields->tp_src = htons(match->fields.icmpv6_type);
+                fields->tp_dst = htons(match->fields.icmpv6_code);
+                masks->tp_src = htons(match->masks.icmpv6_type);
+                masks->tp_dst = htons(match->masks.icmpv6_code);
+            }
+        } else if (match->fields.eth_type == ETH_P_ARP) {
+            fields->nw_proto = match->fields.arp_op & 0xff;
+            masks->nw_proto = match->masks.arp_op & 0xff;
+
+            fields->nw_src = htonl(match->fields.arp_spa);
+            fields->nw_dst = htonl(match->fields.arp_tpa);
+            masks->nw_src = htonl(match->masks.arp_spa);
+            masks->nw_dst = htonl(match->masks.arp_tpa);
         }
     }
 
