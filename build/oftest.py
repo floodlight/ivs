@@ -150,22 +150,26 @@ class VethNetworkConfig(object):
         self.switchInterfaces = ["veth%d" % (i*2) for i in range(portCount)]
         self.oftestInterfaces = ["%d@veth%d" % (i+1, i*2+1) for i in range(portCount)]
 
-def listOFTests(spec=None, testfile=None):
+def listOFTests(spec=None, testfile=None, openflowVersion=None):
     args = [ OFT, "--list-test-names" ]
     if spec:
         args.append(spec)
     if testfile:
         args.append("--test-file=%s" % testfile)
+    if openflowVersion:
+        args.append("-V%s" % openflowVersion)
     stdout = subprocess.check_output(args);
     return stdout.splitlines();
 
-def runOFTest(test, networkConfig, logDir, oftArgs=None):
+def runOFTest(test, networkConfig, logDir, openflowVersion, oftArgs=None):
     args = [ OFT,
              "-H", str(networkConfig.caddr),
              "-p", str(networkConfig.cport),
              "--verbose",
              "--log-file", "%s/oft.log" % logDir,
              "--fail-skipped" ]
+
+    args.append("-V%s" % openflowVersion)
 
     for iface in networkConfig.oftestInterfaces:
         args.append('-i')
@@ -190,15 +194,18 @@ def runOFTest(test, networkConfig, logDir, oftArgs=None):
     return child.returncode;
 
 class IVS(object):
-    def __init__(self, networkConfig, logDir, ivsArgs=None):
+    def __init__(self, networkConfig, logDir, openflowVersion, ivsArgs=None):
         self.networkConfig = networkConfig
         self.logDir = logDir
+        self.openflowVersion = openflowVersion
         self.ivsArgs = ivsArgs
         self.child = None
 
     def start(self):
         args = [ IVS_BINARY,
                  "-c", "%s:%d" % (self.networkConfig.caddr, self.networkConfig.cport) ]
+
+        args.append("-V%s" % self.openflowVersion)
 
         if self.ivsArgs:
             args += self.ivsArgs
@@ -257,7 +264,8 @@ class AutotestIVS(object):
 
     def __setup(self):
         self.oftests = listOFTests(spec=self.config.test_spec,
-                                   testfile=self.config.test_file)
+                                   testfile=self.config.test_file,
+                                   openflowVersion=self.config.openflow_version)
 
     def runTests(self):
         results = { 'FAILED' : [], 'PASSED' : [] }
@@ -275,20 +283,25 @@ class AutotestIVS(object):
                 print test
 
     def runTest(self, test):
-        testLogDir = "%s/%s" % (LOG_BASEDIR, test)
+        if self.config.openflow_version == "1.3":
+            testName = "of13.%s" % test
+        else:
+            testName = test
+
+        testLogDir = "%s/%s" % (LOG_BASEDIR, testName)
         system("mkdir -p %s" % (testLogDir))
 
-        sys.stdout.write("Running %s ... " % test)
+        sys.stdout.write("Running %s ... " % testName)
         sys.stdout.flush()
 
         if self.abat:
-            self.abat.addTestcase(test, testLogDir)
+            self.abat.addTestcase(testName, testLogDir)
 
         networkConfig = VethNetworkConfig(4)
-        ivs = IVS(networkConfig, testLogDir, self.config.ivs_args)
+        ivs = IVS(networkConfig, testLogDir, self.config.openflow_version, self.config.ivs_args)
 
         ivs.start()
-        rv = runOFTest(test, networkConfig, testLogDir, self.config.oft_args)
+        rv = runOFTest(test, networkConfig, testLogDir, self.config.openflow_version, self.config.oft_args)
         ivs.stop()
 
         if rv == 0:
@@ -300,7 +313,7 @@ class AutotestIVS(object):
             print "Test logs in %s" % testLogDir
 
         if self.abat:
-            self.abat.updateTestcase(test, result)
+            self.abat.updateTestcase(testName, result)
 
         return result
 
@@ -315,6 +328,7 @@ if __name__ == "__main__":
     ap.add_argument("--ivs-args", help="Additional arguments passed to IVS.")
     ap.add_argument("--oft-args", help="Additional arguments passed to oft.")
     ap.add_argument("--log-base-dir", help="Set the log base directory.", default=None)
+    ap.add_argument("-V", "--openflow-version", help="OpenFlow version (1.0, 1.3)", default="1.0")
 
     config = ap.parse_args()
 
