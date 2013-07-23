@@ -343,7 +343,8 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
             /* Special cased because it can drop the packet */
             if (ATTR_BITMAP_TEST(ctx.current_key.populated, OVS_KEY_ATTR_IPV4)) {
                 ATTR_BITMAP_SET(ctx.modified_attrs, OVS_KEY_ATTR_IPV4);
-                if (--ctx.current_key.ipv4.ipv4_ttl == 0) {
+                if (ctx.current_key.ipv4.ipv4_ttl == 0
+                    || --ctx.current_key.ipv4.ipv4_ttl == 0) {
                     goto finish;
                 }
             }
