@@ -17,8 +17,13 @@
 #
 ################################################################
 
-BASEDIR := $(dir $(lastword $(MAKEFILE_LIST)))
-OVSDriver_BASEDIR := $(BASEDIR)/OVSDriver
-flowtable_BASEDIR := $(BASEDIR)/flowtable
-l2table_BASEDIR := $(BASEDIR)/l2table
-luajit_BASEDIR := $(BASEDIR)/luajit
+THIS_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+LUAJIT := $(THIS_DIR)/../../luajit-2.0
+luajit_INCLUDES := -I $(LUAJIT)/src
+
+LIBRARY_TARGETS += libluajit.a
+
+.PHONY: libluajit.a
+libluajit.a:
+	$(MAKE) -C $(LUAJIT)/src libluajit.a LJCORE_O=ljamalg.o BUILDMODE=static
+	cp $(LUAJIT)/src/libluajit.a $(LIBRARY_DIR)/libluajit.a
