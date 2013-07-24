@@ -17,8 +17,22 @@
 #
 ################################################################
 
-BASEDIR := $(dir $(lastword $(MAKEFILE_LIST)))
-OVSDriver_BASEDIR := $(BASEDIR)/OVSDriver
-flowtable_BASEDIR := $(BASEDIR)/flowtable
-l2table_BASEDIR := $(BASEDIR)/l2table
-luajit_BASEDIR := $(BASEDIR)/luajit
+###############################################################################
+#
+#  Makefile
+#
+#  luajit Makefile
+#
+###############################################################################
+MODULE := luajit
+
+ifndef INDIGO
+INDIGO:=$(dir $(lastword $(MAKEFILE_LIST)))../../indigo
+endif
+
+# Necessary for our own settings and the Builder itself
+ifndef BUILDER
+BUILDER:=$(INDIGO)/Builder/unix
+endif
+
+include $(BUILDER)/definemodule.mk
