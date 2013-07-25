@@ -457,6 +457,56 @@ out:
     indigo_core_port_stats_get_callback(err, port_stats_reply, callback_cookie);
 }
 
+indigo_error_t indigo_port_desc_stats_get(
+    of_port_desc_stats_reply_t *port_desc_stats_reply)
+{
+    indigo_error_t result = INDIGO_ERROR_NONE;
+
+    of_port_desc_t *of_port_desc = 0;
+    of_list_port_desc_t *of_list_port_desc = 0;
+
+    if (port_desc_stats_reply->version < OF_VERSION_1_3) {
+        return INDIGO_ERROR_NONE;
+    }
+
+    if ((of_port_desc = of_port_desc_new(port_desc_stats_reply->version)) == 0) {
+        LOG_ERROR("of_port_desc_new() failed");
+        result = INDIGO_ERROR_UNKNOWN;
+        goto done;
+    }
+
+    if ((of_list_port_desc = of_list_port_desc_new(port_desc_stats_reply->version)) == 0) {
+        LOG_ERROR("of_list_port_desc_new() failed");
+        result = INDIGO_ERROR_UNKNOWN;
+        goto done;
+    }
+
+    int i;
+    for (i = 0; i < IND_OVS_MAX_PORTS; i++) {
+        if (ind_ovs_ports[i]) {
+            port_desc_set(of_port_desc, i);
+            /* TODO error handling */
+            of_list_port_desc_append(of_list_port_desc, of_port_desc);
+        }
+    }
+    port_desc_set_local(of_port_desc);
+    /* TODO error handling */
+    of_list_port_desc_append(of_list_port_desc, of_port_desc);
+
+    if (LOXI_FAILURE(of_port_desc_stats_reply_entries_set(port_desc_stats_reply,
+            of_list_port_desc))){
+        LOG_ERROR("of_port_desc_stats_reply_entries_set() failed");
+        result = INDIGO_ERROR_UNKNOWN;
+        goto done;
+    }
+
+ done:
+    if (of_list_port_desc) of_list_port_desc_delete(of_list_port_desc);
+    if (of_port_desc) of_port_desc_delete(of_port_desc);
+
+    return (result);
+}
+
 /* Currently returns an empty reply */
 void indigo_port_queue_config_get(
     of_queue_get_config_request_t *request,
