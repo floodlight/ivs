@@ -675,10 +675,6 @@ ind_ovs_fwd_init(void)
         list_init(bucket);
     }
 
-    struct ind_ovs_cfr hash_mask;
-    memset(&hash_mask, 0, sizeof(hash_mask));
-    memset(&hash_mask.dl_dst, 0xff, sizeof(&hash_mask.dl_dst));
-    memset(&hash_mask.dl_src, 0xff, sizeof(&hash_mask.dl_src));
     ind_ovs_ft = flowtable_create();
     if (!ind_ovs_ft) {
         return INDIGO_ERROR_RESOURCE;
