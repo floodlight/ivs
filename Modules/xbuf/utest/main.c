@@ -64,6 +64,13 @@ test_basic(void)
     assert(xbuf_length(&a) == 0);
     assert(a.allocated == 128);
 
+    /* Should be able to compact */
+    xbuf_reset(&a);
+    xbuf_append_zeroes(&a, 6);
+    xbuf_compact(&a);
+    assert(xbuf_length(&a) == 6);
+    assert(a.allocated == 6);
+
     xbuf_cleanup(&a);
 }
 
@@ -162,6 +169,15 @@ test_iteration(void)
 
     /* Iterate over an empty xbuf */
     xbuf_reset(&a);
+    count = 0;
+    XBUF_FOREACH(xbuf_data(&a), xbuf_length(&a), attr) {
+        count++;
+    }
+    assert(count == 0);
+
+    /* Iterate over a compact empty xbuf */
+    xbuf_reset(&a);
+    xbuf_compact(&a);
     count = 0;
     XBUF_FOREACH(xbuf_data(&a), xbuf_length(&a), attr) {
         count++;

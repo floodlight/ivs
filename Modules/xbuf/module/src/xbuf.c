@@ -56,3 +56,11 @@ xbuf_resize(struct xbuf *xbuf, uint32_t new_len)
     xbuf->data = realloc(xbuf->data, xbuf->allocated);
     AIM_TRUE_OR_DIE(xbuf->data != NULL, "failed to allocate xbuf");
 }
+
+void
+xbuf_compact(struct xbuf *xbuf)
+{
+    xbuf->allocated = xbuf->length;
+    xbuf->data = realloc(xbuf->data, xbuf->allocated);
+    AIM_TRUE_OR_DIE(xbuf->allocated == 0 || xbuf->data != NULL, "failed to allocate xbuf");
+}

@@ -189,6 +189,8 @@ init_effects(struct ind_ovs_flow_effects *effects,
         return err;
     }
 
+    xbuf_compact(&effects->apply_actions);
+
     effects->flood = actions_contain_flood(&openflow_actions);
 
     return INDIGO_ERROR_NONE;

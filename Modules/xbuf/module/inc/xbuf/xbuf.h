@@ -92,6 +92,11 @@ xbuf_resize_check(struct xbuf *xbuf, uint32_t new_len)
 }
 
 /**
+ * Shrink an xbuf's backing memory to just fit the contents
+ */
+void xbuf_compact(struct xbuf *xbuf);
+
+/**
  * Set the current length to zero
  */
 static inline void
