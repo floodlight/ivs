@@ -22,6 +22,8 @@
  */
 #pragma GCC optimize (4)
 #include "ovs_driver_int.h"
+#include "actions.h"
+#include "xbuf/xbuf.h"
 #include <byteswap.h>
 #include <linux/if_ether.h>
 
@@ -97,56 +99,85 @@ OVS_TUNNEL_KEY_FIELDS
     ctx->modified_attrs = 0;
 }
 
+/*
+ * Output actions
+ */
+
 static void
-ind_ovs_action_output(of_action_output_t *act, struct translate_context *ctx)
+ind_ovs_action_output(struct nlattr *attr, struct translate_context *ctx)
+{
+    ind_ovs_commit_set_field_actions(ctx);
+    nla_put_u32(ctx->msg, OVS_ACTION_ATTR_OUTPUT, *XBUF_PAYLOAD(attr, uint32_t));
+}
+
+static void
+ind_ovs_action_controller(struct nlattr *attr, struct translate_context *ctx)
 {
     uint32_t ingress_port_no = ctx->current_key.in_port;
-    of_port_no_t of_port_num;
-    of_action_output_port_get(act, &of_port_num);
-    switch (of_port_num) {
-    case OF_PORT_DEST_CONTROLLER: {
-        struct nlattr *action_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_USERSPACE);
-        struct nl_sock *sk = ind_ovs_ports[ingress_port_no]->notify_socket;
-        nla_put_u32(ctx->msg, OVS_USERSPACE_ATTR_PID, nl_socket_get_local_port(sk));
-        nla_nest_end(ctx->msg, action_attr);
-        break;
-    }
-    case OF_PORT_DEST_FLOOD:
-        /* Fallthrough */
-    case OF_PORT_DEST_ALL: {
-        /* Add all port numbers as outputs */
-        int flood = of_port_num == OF_PORT_DEST_FLOOD;
-        int i;
-        for (i = 0; i < IND_OVS_MAX_PORTS; i++) {
-            struct ind_ovs_port *port = ind_ovs_ports[i];
-            if (port != NULL && i != ingress_port_no &&
-                (!flood || !(port->config & OF_PORT_CONFIG_FLAG_NO_FLOOD))) {
-                nla_put_u32(ctx->msg, OVS_ACTION_ATTR_OUTPUT, i);
-            }
+    ind_ovs_commit_set_field_actions(ctx);
+    struct nlattr *action_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_USERSPACE);
+    struct nl_sock *sk = ind_ovs_ports[ingress_port_no]->notify_socket;
+    nla_put_u32(ctx->msg, OVS_USERSPACE_ATTR_PID, nl_socket_get_local_port(sk));
+    nla_nest_end(ctx->msg, action_attr);
+}
+
+static void
+ind_ovs_action_flood(struct nlattr *attr, struct translate_context *ctx)
+{
+    uint32_t ingress_port_no = ctx->current_key.in_port;
+    ind_ovs_commit_set_field_actions(ctx);
+    int i;
+    for (i = 0; i < IND_OVS_MAX_PORTS; i++) {
+        struct ind_ovs_port *port = ind_ovs_ports[i];
+        if (port != NULL && i != ingress_port_no &&
+                !(port->config & OF_PORT_CONFIG_FLAG_NO_FLOOD)) {
+            nla_put_u32(ctx->msg, OVS_ACTION_ATTR_OUTPUT, i);
         }
-        break;
     }
-    case OF_PORT_DEST_USE_TABLE: {
-        /* HACK send the packet through the datapath to have all its
-         * actions executed, then back to userspace to be treated
-         * as a table miss (but with no flow install). */
-        struct nlattr *action_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_USERSPACE);
-        struct nl_sock *sk = ind_ovs_ports[ingress_port_no]->notify_socket;
-        nla_put_u32(ctx->msg, OVS_USERSPACE_ATTR_PID, nl_socket_get_local_port(sk));
-        nla_put_u64(ctx->msg, OVS_USERSPACE_ATTR_USERDATA, -1);
-        nla_nest_end(ctx->msg, action_attr);
-        break;
+}
+
+static void
+ind_ovs_action_all(struct nlattr *attr, struct translate_context *ctx)
+{
+    uint32_t ingress_port_no = ctx->current_key.in_port;
+    ind_ovs_commit_set_field_actions(ctx);
+    int i;
+    for (i = 0; i < IND_OVS_MAX_PORTS; i++) {
+        struct ind_ovs_port *port = ind_ovs_ports[i];
+        if (port != NULL && i != ingress_port_no) {
+            nla_put_u32(ctx->msg, OVS_ACTION_ATTR_OUTPUT, i);
+        }
     }
-    case OF_PORT_DEST_LOCAL:
-        nla_put_u32(ctx->msg, OVS_ACTION_ATTR_OUTPUT, 0);
-        break;
-    case OF_PORT_DEST_IN_PORT:
-        nla_put_u32(ctx->msg, OVS_ACTION_ATTR_OUTPUT, ingress_port_no);
-        break;
-    default:
-        nla_put_u32(ctx->msg, OVS_ACTION_ATTR_OUTPUT, of_port_num);
-        break;
-    }
+}
+
+static void
+ind_ovs_action_table(struct nlattr *attr, struct translate_context *ctx)
+{
+    /* HACK send the packet through the datapath to have all its
+     * actions executed, then back to userspace to be treated
+     * as a table miss (but with no flow install). */
+    uint32_t ingress_port_no = ctx->current_key.in_port;
+    ind_ovs_commit_set_field_actions(ctx);
+    struct nlattr *action_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_USERSPACE);
+    struct nl_sock *sk = ind_ovs_ports[ingress_port_no]->notify_socket;
+    nla_put_u32(ctx->msg, OVS_USERSPACE_ATTR_PID, nl_socket_get_local_port(sk));
+    nla_put_u64(ctx->msg, OVS_USERSPACE_ATTR_USERDATA, -1);
+    nla_nest_end(ctx->msg, action_attr);
+}
+
+static void
+ind_ovs_action_local(struct nlattr *attr, struct translate_context *ctx)
+{
+    ind_ovs_commit_set_field_actions(ctx);
+    nla_put_u32(ctx->msg, OVS_ACTION_ATTR_OUTPUT, 0);
+}
+
+static void
+ind_ovs_action_in_port(struct nlattr *attr, struct translate_context *ctx)
+{
+    uint32_t ingress_port_no = ctx->current_key.in_port;
+    ind_ovs_commit_set_field_actions(ctx);
+    nla_put_u32(ctx->msg, OVS_ACTION_ATTR_OUTPUT, ingress_port_no);
 }
 
 /*
@@ -156,91 +187,106 @@ ind_ovs_action_output(of_action_output_t *act, struct translate_context *ctx)
  */
 
 static void
-ind_ovs_action_set_dl_dst(of_action_set_dl_dst_t *act, struct translate_context *ctx)
+ind_ovs_action_set_eth_dst(struct nlattr *attr, struct translate_context *ctx)
 {
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_ETHERNET)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_ETHERNET);
-        of_action_set_dl_dst_dl_addr_get(act,
-            (of_mac_addr_t *)ctx->current_key.ethernet.eth_dst);
+        memcpy(ctx->current_key.ethernet.eth_dst, XBUF_PAYLOAD(attr, of_mac_addr_t), sizeof(of_mac_addr_t));
     }
 }
 
 static void
-ind_ovs_action_set_dl_src(of_action_set_dl_src_t *act, struct translate_context *ctx)
+ind_ovs_action_set_eth_src(struct nlattr *attr, struct translate_context *ctx)
 {
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_ETHERNET)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_ETHERNET);
-        of_action_set_dl_src_dl_addr_get(act,
-            (of_mac_addr_t *)ctx->current_key.ethernet.eth_src);
+        memcpy(ctx->current_key.ethernet.eth_src, XBUF_PAYLOAD(attr, of_mac_addr_t), sizeof(of_mac_addr_t));
     }
 }
 
 static void
-ind_ovs_action_set_nw_dst(of_action_set_nw_dst_t *act, struct translate_context *ctx)
+ind_ovs_action_set_ipv4_dst(struct nlattr *attr, struct translate_context *ctx)
 {
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV4)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV4);
-        uint32_t tmp;
-        of_action_set_nw_dst_nw_addr_get(act, &tmp);
-        ctx->current_key.ipv4.ipv4_dst = htonl(tmp);
+        ctx->current_key.ipv4.ipv4_dst = htonl(*XBUF_PAYLOAD(attr, uint32_t));
     }
 }
 
 static void
-ind_ovs_action_set_nw_src(of_action_set_nw_src_t *act, struct translate_context *ctx)
+ind_ovs_action_set_ipv4_src(struct nlattr *attr, struct translate_context *ctx)
 {
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV4)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV4);
-        uint32_t tmp;
-        of_action_set_nw_src_nw_addr_get(act, &tmp);
-        ctx->current_key.ipv4.ipv4_src = htonl(tmp);
+        ctx->current_key.ipv4.ipv4_src = htonl(*XBUF_PAYLOAD(attr, uint32_t));
     }
 }
 
 static void
-ind_ovs_action_set_nw_tos(of_action_set_nw_tos_t *act, struct translate_context *ctx)
+ind_ovs_action_set_ipv4_dscp(struct nlattr *attr, struct translate_context *ctx)
 {
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV4)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV4);
-        of_action_set_nw_tos_nw_tos_get(act,
-            &ctx->current_key.ipv4.ipv4_tos);
+        ctx->current_key.ipv4.ipv4_tos = *XBUF_PAYLOAD(attr, uint8_t);
     }
 }
 
 static void
-ind_ovs_action_set_tp_dst(of_action_set_tp_dst_t *act, struct translate_context *ctx)
+ind_ovs_action_set_tcp_src(struct nlattr *attr, struct translate_context *ctx)
 {
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_TCP)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_TCP);
-        uint16_t tmp;
-        of_action_set_tp_dst_tp_port_get(act, &tmp);
-        ctx->current_key.tcp.tcp_dst = htons(tmp);
-    } else if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_UDP)) {
-        ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_UDP);
-        uint16_t tmp;
-        of_action_set_tp_dst_tp_port_get(act, &tmp);
-        ctx->current_key.udp.udp_dst = htons(tmp);
+        ctx->current_key.tcp.tcp_src = htons(*XBUF_PAYLOAD(attr, uint16_t));
     }
 }
 
 static void
-ind_ovs_action_set_tp_src(of_action_set_tp_src_t *act, struct translate_context *ctx)
+ind_ovs_action_set_tcp_dst(struct nlattr *attr, struct translate_context *ctx)
 {
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_TCP)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_TCP);
-        uint16_t tmp;
-        of_action_set_tp_src_tp_port_get(act, &tmp);
-        ctx->current_key.tcp.tcp_src = htons(tmp);
-    } else if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_UDP)) {
-        ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_UDP);
-        uint16_t tmp;
-        of_action_set_tp_src_tp_port_get(act, &tmp);
-        ctx->current_key.udp.udp_src = htons(tmp);
+        ctx->current_key.tcp.tcp_dst = htons(*XBUF_PAYLOAD(attr, uint16_t));
     }
 }
 
 static void
-ind_ovs_action_set_vlan_vid(of_action_set_vlan_vid_t *act, struct translate_context *ctx)
+ind_ovs_action_set_udp_src(struct nlattr *attr, struct translate_context *ctx)
+{
+    if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_UDP)) {
+        ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_UDP);
+        ctx->current_key.udp.udp_src = htons(*XBUF_PAYLOAD(attr, uint16_t));
+    }
+}
+
+static void
+ind_ovs_action_set_udp_dst(struct nlattr *attr, struct translate_context *ctx)
+{
+    if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_UDP)) {
+        ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_UDP);
+        ctx->current_key.udp.udp_dst = htons(*XBUF_PAYLOAD(attr, uint16_t));
+    }
+}
+
+static void
+ind_ovs_action_set_tp_src(struct nlattr *attr, struct translate_context *ctx)
+{
+    ind_ovs_action_set_tcp_src(attr, ctx);
+    ind_ovs_action_set_udp_src(attr, ctx);
+}
+
+static void
+ind_ovs_action_set_tp_dst(struct nlattr *attr, struct translate_context *ctx)
+{
+    ind_ovs_action_set_tcp_dst(attr, ctx);
+    ind_ovs_action_set_udp_dst(attr, ctx);
+}
+
+/*
+ * VLAN actions
+ */
+
+static void
+ind_ovs_action_set_vlan_vid(struct nlattr *attr, struct translate_context *ctx)
 {
     ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_VLAN);
     uint16_t cur_tci;
@@ -250,13 +296,12 @@ ind_ovs_action_set_vlan_vid(of_action_set_vlan_vid_t *act, struct translate_cont
         cur_tci = VLAN_CFI_BIT;
         ATTR_BITMAP_SET(ctx->current_key.populated, OVS_KEY_ATTR_VLAN);
     }
-    uint16_t vlan_vid;
-    of_action_set_vlan_vid_vlan_vid_get(act, &vlan_vid);
+    uint16_t vlan_vid = *XBUF_PAYLOAD(attr, uint16_t);
     ctx->current_key.vlan = htons(VLAN_TCI(vlan_vid, VLAN_PCP(cur_tci)) | VLAN_CFI_BIT);
 }
 
 static void
-ind_ovs_action_set_vlan_pcp(of_action_set_vlan_pcp_t *act, struct translate_context *ctx)
+ind_ovs_action_set_vlan_pcp(struct nlattr *attr, struct translate_context *ctx)
 {
     ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_VLAN);
     uint16_t cur_tci;
@@ -266,13 +311,12 @@ ind_ovs_action_set_vlan_pcp(of_action_set_vlan_pcp_t *act, struct translate_cont
         cur_tci = VLAN_CFI_BIT;
         ATTR_BITMAP_SET(ctx->current_key.populated, OVS_KEY_ATTR_VLAN);
     }
-    uint8_t vlan_pcp;
-    of_action_set_vlan_pcp_vlan_pcp_get(act, &vlan_pcp);
+    uint8_t vlan_pcp = *XBUF_PAYLOAD(attr, uint8_t);
     ctx->current_key.vlan = htons(VLAN_TCI(VLAN_VID(cur_tci), vlan_pcp) | VLAN_CFI_BIT);
 }
 
 static void
-ind_ovs_action_strip_vlan(of_action_strip_vlan_t *act, struct translate_context *ctx)
+ind_ovs_action_pop_vlan(struct nlattr *attr, struct translate_context *ctx)
 {
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_VLAN)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_VLAN);
@@ -280,18 +324,21 @@ ind_ovs_action_strip_vlan(of_action_strip_vlan_t *act, struct translate_context 
     }
 }
 
+/*
+ * Extension actions
+ */
+
 static void
-ind_ovs_action_bsn_set_tunnel_dst(of_action_bsn_set_tunnel_dst_t *act, struct translate_context *ctx)
+ind_ovs_action_set_tunnel_dst(struct nlattr *attr, struct translate_context *ctx)
 {
     ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_TUNNEL);
-    uint32_t ipv4_dst;
-    of_action_bsn_set_tunnel_dst_dst_get(act, &ipv4_dst);
-    ctx->current_key.tunnel.ipv4_dst = htonl(ipv4_dst);
+    ctx->current_key.tunnel.ipv4_dst = htonl(*XBUF_PAYLOAD(attr, uint32_t));
 }
+
 
 void
 ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
-                          of_list_action_t *actions,
+                          struct xbuf *xbuf,
                           struct nl_msg *msg, int attr_type)
 {
     struct translate_context ctx;
@@ -301,45 +348,73 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
 
     struct nlattr *actions_attr = nla_nest_start(msg, attr_type);
 
-    of_action_t act;
-    int rv;
-    OF_LIST_ACTION_ITER(actions, &act, rv) {
-        switch (act.header.object_id) {
-        case OF_ACTION_OUTPUT:
-            ind_ovs_commit_set_field_actions(&ctx);
-            ind_ovs_action_output(&act.output, &ctx);
+    struct nlattr *attr;
+    XBUF_FOREACH(xbuf_data(xbuf), xbuf_length(xbuf), attr) {
+        switch (attr->nla_type) {
+        case IND_OVS_ACTION_OUTPUT:
+            ind_ovs_action_output(attr, &ctx);
             break;
-        case OF_ACTION_SET_DL_DST:
-            ind_ovs_action_set_dl_dst(&act.set_dl_dst, &ctx);
+        case IND_OVS_ACTION_CONTROLLER:
+            ind_ovs_action_controller(attr, &ctx);
             break;
-        case OF_ACTION_SET_DL_SRC:
-            ind_ovs_action_set_dl_src(&act.set_dl_src, &ctx);
+        case IND_OVS_ACTION_FLOOD:
+            ind_ovs_action_flood(attr, &ctx);
             break;
-        case OF_ACTION_SET_NW_DST:
-            ind_ovs_action_set_nw_dst(&act.set_nw_dst, &ctx);
+        case IND_OVS_ACTION_ALL:
+            ind_ovs_action_all(attr, &ctx);
             break;
-        case OF_ACTION_SET_NW_SRC:
-            ind_ovs_action_set_nw_src(&act.set_nw_src, &ctx);
+        case IND_OVS_ACTION_TABLE:
+            ind_ovs_action_table(attr, &ctx);
             break;
-        case OF_ACTION_SET_NW_TOS:
-            ind_ovs_action_set_nw_tos(&act.set_nw_tos, &ctx);
+        case IND_OVS_ACTION_LOCAL:
+            ind_ovs_action_local(attr, &ctx);
             break;
-        case OF_ACTION_SET_TP_DST:
-            ind_ovs_action_set_tp_dst(&act.set_tp_dst, &ctx);
+        case IND_OVS_ACTION_IN_PORT:
+            ind_ovs_action_in_port(attr, &ctx);
             break;
-        case OF_ACTION_SET_TP_SRC:
-            ind_ovs_action_set_tp_src(&act.set_tp_src, &ctx);
+        case IND_OVS_ACTION_SET_ETH_DST:
+            ind_ovs_action_set_eth_dst(attr, &ctx);
             break;
-        case OF_ACTION_SET_VLAN_VID:
-            ind_ovs_action_set_vlan_vid(&act.set_vlan_vid, &ctx);
+        case IND_OVS_ACTION_SET_ETH_SRC:
+            ind_ovs_action_set_eth_src(attr, &ctx);
             break;
-        case OF_ACTION_SET_VLAN_PCP:
-            ind_ovs_action_set_vlan_pcp(&act.set_vlan_pcp, &ctx);
+        case IND_OVS_ACTION_SET_IPV4_DST:
+            ind_ovs_action_set_ipv4_dst(attr, &ctx);
             break;
-        case OF_ACTION_STRIP_VLAN:
-            ind_ovs_action_strip_vlan(&act.strip_vlan, &ctx);
+        case IND_OVS_ACTION_SET_IPV4_SRC:
+            ind_ovs_action_set_ipv4_src(attr, &ctx);
             break;
-        case OF_ACTION_NICIRA_DEC_TTL:
+        case IND_OVS_ACTION_SET_IPV4_DSCP:
+            ind_ovs_action_set_ipv4_dscp(attr, &ctx);
+            break;
+        case IND_OVS_ACTION_SET_TCP_DST:
+            ind_ovs_action_set_tcp_dst(attr, &ctx);
+            break;
+        case IND_OVS_ACTION_SET_TCP_SRC:
+            ind_ovs_action_set_tcp_src(attr, &ctx);
+            break;
+        case IND_OVS_ACTION_SET_UDP_DST:
+            ind_ovs_action_set_udp_dst(attr, &ctx);
+            break;
+        case IND_OVS_ACTION_SET_UDP_SRC:
+            ind_ovs_action_set_udp_src(attr, &ctx);
+            break;
+        case IND_OVS_ACTION_SET_TP_DST:
+            ind_ovs_action_set_tp_dst(attr, &ctx);
+            break;
+        case IND_OVS_ACTION_SET_TP_SRC:
+            ind_ovs_action_set_tp_src(attr, &ctx);
+            break;
+        case IND_OVS_ACTION_SET_VLAN_VID:
+            ind_ovs_action_set_vlan_vid(attr, &ctx);
+            break;
+        case IND_OVS_ACTION_SET_VLAN_PCP:
+            ind_ovs_action_set_vlan_pcp(attr, &ctx);
+            break;
+        case IND_OVS_ACTION_POP_VLAN:
+            ind_ovs_action_pop_vlan(attr, &ctx);
+            break;
+        case IND_OVS_ACTION_DEC_NW_TTL:
             /* Special cased because it can drop the packet */
             if (ATTR_BITMAP_TEST(ctx.current_key.populated, OVS_KEY_ATTR_IPV4)) {
                 ATTR_BITMAP_SET(ctx.modified_attrs, OVS_KEY_ATTR_IPV4);
@@ -350,10 +425,10 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
             }
             break;
         case OF_ACTION_BSN_SET_TUNNEL_DST:
-            ind_ovs_action_bsn_set_tunnel_dst(&act.bsn_set_tunnel_dst, &ctx);
+            ind_ovs_action_set_tunnel_dst(attr, &ctx);
             break;
         default:
-            LOG_ERROR("unsupported action");
+            assert(0);
             break;
         }
     }
@@ -366,4 +441,131 @@ finish:
         /* Not technically legal netlink before 2.6.29 */
         nla_put(msg, attr_type, 0, NULL);
     }
+}
+
+
+/* The code below is not in a performance-critical path */
+#pragma GCC optimize ("s")
+
+/**
+ * Translate LOCI actions into an IVS-internal representation.
+ *
+ * The actions are written to 'xbuf'.
+ */
+indigo_error_t
+ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf)
+{
+    of_action_t act;
+    int rv;
+    OF_LIST_ACTION_ITER(actions, &act, rv) {
+        switch (act.header.object_id) {
+        case OF_ACTION_OUTPUT: {
+            of_port_no_t port_no;
+            of_action_output_port_get(&act.output, &port_no);
+            switch (port_no) {
+                case OF_PORT_DEST_CONTROLLER:
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_CONTROLLER, NULL, 0);
+                    break;
+                case OF_PORT_DEST_FLOOD:
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_FLOOD, NULL, 0);
+                    break;
+                case OF_PORT_DEST_ALL:
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_ALL, NULL, 0);
+                    break;
+                case OF_PORT_DEST_USE_TABLE:
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_TABLE, NULL, 0);
+                    break;
+                case OF_PORT_DEST_LOCAL:
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_LOCAL, NULL, 0);
+                    break;
+                case OF_PORT_DEST_IN_PORT:
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_IN_PORT, NULL, 0);
+                    break;
+                default: {
+                    if (port_no < IND_OVS_MAX_PORTS) {
+                        xbuf_append_attr(xbuf, IND_OVS_ACTION_OUTPUT, &port_no, sizeof(port_no));
+                    } else {
+                        LOG_ERROR("invalid output port %u", port_no);
+                        return INDIGO_ERROR_COMPAT;
+                    }
+                    break;
+                }
+            }
+            break;
+        }
+        case OF_ACTION_SET_DL_DST: {
+            of_mac_addr_t mac;
+            of_action_set_dl_dst_dl_addr_get(&act.set_dl_dst, &mac);
+            xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_ETH_DST, &mac, sizeof(mac));
+            break;
+        }
+        case OF_ACTION_SET_DL_SRC: {
+            of_mac_addr_t mac;
+            of_action_set_dl_src_dl_addr_get(&act.set_dl_src, &mac);
+            xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_ETH_SRC, &mac, sizeof(mac));
+            break;
+        }
+        case OF_ACTION_SET_NW_DST: {
+            uint32_t ipv4;
+            of_action_set_nw_dst_nw_addr_get(&act.set_nw_dst, &ipv4);
+            xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IPV4_DST, &ipv4, sizeof(ipv4));
+            break;
+        }
+        case OF_ACTION_SET_NW_SRC: {
+            uint32_t ipv4;
+            of_action_set_nw_src_nw_addr_get(&act.set_nw_src, &ipv4);
+            xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IPV4_SRC, &ipv4, sizeof(ipv4));
+            break;
+        }
+        case OF_ACTION_SET_NW_TOS: {
+            uint8_t tos;
+            of_action_set_nw_tos_nw_tos_get(&act.set_nw_tos, &tos);
+            xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IPV4_DSCP, &tos, sizeof(tos));
+            break;
+        }
+        case OF_ACTION_SET_TP_DST: {
+            uint16_t port;
+            of_action_set_tp_dst_tp_port_get(&act.set_tp_dst, &port);
+            xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_TP_DST, &port, sizeof(port));
+            break;
+        }
+        case OF_ACTION_SET_TP_SRC: {
+            uint16_t port;
+            of_action_set_tp_src_tp_port_get(&act.set_tp_src, &port);
+            xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_TP_SRC, &port, sizeof(port));
+            break;
+        }
+        case OF_ACTION_SET_VLAN_VID: {
+            uint16_t vlan_vid;
+            of_action_set_vlan_vid_vlan_vid_get(&act.set_vlan_vid, &vlan_vid);
+            xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_VLAN_VID, &vlan_vid, sizeof(vlan_vid));
+            break;
+        }
+        case OF_ACTION_SET_VLAN_PCP: {
+            uint8_t vlan_pcp;
+            of_action_set_vlan_pcp_vlan_pcp_get(&act.set_vlan_pcp, &vlan_pcp);
+            xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_VLAN_PCP, &vlan_pcp, sizeof(vlan_pcp));
+            break;
+        }
+        case OF_ACTION_STRIP_VLAN: {
+            xbuf_append_attr(xbuf, IND_OVS_ACTION_POP_VLAN, NULL, 0);
+            break;
+        }
+        case OF_ACTION_NICIRA_DEC_TTL: {
+            xbuf_append_attr(xbuf, IND_OVS_ACTION_DEC_NW_TTL, NULL, 0);
+            break;
+        }
+        case OF_ACTION_BSN_SET_TUNNEL_DST: {
+            uint32_t ipv4;
+            of_action_bsn_set_tunnel_dst_dst_get(&act.bsn_set_tunnel_dst, &ipv4);
+            xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_TUNNEL_DST, &ipv4, sizeof(ipv4));
+            break;
+        }
+        default:
+            LOG_ERROR("unsupported action %s", of_object_id_str[act.header.object_id]);
+            return INDIGO_ERROR_COMPAT;
+        }
+    }
+
+    return INDIGO_ERROR_NONE;
 }

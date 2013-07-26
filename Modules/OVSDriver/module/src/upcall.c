@@ -253,7 +253,7 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
 
     /* Reuse the incoming message for the packet execute */
     gnlh->cmd = OVS_PACKET_CMD_EXECUTE;
-    ind_ovs_translate_actions(&pkey, flow->of_list_action,
+    ind_ovs_translate_actions(&pkey, &flow->effects.apply_actions,
                               msg, OVS_PACKET_ATTR_ACTIONS);
 
     __sync_fetch_and_add(&flow->packets, 1);
@@ -332,7 +332,7 @@ ind_ovs_handle_packet_table(struct ind_ovs_upcall_thread *thread,
     struct nl_msg *reply = ind_ovs_create_nlmsg(ovs_packet_family,
                                                 OVS_PACKET_CMD_EXECUTE);
 
-    ind_ovs_translate_actions(&pkey, flow->of_list_action,
+    ind_ovs_translate_actions(&pkey, &flow->effects.apply_actions,
                               reply, OVS_PACKET_ATTR_ACTIONS);
 
     nla_put(reply, OVS_PACKET_ATTR_KEY, nla_len(key), nla_data(key));
