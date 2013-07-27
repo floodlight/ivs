@@ -158,6 +158,18 @@ ifdef OF_CXN_DUMP_ALL_OBJECTS
 GLOBAL_CFLAGS += -DOF_CXN_DUMP_ALL_OBJECTS
 endif
 
+ifdef PROFILE_GENERATE
+export CCACHE_DISABLE=1
+GLOBAL_CFLAGS += -fprofile-generate
+LDFLAGS += -fprofile-generate
+endif
+
+ifdef PROFILE_USE
+export CCACHE_DISABLE=1
+GLOBAL_CFLAGS += -fprofile-use -fprofile-correction
+LDFLAGS += -fprofile-use -fprofile-correction
+endif
+
 GLOBAL_LINK_LIBS += -lpthread -lrt -lm
 
 LIBNL_CFLAGS := $(shell pkg-config --cflags libnl-3.0)
