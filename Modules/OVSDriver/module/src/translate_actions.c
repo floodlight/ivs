@@ -180,6 +180,12 @@ ind_ovs_action_in_port(struct nlattr *attr, struct translate_context *ctx)
     nla_put_u32(ctx->msg, OVS_ACTION_ATTR_OUTPUT, ingress_port_no);
 }
 
+static void
+ind_ovs_action_normal(struct nlattr *attr, struct translate_context *ctx)
+{
+    /* stub */
+}
+
 /*
  * Set-field actions
  *
@@ -372,6 +378,9 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
         case IND_OVS_ACTION_IN_PORT:
             ind_ovs_action_in_port(attr, &ctx);
             break;
+        case IND_OVS_ACTION_NORMAL:
+            ind_ovs_action_normal(attr, &ctx);
+            break;
         case IND_OVS_ACTION_SET_ETH_DST:
             ind_ovs_action_set_eth_dst(attr, &ctx);
             break;
@@ -480,6 +489,9 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf)
                     break;
                 case OF_PORT_DEST_IN_PORT:
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_IN_PORT, NULL, 0);
+                    break;
+                case OF_PORT_DEST_NORMAL:
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_NORMAL, NULL, 0);
                     break;
                 default: {
                     if (port_no < IND_OVS_MAX_PORTS) {

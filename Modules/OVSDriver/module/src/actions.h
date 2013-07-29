@@ -36,6 +36,7 @@ enum {
     IND_OVS_ACTION_TABLE,
     IND_OVS_ACTION_LOCAL,
     IND_OVS_ACTION_IN_PORT,
+    IND_OVS_ACTION_NORMAL,
     IND_OVS_ACTION_SET_ETH_DST, /* of_mac_addr_t */
     IND_OVS_ACTION_SET_ETH_SRC, /* of_mac_addr_t */
     IND_OVS_ACTION_SET_IPV4_DST, /* uint32_t */
