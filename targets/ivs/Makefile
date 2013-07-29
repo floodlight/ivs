@@ -91,6 +91,8 @@ DEPENDMODULES := SocketManager OFConnectionManager OFStateManager OVSDriver \
 ifdef USE_LUAJIT
 DEPENDMODULES += luajit
 GLOBAL_CFLAGS += -DHAVE_LUAJIT=1
+LDFLAGS += -rdynamic
+GLOBAL_LINK_LIBS += -ldl
 endif
 
 #
