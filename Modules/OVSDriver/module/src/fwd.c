@@ -370,19 +370,8 @@ indigo_fwd_flow_stats_get(indigo_cookie_t flow_id,
 
     flow_stats.flow_id = flow_id;
     flow_stats.duration_ns = 0;
-
     flow_stats.packets = flow->stats.packets;
     flow_stats.bytes = flow->stats.bytes;
-
-    LOG_VERBOSE("Getting stats for %d kernel flows", list_length(&flow->kflows));
-
-    struct list_links *cur;
-    LIST_FOREACH(&flow->kflows, cur) {
-        struct ind_ovs_kflow *kflow = container_of(cur, flow_links, struct ind_ovs_kflow);
-        ind_ovs_kflow_sync_stats(kflow);
-        flow_stats.packets += kflow->stats.packets;
-        flow_stats.bytes += kflow->stats.bytes;
-    }
 
   done:
     indigo_core_flow_stats_get_callback(result, &flow_stats,

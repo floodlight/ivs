@@ -126,6 +126,13 @@ ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow)
     struct nlattr *stats_attr = attrs[OVS_FLOW_ATTR_STATS];
     if (stats_attr) {
         struct ovs_flow_stats *stats = nla_data(stats_attr);
+
+        uint64_t packet_diff = stats->n_packets - kflow->stats.packets;
+        uint64_t byte_diff = stats->n_bytes - kflow->stats.bytes;
+
+        __sync_fetch_and_add(&kflow->flow->stats.packets, packet_diff);
+        __sync_fetch_and_add(&kflow->flow->stats.bytes, byte_diff);
+
         kflow->stats.packets = stats->n_packets;
         kflow->stats.bytes = stats->n_bytes;
     }
@@ -167,9 +174,6 @@ ind_ovs_kflow_delete(struct ind_ovs_kflow *kflow)
     struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_DEL);
     nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(kflow->key), nla_data(kflow->key));
     (void) ind_ovs_transact(msg);
-
-    __sync_fetch_and_add(&kflow->flow->stats.packets, kflow->stats.packets);
-    __sync_fetch_and_add(&kflow->flow->stats.bytes, kflow->stats.bytes);
 
     list_remove(&kflow->flow_links);
     list_remove(&kflow->global_links);
@@ -232,6 +236,8 @@ ind_ovs_kflow_invalidate_all(void)
 /*
  * Delete all kflows that haven't been used in more than
  * IND_OVS_KFLOW_EXPIRATION_MS milliseconds.
+ *
+ * This has the side effect of synchronizing stats.
  *
  * TODO do this more efficiently, spread out over multiple steps.
  */

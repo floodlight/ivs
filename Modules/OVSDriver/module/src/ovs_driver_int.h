@@ -247,7 +247,7 @@ struct ind_ovs_flow_stats {
 struct ind_ovs_flow {
     struct flowtable_entry fte;
 
-    /* Stats beyond what's in the kernel flows */
+    /* Updated periodically from the kernel flows */
     struct ind_ovs_flow_stats stats;
 
     indigo_cookie_t  flow_id;
