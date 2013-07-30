@@ -185,6 +185,9 @@ ind_ovs_kflow_delete(struct ind_ovs_kflow *kflow)
 void
 ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
 {
+    /* Synchronize stats to previous OpenFlow flow */
+    ind_ovs_kflow_sync_stats(kflow);
+
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key(kflow->key, &pkey);
 
