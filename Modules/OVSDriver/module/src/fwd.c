@@ -167,31 +167,61 @@ init_effects(struct ind_ovs_flow_effects *effects,
     indigo_error_t err;
 
     xbuf_init(&effects->apply_actions);
+    xbuf_init(&effects->write_actions);
+
+    effects->flood = 0;
+    effects->clear_actions = 0;
+    effects->meter_id = -1;
+    effects->next_table_id = -1;
 
     if (flow_mod->version == OF_VERSION_1_0) {
         of_flow_modify_actions_bind(flow_mod, &openflow_actions);
+        effects->flood = actions_contain_flood(&openflow_actions);
+        if ((err = ind_ovs_translate_openflow_actions(&openflow_actions,
+                                                      &effects->apply_actions)) < 0) {
+            return err;
+        }
     } else {
+        int rv;
         of_list_instruction_t insts;
         of_instruction_t inst;
         of_flow_modify_instructions_bind(flow_mod, &insts);
 
-        if (of_list_instruction_first(&insts, &inst) == 0
-            && inst.header.object_id == OF_INSTRUCTION_APPLY_ACTIONS) {
-            of_instruction_apply_actions_actions_bind(&inst.apply_actions,
-                                                      &openflow_actions);
-        } else {
-            return INDIGO_ERROR_COMPAT;
+        OF_LIST_INSTRUCTION_ITER(&insts, &inst, rv) {
+            switch (inst.header.object_id) {
+            case OF_INSTRUCTION_APPLY_ACTIONS:
+                of_instruction_apply_actions_actions_bind(&inst.apply_actions,
+                                                          &openflow_actions);
+                if ((err = ind_ovs_translate_openflow_actions(&openflow_actions,
+                                                              &effects->apply_actions)) < 0) {
+                    return err;
+                }
+                break;
+            case OF_INSTRUCTION_WRITE_ACTIONS:
+                of_instruction_write_actions_actions_bind(&inst.write_actions,
+                                                          &openflow_actions);
+                if ((err = ind_ovs_translate_openflow_actions(&openflow_actions,
+                                                              &effects->write_actions)) < 0) {
+                    return err;
+                }
+                break;
+            case OF_INSTRUCTION_CLEAR_ACTIONS:
+                effects->clear_actions = 1;
+                break;
+            case OF_INSTRUCTION_GOTO_TABLE:
+                of_instruction_goto_table_table_id_get(&inst.goto_table, &effects->next_table_id);
+                break;
+            case OF_INSTRUCTION_METER:
+                of_instruction_meter_meter_id_get(&inst.meter, &effects->meter_id);
+                break;
+            default:
+                return INDIGO_ERROR_COMPAT;
+            }
         }
     }
 
-    if ((err = ind_ovs_translate_openflow_actions(&openflow_actions,
-                                                  &effects->apply_actions)) < 0) {
-        return err;
-    }
-
     xbuf_compact(&effects->apply_actions);
-
-    effects->flood = actions_contain_flood(&openflow_actions);
+    xbuf_compact(&effects->write_actions);
 
     return INDIGO_ERROR_NONE;
 }
@@ -200,6 +230,7 @@ static void
 cleanup_effects(struct ind_ovs_flow_effects *effects)
 {
     xbuf_cleanup(&effects->apply_actions);
+    xbuf_cleanup(&effects->write_actions);
 }
 
 /** \brief Create a flow */

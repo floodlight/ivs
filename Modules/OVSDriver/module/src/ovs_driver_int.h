@@ -226,7 +226,13 @@ AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == FLOWTABLE_KEY_SIZE);
  */
 struct ind_ovs_flow_effects {
     struct xbuf apply_actions;
-    unsigned int flood : 1; /* Whether this flow uses the ALL or FLOOD ports */
+    struct xbuf write_actions;
+    uint64_t metadata;
+    uint64_t metadata_mask;
+    uint32_t meter_id;
+    uint8_t next_table_id;
+    unsigned clear_actions : 1;
+    unsigned flood : 1; /* Whether this flow uses the ALL or FLOOD ports */
 };
 
 /*
