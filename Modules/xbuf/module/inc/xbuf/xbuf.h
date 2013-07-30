@@ -28,6 +28,7 @@
 
 #include <assert.h>
 #include <AIM/aim.h>
+#include <sys/socket.h>
 #include <linux/netlink.h>
 
 struct xbuf {
