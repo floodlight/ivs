@@ -71,8 +71,8 @@ ind_ovs_kflow_add(struct ind_ovs_flow *flow,
         }
     }
 
-    int ovs_key_len = nla_attr_size(nla_len(key));
-    struct ind_ovs_kflow *kflow = malloc(sizeof(*kflow) + ovs_key_len);
+    struct ind_ovs_kflow *kflow = malloc(ALIGN8(sizeof(*kflow) + key->nla_len) +
+                                         sizeof(struct ind_ovs_flow *));
     if (kflow == NULL) {
         return INDIGO_ERROR_RESOURCE;
     }
@@ -86,12 +86,14 @@ ind_ovs_kflow_add(struct ind_ovs_flow *flow,
     }
 
     kflow->last_used = monotonic_us()/1000;
-    kflow->flow = flow;
     kflow->in_port = in_port;
     kflow->stats.packets = 0;
     kflow->stats.bytes = 0;
 
-    memcpy(kflow->key, key, ovs_key_len);
+    memcpy(kflow->key, key, key->nla_len);
+
+    kflow->num_flows = 1;
+    ind_ovs_kflow_flows(kflow)[0] = flow;
 
     list_push(&ind_ovs_kflows, &kflow->global_links);
     list_push(bucket, &kflow->bucket_links);
@@ -128,11 +130,17 @@ ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow)
         uint64_t packet_diff = stats->n_packets - kflow->stats.packets;
         uint64_t byte_diff = stats->n_bytes - kflow->stats.bytes;
 
-        __sync_fetch_and_add(&kflow->flow->stats.packets, packet_diff);
-        __sync_fetch_and_add(&kflow->flow->stats.bytes, byte_diff);
+        if (packet_diff > 0 || byte_diff > 0) {
+            int i;
+            struct ind_ovs_flow **flows = ind_ovs_kflow_flows(kflow);
+            for (i = 0; i < kflow->num_flows; i++) {
+                __sync_fetch_and_add(&flows[i]->stats.packets, packet_diff);
+                __sync_fetch_and_add(&flows[i]->stats.bytes, byte_diff);
+            }
 
-        kflow->stats.packets = stats->n_packets;
-        kflow->stats.bytes = stats->n_bytes;
+            kflow->stats.packets = stats->n_packets;
+            kflow->stats.bytes = stats->n_bytes;
+        }
     }
 
     struct nlattr *used_attr = attrs[OVS_FLOW_ATTR_USED];
@@ -210,7 +218,7 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
         return;
     }
 
-    kflow->flow = flow;
+    ind_ovs_kflow_flows(kflow)[0] = flow;
 }
 
 /*
