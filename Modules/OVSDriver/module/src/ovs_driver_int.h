@@ -252,7 +252,6 @@ struct ind_ovs_flow {
 
     indigo_cookie_t  flow_id;
     struct list_links flow_id_links; /* (global) ind_ovs_flow_id_buckets */
-    struct list_head kflows; /* List of struct ind_ovs_kflow through flow_links */
 
     /* Modified by of_flow_modify messages */
     struct ind_ovs_flow_effects effects;
@@ -264,7 +263,6 @@ struct ind_ovs_flow {
  * purposes.
  */
 struct ind_ovs_kflow {
-    struct list_links flow_links; /* struct ind_ovs_flow kflows */
     struct list_links global_links; /* (global) kflows */
     struct list_links bucket_links; /* (global) kflow_buckets[] */
     struct ind_ovs_flow *flow; /* backpointer to parent flow */

@@ -94,7 +94,6 @@ ind_ovs_kflow_add(struct ind_ovs_flow *flow,
 
     memcpy(kflow->key, key, ovs_key_len);
 
-    list_push(&flow->kflows, &kflow->flow_links);
     list_push(&ind_ovs_kflows, &kflow->global_links);
     list_push(bucket, &kflow->bucket_links);
 
@@ -175,7 +174,6 @@ ind_ovs_kflow_delete(struct ind_ovs_kflow *kflow)
     nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(kflow->key), nla_data(kflow->key));
     (void) ind_ovs_transact(msg);
 
-    list_remove(&kflow->flow_links);
     list_remove(&kflow->global_links);
     list_remove(&kflow->bucket_links);
     free(kflow);
@@ -211,8 +209,6 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
     }
 
     kflow->flow = flow;
-    list_remove(&kflow->flow_links);
-    list_push(&flow->kflows, &kflow->flow_links);
 }
 
 /*

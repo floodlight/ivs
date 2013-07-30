@@ -216,7 +216,6 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
     }
 
     flow->flow_id = flow_id;
-    list_init(&flow->kflows);
     flow->stats.packets = 0;
     flow->stats.bytes = 0;
 
