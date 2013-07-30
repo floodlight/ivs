@@ -235,6 +235,11 @@ struct ind_ovs_flow_effects {
     unsigned flood : 1; /* Whether this flow uses the ALL or FLOOD ports */
 };
 
+struct ind_ovs_flow_stats {
+    uint64_t packets;
+    uint64_t bytes;
+};
+
 /*
  * An OpenFlow flow.
  *
@@ -244,8 +249,7 @@ struct ind_ovs_flow {
     struct flowtable_entry fte;
 
     /* Stats beyond what's in the kernel flows */
-    uint64_t packets;
-    uint64_t bytes;
+    struct ind_ovs_flow_stats stats;
 
     indigo_cookie_t  flow_id;
     struct list_links flow_id_links; /* (global) ind_ovs_flow_id_buckets */
@@ -265,7 +269,7 @@ struct ind_ovs_kflow {
     struct list_links global_links; /* (global) kflows */
     struct list_links bucket_links; /* (global) kflow_buckets[] */
     struct ind_ovs_flow *flow; /* backpointer to parent flow */
-    struct ovs_flow_stats stats; /* periodically synchronized with the kernel */
+    struct ind_ovs_flow_stats stats; /* periodically synchronized with the kernel */
     uint16_t priority;
     uint16_t in_port;
     uint64_t last_used; /* monotonic time in ms */

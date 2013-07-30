@@ -253,8 +253,8 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
 
     flow->flow_id = flow_id;
     list_init(&flow->kflows);
-    flow->packets = 0;
-    flow->bytes = 0;
+    flow->stats.packets = 0;
+    flow->stats.bytes = 0;
 
     of_match_t of_match;
     memset(&of_match, 0, sizeof(of_match));
@@ -370,8 +370,8 @@ indigo_fwd_flow_delete(indigo_cookie_t flow_id,
     ind_ovs_flow_invalidate_kflows(flow);
 
     flow_stats.flow_id = flow_id;
-    flow_stats.packets = flow->packets;
-    flow_stats.bytes = flow->bytes;
+    flow_stats.packets = flow->stats.packets;
+    flow_stats.bytes = flow->stats.bytes;
     flow_stats.duration_ns = 0;
 
     cleanup_effects(&flow->effects);
@@ -407,8 +407,8 @@ indigo_fwd_flow_stats_get(indigo_cookie_t flow_id,
     flow_stats.flow_id = flow_id;
     flow_stats.duration_ns = 0;
 
-    flow_stats.packets = flow->packets;
-    flow_stats.bytes = flow->bytes;
+    flow_stats.packets = flow->stats.packets;
+    flow_stats.bytes = flow->stats.bytes;
 
     LOG_VERBOSE("Getting stats for %d kernel flows", list_length(&flow->kflows));
 
@@ -416,8 +416,8 @@ indigo_fwd_flow_stats_get(indigo_cookie_t flow_id,
     LIST_FOREACH(&flow->kflows, cur) {
         struct ind_ovs_kflow *kflow = container_of(cur, flow_links, struct ind_ovs_kflow);
         ind_ovs_kflow_sync_stats(kflow);
-        flow_stats.packets += kflow->stats.n_packets;
-        flow_stats.bytes += kflow->stats.n_bytes;
+        flow_stats.packets += kflow->stats.packets;
+        flow_stats.bytes += kflow->stats.bytes;
     }
 
   done:

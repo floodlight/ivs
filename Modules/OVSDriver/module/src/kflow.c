@@ -89,8 +89,8 @@ ind_ovs_kflow_add(struct ind_ovs_flow *flow,
     kflow->last_used = monotonic_us()/1000;
     kflow->flow = flow;
     kflow->in_port = in_port;
-    kflow->stats.n_packets = 0;
-    kflow->stats.n_bytes = 0;
+    kflow->stats.packets = 0;
+    kflow->stats.bytes = 0;
 
     memcpy(kflow->key, key, ovs_key_len);
 
@@ -126,7 +126,8 @@ ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow)
     struct nlattr *stats_attr = attrs[OVS_FLOW_ATTR_STATS];
     if (stats_attr) {
         struct ovs_flow_stats *stats = nla_data(stats_attr);
-        kflow->stats = *stats;
+        kflow->stats.packets = stats->n_packets;
+        kflow->stats.bytes = stats->n_bytes;
     }
 
     struct nlattr *used_attr = attrs[OVS_FLOW_ATTR_USED];
@@ -167,8 +168,8 @@ ind_ovs_kflow_delete(struct ind_ovs_kflow *kflow)
     nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(kflow->key), nla_data(kflow->key));
     (void) ind_ovs_transact(msg);
 
-    __sync_fetch_and_add(&kflow->flow->packets, kflow->stats.n_packets);
-    __sync_fetch_and_add(&kflow->flow->bytes, kflow->stats.n_bytes);
+    __sync_fetch_and_add(&kflow->flow->stats.packets, kflow->stats.packets);
+    __sync_fetch_and_add(&kflow->flow->stats.bytes, kflow->stats.bytes);
 
     list_remove(&kflow->flow_links);
     list_remove(&kflow->global_links);
