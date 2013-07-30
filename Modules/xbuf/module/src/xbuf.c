@@ -34,6 +34,9 @@ void
 xbuf_cleanup(struct xbuf *xbuf)
 {
     free(xbuf->data);
+    xbuf->data = NULL;
+    xbuf->length = 0;
+    xbuf->allocated = 0;
 }
 
 /* From http://locklessinc.com/articles/next_pow2/ */
