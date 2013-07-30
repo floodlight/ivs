@@ -34,6 +34,7 @@
 #include "AIM/aim_rl.h"
 #include "AIM/aim_utils.h"
 #include "flowtable/flowtable.h"
+#include "xbuf/xbuf.h"
 
 #define IND_OVS_MAX_PORTS 1024
 
@@ -221,6 +222,14 @@ AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == 8*8);
 AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == FLOWTABLE_KEY_SIZE);
 
 /*
+ * Derived from a flow's actions/instructions.
+ */
+struct ind_ovs_flow_effects {
+    struct xbuf apply_actions;
+    unsigned int flood : 1; /* Whether this flow uses the ALL or FLOOD ports */
+};
+
+/*
  * An OpenFlow flow.
  *
  * Parent of zero or more exact-match kernel flows (struct ind_ovs_kflow).
@@ -234,9 +243,10 @@ struct ind_ovs_flow {
 
     indigo_cookie_t  flow_id;
     struct list_links flow_id_links; /* (global) ind_ovs_flow_id_buckets */
-    of_list_action_t *of_list_action;
     struct list_head kflows; /* List of struct ind_ovs_kflow through flow_links */
-    unsigned int flood : 1; /* Whether this flow uses the ALL or FLOOD ports */
+
+    /* Modified by of_flow_modify messages */
+    struct ind_ovs_flow_effects effects;
 };
 
 /*
@@ -270,8 +280,11 @@ struct ind_ovs_pktin_suppression_cfg {
 /* Translate an OVS key into a flat struct */
 void ind_ovs_parse_key(struct nlattr *key, struct ind_ovs_parsed_key *pkey);
 
-/* Translate OpenFlow actions into OVS actions */
-void ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey, of_list_action_t *of_list_action, struct nl_msg *msg, int attr_type);
+/* Translate OpenFlow actions into IVS actions */
+indigo_error_t ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf);
+
+/* Translate IVS actions into OVS actions */
+void ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey, struct xbuf *actions, struct nl_msg *msg, int attr_type);
 
 /* Translate an OVS key into an OpenFlow match object */
 void ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey, of_match_t *match);

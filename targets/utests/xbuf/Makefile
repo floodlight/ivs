@@ -17,9 +17,19 @@
 #
 ################################################################
 
-BASEDIR := $(dir $(lastword $(MAKEFILE_LIST)))
-OVSDriver_BASEDIR := $(BASEDIR)/OVSDriver
-flowtable_BASEDIR := $(BASEDIR)/flowtable
-l2table_BASEDIR := $(BASEDIR)/l2table
-luajit_BASEDIR := $(BASEDIR)/luajit
-xbuf_BASEDIR := $(BASEDIR)/xbuf
+###############################################################################
+#
+#  xbuf Unit Testing Module Makefile
+#
+#
+#
+###############################################################################
+MODULE := xbuf_utest
+NOMODULEMAKE := 1
+TEST_MODULE :=  xbuf
+DEPENDMODULES := AIM
+GLOBAL_CFLAGS += -DAIM_CONFIG_INCLUDE_POSIX=1
+GLOBAL_CFLAGS += -DAIM_CONFIG_INCLUDE_MAIN=1
+OS_MAKE_CONFIG_AUTOSELECT := 1
+PEDANTIC := 1
+include ../make/utestmodule.mk

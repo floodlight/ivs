@@ -159,6 +159,49 @@ actions_contain_flood(of_list_action_t *actions)
     return false;
 }
 
+static indigo_error_t
+init_effects(struct ind_ovs_flow_effects *effects,
+             of_flow_modify_t *flow_mod)
+{
+    of_list_action_t openflow_actions;
+    indigo_error_t err;
+
+    xbuf_init(&effects->apply_actions);
+
+    if (flow_mod->version == OF_VERSION_1_0) {
+        of_flow_modify_actions_bind(flow_mod, &openflow_actions);
+    } else {
+        of_list_instruction_t insts;
+        of_instruction_t inst;
+        of_flow_modify_instructions_bind(flow_mod, &insts);
+
+        if (of_list_instruction_first(&insts, &inst) == 0
+            && inst.header.object_id == OF_INSTRUCTION_APPLY_ACTIONS) {
+            of_instruction_apply_actions_actions_bind(&inst.apply_actions,
+                                                      &openflow_actions);
+        } else {
+            return INDIGO_ERROR_COMPAT;
+        }
+    }
+
+    if ((err = ind_ovs_translate_openflow_actions(&openflow_actions,
+                                                  &effects->apply_actions)) < 0) {
+        return err;
+    }
+
+    xbuf_compact(&effects->apply_actions);
+
+    effects->flood = actions_contain_flood(&openflow_actions);
+
+    return INDIGO_ERROR_NONE;
+}
+
+static void
+cleanup_effects(struct ind_ovs_flow_effects *effects)
+{
+    xbuf_cleanup(&effects->apply_actions);
+}
+
 /** \brief Create a flow */
 
 void
@@ -168,7 +211,6 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
 {
     indigo_error_t result = INDIGO_ERROR_NONE;
     struct ind_ovs_flow *flow = NULL;
-    of_list_action_t *of_list_action = NULL;
 
     LOG_TRACE("Flow create called");
     flow = malloc(sizeof(*flow));
@@ -207,26 +249,9 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
                          (struct flowtable_key *)&masks,
                          priority);
 
-    if (flow_add->version == OF_VERSION_1_0) {
-        of_list_action = of_flow_add_actions_get(flow_add);
-    } else {
-        of_list_instruction_t insts;
-        of_instruction_t inst;
-        of_flow_add_instructions_bind(flow_add, &insts);
-
-        if (of_list_instruction_first(&insts, &inst) == 0) {
-            if (inst.header.object_id == OF_INSTRUCTION_APPLY_ACTIONS) {
-                of_list_action = of_instruction_apply_actions_actions_get(&inst.apply_actions);
-            }
-        }
-    }
-
-    if (of_list_action == NULL) {
-        result = INDIGO_ERROR_UNKNOWN;
+    if ((result = init_effects(&flow->effects, flow_add)) < 0) {
         goto done;
     }
-    flow->of_list_action = of_list_action;
-    flow->flood = actions_contain_flood(of_list_action);
 
     /* N.B. No check made for duplicate flow_ids */
     struct list_head *flow_id_bucket = ind_ovs_flow_id_bucket(flow->flow_id);
@@ -242,7 +267,7 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
 
  done:
     if (INDIGO_FAILURE(result)) {
-        if (of_list_action) of_list_action_delete(of_list_action);
+        cleanup_effects(&flow->effects);
         free(flow);
     }
 
@@ -259,7 +284,6 @@ indigo_fwd_flow_modify(indigo_cookie_t flow_id,
 {
     indigo_error_t       result = INDIGO_ERROR_NONE;
     struct ind_ovs_flow *flow;
-    of_list_action_t     *of_list_action = 0, *old_of_list_action;
 
     if ((flow = ind_ovs_flow_lookup(flow_id)) == 0) {
        LOG_ERROR("Flow not found");
@@ -267,33 +291,27 @@ indigo_fwd_flow_modify(indigo_cookie_t flow_id,
        goto done;
     }
 
-    /* @todo Fill in flow_modify if non-NULL */
     LOG_TRACE("Flow modify called\n");
 
-    of_list_action = of_flow_modify_strict_actions_get(flow_modify);
-    if (of_list_action == NULL) {
-        LOG_ERROR("of_flow_modify_actions_get() failed to get actions");
-        result = INDIGO_ERROR_UNKNOWN;
+    struct ind_ovs_flow_effects effects, old_effects;
+    if ((result = init_effects(&effects, flow_modify)) < 0) {
+        cleanup_effects(&effects);
         goto done;
     }
 
-    old_of_list_action = flow->of_list_action;
+    old_effects = flow->effects;
 
     ind_ovs_fwd_write_lock();
-    flow->of_list_action = of_list_action;
+    flow->effects = effects;
     ind_ovs_fwd_write_unlock();
 
-    of_list_action_delete(old_of_list_action);  /* Free old action list */
+    cleanup_effects(&old_effects);
 
     ind_ovs_flow_invalidate_kflows(flow);
 
     /** \todo Clear flow stats? */
 
  done:
-    if (INDIGO_FAILURE(result)) {
-        of_list_action_delete(of_list_action);
-    }
-
     indigo_core_flow_modify_callback(result, NULL, callback_cookie);
 }
 
@@ -325,7 +343,7 @@ indigo_fwd_flow_delete(indigo_cookie_t flow_id,
     flow_stats.bytes = flow->bytes;
     flow_stats.duration_ns = 0;
 
-    of_list_action_delete(flow->of_list_action);
+    cleanup_effects(&flow->effects);
 
     list_remove(&flow->flow_id_links);
 
@@ -622,7 +640,11 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
     nlmsg_hdr(msg)->nlmsg_len -= nla_total_size(nla_len(actions));
 
     /* Add the real actions generated from the kernel's flow key */
-    ind_ovs_translate_actions(&pkey, of_list_action, msg, OVS_PACKET_ATTR_ACTIONS);
+    struct xbuf xbuf;
+    xbuf_init(&xbuf);
+    ind_ovs_translate_openflow_actions(of_list_action, &xbuf);
+    ind_ovs_translate_actions(&pkey, &xbuf, msg, OVS_PACKET_ATTR_ACTIONS);
+    xbuf_cleanup(&xbuf);
 
     /* Send the second message */
     if (ind_ovs_transact(msg) < 0) {
@@ -675,10 +697,6 @@ ind_ovs_fwd_init(void)
         list_init(bucket);
     }
 
-    struct ind_ovs_cfr hash_mask;
-    memset(&hash_mask, 0, sizeof(hash_mask));
-    memset(&hash_mask.dl_dst, 0xff, sizeof(&hash_mask.dl_dst));
-    memset(&hash_mask.dl_src, 0xff, sizeof(&hash_mask.dl_src));
     ind_ovs_ft = flowtable_create();
     if (!ind_ovs_ft) {
         return INDIGO_ERROR_RESOURCE;
@@ -718,7 +736,7 @@ ind_ovs_fwd_finish(void)
         struct list_links *cur, *next;
         LIST_FOREACH_SAFE(bucket, cur, next) {
             struct ind_ovs_flow *flow = container_of(cur, flow_id_links, struct ind_ovs_flow);
-            of_list_action_delete(flow->of_list_action);
+            cleanup_effects(&flow->effects);
             free(flow);
         }
     }

@@ -197,7 +197,7 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
 
     nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(kflow->key), nla_data(kflow->key));
 
-    ind_ovs_translate_actions(&pkey, flow->of_list_action,
+    ind_ovs_translate_actions(&pkey, &flow->effects.apply_actions,
                               msg, OVS_FLOW_ATTR_ACTIONS);
 
     if (ind_ovs_transact(msg) < 0) {
@@ -268,7 +268,7 @@ ind_ovs_kflow_invalidate_flood(void)
     struct list_links *cur, *next;
     LIST_FOREACH_SAFE(&ind_ovs_kflows, cur, next) {
         struct ind_ovs_kflow *kflow = container_of(cur, global_links, struct ind_ovs_kflow);
-        if (kflow->flow->flood) {
+        if (kflow->flow->effects.flood) {
             LOG_VERBOSE("invalidating kflow (flood)");
             ind_ovs_kflow_invalidate(kflow);
         }

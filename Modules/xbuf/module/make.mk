@@ -17,9 +17,6 @@
 #
 ################################################################
 
-BASEDIR := $(dir $(lastword $(MAKEFILE_LIST)))
-OVSDriver_BASEDIR := $(BASEDIR)/OVSDriver
-flowtable_BASEDIR := $(BASEDIR)/flowtable
-l2table_BASEDIR := $(BASEDIR)/l2table
-luajit_BASEDIR := $(BASEDIR)/luajit
-xbuf_BASEDIR := $(BASEDIR)/xbuf
+THIS_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+xbuf_INCLUDES := -I $(THIS_DIR)inc
+xbuf_INTERNAL_INCLUDES := -I $(THIS_DIR)src

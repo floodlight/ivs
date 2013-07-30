@@ -17,9 +17,6 @@
 #
 ################################################################
 
-BASEDIR := $(dir $(lastword $(MAKEFILE_LIST)))
-OVSDriver_BASEDIR := $(BASEDIR)/OVSDriver
-flowtable_BASEDIR := $(BASEDIR)/flowtable
-l2table_BASEDIR := $(BASEDIR)/l2table
-luajit_BASEDIR := $(BASEDIR)/luajit
-xbuf_BASEDIR := $(BASEDIR)/xbuf
+UMODULE := xbuf
+UMODULE_SUBDIR := $(dir $(lastword $(MAKEFILE_LIST)))
+include $(BUILDER)/utest.mk
