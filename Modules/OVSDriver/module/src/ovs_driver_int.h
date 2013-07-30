@@ -267,7 +267,6 @@ struct ind_ovs_kflow {
     struct list_links bucket_links; /* (global) kflow_buckets[] */
     struct ind_ovs_flow *flow; /* backpointer to parent flow */
     struct ind_ovs_flow_stats stats; /* periodically synchronized with the kernel */
-    uint16_t priority;
     uint16_t in_port;
     uint64_t last_used; /* monotonic time in ms */
     struct nlattr key[0];

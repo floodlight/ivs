@@ -85,7 +85,6 @@ ind_ovs_kflow_add(struct ind_ovs_flow *flow,
         return INDIGO_ERROR_UNKNOWN;
     }
 
-    kflow->priority = flow->fte.priority;
     kflow->last_used = monotonic_us()/1000;
     kflow->flow = flow;
     kflow->in_port = in_port;
