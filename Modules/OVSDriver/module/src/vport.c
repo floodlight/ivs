@@ -245,7 +245,7 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname, of_mac_addr_t mac_addr)
 
     ind_ovs_upcall_register(port);
     LOG_INFO("Added port %s", port->ifname);
-    ind_ovs_kflow_invalidate_flood();
+    ind_ovs_kflow_invalidate_all();
     return;
 
 cleanup_port:
@@ -298,7 +298,7 @@ ind_ovs_port_deleted(uint32_t port_no)
     ind_ovs_ports[port_no] = NULL;
     ind_ovs_fwd_write_unlock();
 
-    ind_ovs_kflow_invalidate_flood();
+    ind_ovs_kflow_invalidate_all();
 }
 
 void indigo_port_modify(
@@ -320,7 +320,7 @@ void indigo_port_modify(
 
     port->config = (port->config & ~mask) | (config & mask);
     /* TODO change other configuration? */
-    ind_ovs_kflow_invalidate_flood();
+    ind_ovs_kflow_invalidate_all();
 
     indigo_core_port_modify_callback(INDIGO_ERROR_NONE, callback_cookie);
 }

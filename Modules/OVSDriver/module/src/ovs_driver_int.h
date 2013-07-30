@@ -232,7 +232,6 @@ struct ind_ovs_flow_effects {
     uint32_t meter_id;
     uint8_t next_table_id;
     unsigned clear_actions : 1;
-    unsigned flood : 1; /* Whether this flow uses the ALL or FLOOD ports */
 };
 
 struct ind_ovs_flow_stats {
@@ -330,8 +329,7 @@ void ind_ovs_fwd_write_unlock();
 indigo_error_t ind_ovs_kflow_add(struct ind_ovs_flow *flow, const struct nlattr *key, const struct nlattr *actions);
 void ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow);
 void ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow);
-void ind_ovs_kflow_invalidate_overlap(const struct ind_ovs_cfr *flow_fields, const struct ind_ovs_cfr *flow_masks, uint16_t priority);
-void ind_ovs_kflow_invalidate_flood(void);
+void ind_ovs_kflow_invalidate_all(void);
 void ind_ovs_kflow_expire(void);
 void ind_ovs_kflow_module_init(void);
 

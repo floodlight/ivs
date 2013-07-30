@@ -125,40 +125,6 @@ ind_ovs_flow_lookup(indigo_cookie_t flow_id)
     return NULL;
 }
 
-/* Invalidate all the kernel flows for the given user flow. */
-static void
-ind_ovs_flow_invalidate_kflows(struct ind_ovs_flow *flow)
-{
-    struct list_links *cur, *next;
-    LIST_FOREACH_SAFE(&flow->kflows, cur, next) {
-        struct ind_ovs_kflow *kflow = container_of(cur, flow_links, struct ind_ovs_kflow);
-        ind_ovs_kflow_invalidate(kflow);
-    }
-}
-
-/*
- * Returns true if the action list contains an output to the "all" or
- * "flood" virtual ports.
- */
-static bool
-actions_contain_flood(of_list_action_t *actions)
-{
-    of_action_t action[1];
-    int rv;
-    OF_LIST_ACTION_ITER(actions, action, rv) {
-        if (action->header.object_id == OF_ACTION_OUTPUT) {
-            of_port_no_t of_port_num;
-            of_action_output_port_get(&action->output, &of_port_num);
-            if (of_port_num == OF_PORT_DEST_FLOOD ||
-                of_port_num == OF_PORT_DEST_ALL) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
 static indigo_error_t
 init_effects(struct ind_ovs_flow_effects *effects,
              of_flow_modify_t *flow_mod)
@@ -169,14 +135,12 @@ init_effects(struct ind_ovs_flow_effects *effects,
     xbuf_init(&effects->apply_actions);
     xbuf_init(&effects->write_actions);
 
-    effects->flood = 0;
     effects->clear_actions = 0;
     effects->meter_id = -1;
     effects->next_table_id = -1;
 
     if (flow_mod->version == OF_VERSION_1_0) {
         of_flow_modify_actions_bind(flow_mod, &openflow_actions);
-        effects->flood = actions_contain_flood(&openflow_actions);
         if ((err = ind_ovs_translate_openflow_actions(&openflow_actions,
                                                       &effects->apply_actions)) < 0) {
             return err;
@@ -292,7 +256,7 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
     flowtable_insert(ind_ovs_ft, &flow->fte);
     ind_ovs_fwd_write_unlock();
 
-    ind_ovs_kflow_invalidate_overlap(&fields, &masks, flow->fte.priority);
+    ind_ovs_kflow_invalidate_all();
 
     ++active_count;
 
@@ -338,7 +302,7 @@ indigo_fwd_flow_modify(indigo_cookie_t flow_id,
 
     cleanup_effects(&old_effects);
 
-    ind_ovs_flow_invalidate_kflows(flow);
+    ind_ovs_kflow_invalidate_all();
 
     /** \todo Clear flow stats? */
 
@@ -367,7 +331,7 @@ indigo_fwd_flow_delete(indigo_cookie_t flow_id,
     flowtable_remove(ind_ovs_ft, &flow->fte);
     ind_ovs_fwd_write_unlock();
 
-    ind_ovs_flow_invalidate_kflows(flow);
+    ind_ovs_kflow_invalidate_all();
 
     flow_stats.flow_id = flow_id;
     flow_stats.packets = flow->stats.packets;

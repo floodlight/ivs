@@ -211,69 +211,22 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
     list_push(&flow->kflows, &kflow->flow_links);
 }
 
-/* Check whether pkt_key is contained within flow_key/flow_mask */
-static bool
-cfr_match__(const struct ind_ovs_cfr *flow_key,
-            const struct ind_ovs_cfr *flow_mask,
-            const struct ind_ovs_cfr *pkt_key)
-{
-    uint64_t *f = (uint64_t *)flow_key;
-    uint64_t *m = (uint64_t *)flow_mask;
-    uint64_t *p = (uint64_t *)pkt_key;
-    int i;
-
-    for (i = 0; i < sizeof(*flow_key)/sizeof(*f); i++) {
-        if ((p[i] & m[i]) != f[i]) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 /*
- * Invalidate all kflows that overlap the given match.
+ * Invalidate all kernel flows
  */
 void
-ind_ovs_kflow_invalidate_overlap(const struct ind_ovs_cfr *flow_fields,
-                                 const struct ind_ovs_cfr *flow_masks,
-                                 uint16_t priority)
+ind_ovs_kflow_invalidate_all(void)
 {
+    uint64_t start_time = monotonic_us();
+    int count = 0;
     struct list_links *cur, *next;
     LIST_FOREACH_SAFE(&ind_ovs_kflows, cur, next) {
         struct ind_ovs_kflow *kflow = container_of(cur, global_links, struct ind_ovs_kflow);
-        if (kflow->priority >= priority) {
-            continue;
-        }
-
-        struct ind_ovs_parsed_key pkey;
-        ind_ovs_parse_key(kflow->key, &pkey);
-        struct ind_ovs_cfr kflow_fields;
-        ind_ovs_key_to_cfr(&pkey, &kflow_fields);
-
-        if (cfr_match__(flow_fields, flow_masks, &kflow_fields)) {
-            LOG_VERBOSE("invalidating kflow (overlap)");
-            ind_ovs_kflow_invalidate(kflow);
-        }
+        ind_ovs_kflow_invalidate(kflow);
+        count++;
     }
-}
-
-/*
- * Invalidate all kflows that use a FLOOD or ALL action.
- * This is done when the set of ports changes.
- * TODO keep a list of these flows to optimize this.
- */
-void
-ind_ovs_kflow_invalidate_flood(void)
-{
-    struct list_links *cur, *next;
-    LIST_FOREACH_SAFE(&ind_ovs_kflows, cur, next) {
-        struct ind_ovs_kflow *kflow = container_of(cur, global_links, struct ind_ovs_kflow);
-        if (kflow->flow->effects.flood) {
-            LOG_VERBOSE("invalidating kflow (flood)");
-            ind_ovs_kflow_invalidate(kflow);
-        }
-    }
+    uint64_t end_time = monotonic_us();
+    LOG_VERBOSE("invalidated %d kernel flows in %d us", count, end_time - start_time);
 }
 
 /*
