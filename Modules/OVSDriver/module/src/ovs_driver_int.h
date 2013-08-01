@@ -91,6 +91,8 @@
 
 #define ARRAY_SIZE(a)  (sizeof(a) / sizeof((a)[0]))
 
+#define ALIGN8(x) (((x) + 7) & ~7)
+
 /* Manage a uint64_t bitmap of OVS key attributes. */
 #define ATTR_BITMAP_TEST(bitmap, attr) ((bitmap & (1 << (attr))) != 0)
 #define ATTR_BITMAP_SET(bitmap, attr) (bitmap |= (1 << (attr)))
@@ -226,45 +228,60 @@ AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == FLOWTABLE_KEY_SIZE);
  */
 struct ind_ovs_flow_effects {
     struct xbuf apply_actions;
-    unsigned int flood : 1; /* Whether this flow uses the ALL or FLOOD ports */
+    struct xbuf write_actions;
+    uint64_t metadata;
+    uint64_t metadata_mask;
+    uint32_t meter_id;
+    uint8_t next_table_id;
+    unsigned clear_actions : 1;
+};
+
+struct ind_ovs_flow_stats {
+    uint64_t packets;
+    uint64_t bytes;
 };
 
 /*
  * An OpenFlow flow.
- *
- * Parent of zero or more exact-match kernel flows (struct ind_ovs_kflow).
  */
 struct ind_ovs_flow {
     struct flowtable_entry fte;
 
-    /* Stats beyond what's in the kernel flows */
-    uint64_t packets;
-    uint64_t bytes;
+    /* Updated periodically from the kernel flows */
+    struct ind_ovs_flow_stats stats;
 
     indigo_cookie_t  flow_id;
     struct list_links flow_id_links; /* (global) ind_ovs_flow_id_buckets */
-    struct list_head kflows; /* List of struct ind_ovs_kflow through flow_links */
 
     /* Modified by of_flow_modify messages */
     struct ind_ovs_flow_effects effects;
 };
 
 /*
- * There are 0 or more exact-match flows in the kernel for each real OpenFlow
- * flow. We need to keep track of them in userspace for various bookkeeping
- * purposes.
+ * A cached kernel flow.
+ *
+ * A kflow caches the actions for a particular openvswitch flow key. A kflow
+ * may use multiple OpenFlow flows while traveling through the pipeline.
+ * These are saved in the 'flows' array for stats purposes.
  */
 struct ind_ovs_kflow {
-    struct list_links flow_links; /* struct ind_ovs_flow kflows */
     struct list_links global_links; /* (global) kflows */
     struct list_links bucket_links; /* (global) kflow_buckets[] */
-    struct ind_ovs_flow *flow; /* backpointer to parent flow */
-    struct ovs_flow_stats stats; /* periodically synchronized with the kernel */
-    uint16_t priority;
+    struct ind_ovs_flow_stats stats; /* periodically synchronized with the kernel */
     uint16_t in_port;
+    uint16_t num_flows; /* size of flows array */
     uint64_t last_used; /* monotonic time in ms */
     struct nlattr key[0];
+    /* struct ind_ovs_flow *flows[0]; */
 };
+
+static inline struct ind_ovs_flow **
+ind_ovs_kflow_flows(struct ind_ovs_kflow *kflow)
+{
+    /* 'flows' starts at the first 8-byte aligned address after 'key' */
+    size_t offset = ALIGN8(offsetof(struct ind_ovs_kflow, key) + kflow->key->nla_len);
+    return (struct ind_ovs_flow **) ((char *)kflow + offset);
+}
 
 /* Configuration for the bsn_pktin_suppression extension */
 struct ind_ovs_pktin_suppression_cfg {
@@ -320,8 +337,7 @@ void ind_ovs_fwd_write_unlock();
 indigo_error_t ind_ovs_kflow_add(struct ind_ovs_flow *flow, const struct nlattr *key, const struct nlattr *actions);
 void ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow);
 void ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow);
-void ind_ovs_kflow_invalidate_overlap(const struct ind_ovs_cfr *flow_fields, const struct ind_ovs_cfr *flow_masks, uint16_t priority);
-void ind_ovs_kflow_invalidate_flood(void);
+void ind_ovs_kflow_invalidate_all(void);
 void ind_ovs_kflow_expire(void);
 void ind_ovs_kflow_module_init(void);
 

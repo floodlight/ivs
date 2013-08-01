@@ -71,8 +71,8 @@ ind_ovs_kflow_add(struct ind_ovs_flow *flow,
         }
     }
 
-    int ovs_key_len = nla_attr_size(nla_len(key));
-    struct ind_ovs_kflow *kflow = malloc(sizeof(*kflow) + ovs_key_len);
+    struct ind_ovs_kflow *kflow = malloc(ALIGN8(sizeof(*kflow) + key->nla_len) +
+                                         sizeof(struct ind_ovs_flow *));
     if (kflow == NULL) {
         return INDIGO_ERROR_RESOURCE;
     }
@@ -85,16 +85,16 @@ ind_ovs_kflow_add(struct ind_ovs_flow *flow,
         return INDIGO_ERROR_UNKNOWN;
     }
 
-    kflow->priority = flow->fte.priority;
     kflow->last_used = monotonic_us()/1000;
-    kflow->flow = flow;
     kflow->in_port = in_port;
-    kflow->stats.n_packets = 0;
-    kflow->stats.n_bytes = 0;
+    kflow->stats.packets = 0;
+    kflow->stats.bytes = 0;
 
-    memcpy(kflow->key, key, ovs_key_len);
+    memcpy(kflow->key, key, key->nla_len);
 
-    list_push(&flow->kflows, &kflow->flow_links);
+    kflow->num_flows = 1;
+    ind_ovs_kflow_flows(kflow)[0] = flow;
+
     list_push(&ind_ovs_kflows, &kflow->global_links);
     list_push(bucket, &kflow->bucket_links);
 
@@ -126,7 +126,21 @@ ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow)
     struct nlattr *stats_attr = attrs[OVS_FLOW_ATTR_STATS];
     if (stats_attr) {
         struct ovs_flow_stats *stats = nla_data(stats_attr);
-        kflow->stats = *stats;
+
+        uint64_t packet_diff = stats->n_packets - kflow->stats.packets;
+        uint64_t byte_diff = stats->n_bytes - kflow->stats.bytes;
+
+        if (packet_diff > 0 || byte_diff > 0) {
+            int i;
+            struct ind_ovs_flow **flows = ind_ovs_kflow_flows(kflow);
+            for (i = 0; i < kflow->num_flows; i++) {
+                __sync_fetch_and_add(&flows[i]->stats.packets, packet_diff);
+                __sync_fetch_and_add(&flows[i]->stats.bytes, byte_diff);
+            }
+
+            kflow->stats.packets = stats->n_packets;
+            kflow->stats.bytes = stats->n_bytes;
+        }
     }
 
     struct nlattr *used_attr = attrs[OVS_FLOW_ATTR_USED];
@@ -167,10 +181,6 @@ ind_ovs_kflow_delete(struct ind_ovs_kflow *kflow)
     nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(kflow->key), nla_data(kflow->key));
     (void) ind_ovs_transact(msg);
 
-    __sync_fetch_and_add(&kflow->flow->packets, kflow->stats.n_packets);
-    __sync_fetch_and_add(&kflow->flow->bytes, kflow->stats.n_bytes);
-
-    list_remove(&kflow->flow_links);
     list_remove(&kflow->global_links);
     list_remove(&kflow->bucket_links);
     free(kflow);
@@ -183,6 +193,9 @@ ind_ovs_kflow_delete(struct ind_ovs_kflow *kflow)
 void
 ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
 {
+    /* Synchronize stats to previous OpenFlow flow */
+    ind_ovs_kflow_sync_stats(kflow);
+
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key(kflow->key, &pkey);
 
@@ -205,79 +218,32 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
         return;
     }
 
-    kflow->flow = flow;
-    list_remove(&kflow->flow_links);
-    list_push(&flow->kflows, &kflow->flow_links);
-}
-
-/* Check whether pkt_key is contained within flow_key/flow_mask */
-static bool
-cfr_match__(const struct ind_ovs_cfr *flow_key,
-            const struct ind_ovs_cfr *flow_mask,
-            const struct ind_ovs_cfr *pkt_key)
-{
-    uint64_t *f = (uint64_t *)flow_key;
-    uint64_t *m = (uint64_t *)flow_mask;
-    uint64_t *p = (uint64_t *)pkt_key;
-    int i;
-
-    for (i = 0; i < sizeof(*flow_key)/sizeof(*f); i++) {
-        if ((p[i] & m[i]) != f[i]) {
-            return false;
-        }
-    }
-
-    return true;
+    ind_ovs_kflow_flows(kflow)[0] = flow;
 }
 
 /*
- * Invalidate all kflows that overlap the given match.
+ * Invalidate all kernel flows
  */
 void
-ind_ovs_kflow_invalidate_overlap(const struct ind_ovs_cfr *flow_fields,
-                                 const struct ind_ovs_cfr *flow_masks,
-                                 uint16_t priority)
+ind_ovs_kflow_invalidate_all(void)
 {
+    uint64_t start_time = monotonic_us();
+    int count = 0;
     struct list_links *cur, *next;
     LIST_FOREACH_SAFE(&ind_ovs_kflows, cur, next) {
         struct ind_ovs_kflow *kflow = container_of(cur, global_links, struct ind_ovs_kflow);
-        if (kflow->priority >= priority) {
-            continue;
-        }
-
-        struct ind_ovs_parsed_key pkey;
-        ind_ovs_parse_key(kflow->key, &pkey);
-        struct ind_ovs_cfr kflow_fields;
-        ind_ovs_key_to_cfr(&pkey, &kflow_fields);
-
-        if (cfr_match__(flow_fields, flow_masks, &kflow_fields)) {
-            LOG_VERBOSE("invalidating kflow (overlap)");
-            ind_ovs_kflow_invalidate(kflow);
-        }
+        ind_ovs_kflow_invalidate(kflow);
+        count++;
     }
-}
-
-/*
- * Invalidate all kflows that use a FLOOD or ALL action.
- * This is done when the set of ports changes.
- * TODO keep a list of these flows to optimize this.
- */
-void
-ind_ovs_kflow_invalidate_flood(void)
-{
-    struct list_links *cur, *next;
-    LIST_FOREACH_SAFE(&ind_ovs_kflows, cur, next) {
-        struct ind_ovs_kflow *kflow = container_of(cur, global_links, struct ind_ovs_kflow);
-        if (kflow->flow->effects.flood) {
-            LOG_VERBOSE("invalidating kflow (flood)");
-            ind_ovs_kflow_invalidate(kflow);
-        }
-    }
+    uint64_t end_time = monotonic_us();
+    LOG_VERBOSE("invalidated %d kernel flows in %d us", count, end_time - start_time);
 }
 
 /*
  * Delete all kflows that haven't been used in more than
  * IND_OVS_KFLOW_EXPIRATION_MS milliseconds.
+ *
+ * This has the side effect of synchronizing stats.
  *
  * TODO do this more efficiently, spread out over multiple steps.
  */
