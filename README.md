@@ -23,6 +23,8 @@ Building IVS
   - Ubuntu 12.04: `sudo apt-get install libnl-3-dev libnl-genl-3-dev libnl-route-3-dev pkg-config python-tz libpcap-dev openvswitch-datapath-dkms`
 
 2. Clone the IVS repository: `git clone --recurse-submodules https://github.com/floodlight/ivs.git`
+    - NOTE that if you did not use clone with the "--recursive-submodules" option, you can fix this by running
+            `cd ivs && git submodule update --recursive --init`
 
 3. `cd ivs`
 
