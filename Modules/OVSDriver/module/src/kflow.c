@@ -197,9 +197,6 @@ ind_ovs_kflow_delete(struct ind_ovs_kflow *kflow)
 void
 ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
 {
-    /* Synchronize stats to previous OpenFlow flow */
-    ind_ovs_kflow_sync_stats(kflow);
-
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key(kflow->key, &pkey);
 
@@ -208,6 +205,11 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
     if (ind_ovs_lookup_flow(&pkey, &flow) != 0) {
         ind_ovs_kflow_delete(kflow);
         return;
+    }
+
+    if (flow != ind_ovs_kflow_flows(kflow)[0]) {
+        /* Synchronize stats to previous OpenFlow flow */
+        ind_ovs_kflow_sync_stats(kflow);
     }
 
     struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_SET);
