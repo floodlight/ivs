@@ -111,6 +111,16 @@ ind_ovs_transact_nofree(struct nl_msg *msg)
     assert(reply->nlmsg_seq == seq);
     err = ((struct nlmsgerr *)nlmsg_data(reply))->error;
     ind_ovs_nlmsg_freelist_free(reply_msg);
+
+    /*
+     * HACK the OVS kernel module had a bug (fixed by rlane in d5c9288d) which
+     * returned random values on success. Work around this by assuming the
+     * operation was successful if the kernel returned an invalid errno.
+     */
+    if (err > 0 || err < -4095) {
+        err = 0;
+    }
+
     if (err < 0) {
         LOG_WARN("Transaction failed (%s): %s",
                  ind_ovs_cmd_str(family, cmd), strerror(-err));
