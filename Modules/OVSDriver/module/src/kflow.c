@@ -90,6 +90,9 @@ ind_ovs_kflow_add(struct ind_ovs_flow *flow,
     kflow->stats.packets = 0;
     kflow->stats.bytes = 0;
 
+    kflow->actions = malloc(nla_len(actions));
+    memcpy(kflow->actions, nla_data(actions), nla_len(actions));
+
     memcpy(kflow->key, key, key->nla_len);
 
     kflow->num_flows = 1;
@@ -183,6 +186,7 @@ ind_ovs_kflow_delete(struct ind_ovs_kflow *kflow)
 
     list_remove(&kflow->global_links);
     list_remove(&kflow->bucket_links);
+    free(kflow->actions);
     free(kflow);
 }
 
@@ -213,9 +217,20 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
     ind_ovs_translate_actions(&pkey, &flow->effects.apply_actions,
                               msg, OVS_FLOW_ATTR_ACTIONS);
 
-    if (ind_ovs_transact(msg) < 0) {
-        LOG_ERROR("Failed to modify kernel flow");
-        return;
+    struct nlattr *actions = nlmsg_find_attr(nlmsg_hdr(msg),
+        sizeof(struct genlmsghdr) + sizeof(struct ovs_header),
+        OVS_FLOW_ATTR_ACTIONS);
+
+    if (nla_len(actions) != kflow->actions_len ||
+            memcmp(nla_data(actions), kflow->actions, nla_len(actions))) {
+        if (ind_ovs_transact(msg) < 0) {
+            LOG_ERROR("Failed to modify kernel flow");
+            return;
+        }
+        kflow->actions = realloc(kflow->actions, nla_len(actions));
+        memcpy(kflow->actions, nla_data(actions), nla_len(actions));
+    } else {
+        ind_ovs_nlmsg_freelist_free(msg);
     }
 
     ind_ovs_kflow_flows(kflow)[0] = flow;
@@ -227,6 +242,10 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
 void
 ind_ovs_kflow_invalidate_all(void)
 {
+    if (list_empty(&ind_ovs_kflows)) {
+        return;
+    }
+
     uint64_t start_time = monotonic_us();
     int count = 0;
     struct list_links *cur, *next;
@@ -236,7 +255,9 @@ ind_ovs_kflow_invalidate_all(void)
         count++;
     }
     uint64_t end_time = monotonic_us();
-    LOG_VERBOSE("invalidated %d kernel flows in %d us", count, end_time - start_time);
+    uint64_t elapsed = end_time - start_time;
+    LOG_VERBOSE("invalidated %d kernel flows in %d us (%.3f us/flow)",
+                count, elapsed, (float)elapsed/count);
 }
 
 /*
