@@ -247,7 +247,18 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
     struct list_head *flow_id_bucket = ind_ovs_flow_id_bucket(flow->flow_id);
     list_push(flow_id_bucket, &flow->flow_id_links);
 
-    struct ind_ovs_table *table = &ind_ovs_tables[0];
+    if (flow_add->version > OF_VERSION_1_0) {
+        of_flow_add_table_id_get(flow_add, &flow->table_id);
+        if (flow->table_id >= IND_OVS_NUM_TABLES) {
+            LOG_WARN("Failed to add flow: invalid table_id %u", flow->table_id);
+            result = INDIGO_ERROR_RANGE;
+            goto done;
+        }
+    } else {
+        flow->table_id = 0;
+    }
+
+    struct ind_ovs_table *table = &ind_ovs_tables[flow->table_id];
 
     ind_ovs_fwd_write_lock();
     flowtable_insert(table->ft, &flow->fte);
@@ -263,7 +274,10 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
         free(flow);
     }
 
-    indigo_core_flow_create_callback(result, flow_id, 0, callback_cookie);
+    indigo_core_flow_create_callback(
+        result, flow_id,
+        result == INDIGO_ERROR_NONE ? flow->table_id : 0,
+        callback_cookie);
 }
 
 
@@ -324,7 +338,7 @@ indigo_fwd_flow_delete(indigo_cookie_t flow_id,
        goto done;
     }
 
-    struct ind_ovs_table *table = &ind_ovs_tables[0];
+    struct ind_ovs_table *table = &ind_ovs_tables[flow->table_id];
 
     ind_ovs_fwd_write_lock();
     flowtable_remove(table->ft, &flow->fte);

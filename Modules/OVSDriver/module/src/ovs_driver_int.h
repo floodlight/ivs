@@ -257,6 +257,8 @@ struct ind_ovs_flow {
 
     /* Modified by of_flow_modify messages */
     struct ind_ovs_flow_effects effects;
+
+    uint8_t table_id;
 };
 
 /*
