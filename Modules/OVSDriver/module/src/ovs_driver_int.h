@@ -434,6 +434,12 @@ extern int ind_ovs_version;
 extern struct flowtable *ind_ovs_ft;
 
 /*
+ * Flowtable stats
+ */
+extern struct ind_ovs_flow_stats ind_ovs_matched_stats;
+extern struct ind_ovs_flow_stats ind_ovs_missed_stats;
+
+/*
  * Configuration for the bsn_pktin_suppression extension.
  */
 extern struct ind_ovs_pktin_suppression_cfg ind_ovs_pktin_suppression_cfg;

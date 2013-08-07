@@ -247,9 +247,14 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     /* Lookup the flow in the userspace flowtable. */
     struct ind_ovs_flow *flow;
     if (ind_ovs_lookup_flow(&pkey, &flow) != 0) {
+        __sync_fetch_and_add(&ind_ovs_missed_stats.packets, 1);
+        __sync_fetch_and_add(&ind_ovs_missed_stats.bytes, nla_len(packet));
         ind_ovs_upcall_request_pktin(pkey.in_port, port, packet, key, OF_PACKET_IN_REASON_NO_MATCH);
         return;
     }
+
+    __sync_fetch_and_add(&ind_ovs_matched_stats.packets, 1);
+    __sync_fetch_and_add(&ind_ovs_matched_stats.bytes, nla_len(packet));
 
     /* Reuse the incoming message for the packet execute */
     gnlh->cmd = OVS_PACKET_CMD_EXECUTE;

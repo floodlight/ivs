@@ -36,8 +36,8 @@ struct flowtable *ind_ovs_ft;
 static struct list_head ind_ovs_flow_id_buckets[64];
 
 static unsigned active_count;   /**< Number of flows defined */
-static uint64_t lookup_count;   /**< Number of packets looked up */
-static uint64_t matched_count;  /**< Number of packets matched */
+struct ind_ovs_flow_stats ind_ovs_matched_stats;
+struct ind_ovs_flow_stats ind_ovs_missed_stats;
 
 static pthread_rwlock_t ind_ovs_fwd_rwlock;
 
@@ -386,26 +386,6 @@ indigo_fwd_table_stats_get(of_table_stats_request_t *table_stats_request,
 {
     of_version_t version = table_stats_request->version;
 
-    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_datapath_family, OVS_DP_CMD_GET);
-    struct nlmsghdr *reply;
-    if (ind_ovs_transact_reply(msg, &reply) < 0) {
-        indigo_core_table_stats_get_callback(INDIGO_ERROR_UNKNOWN,
-                                             NULL, callback_cookie);
-        return;
-    }
-
-    struct nlattr *attrs[OVS_DP_ATTR_MAX+1];
-    if (genlmsg_parse(reply, sizeof(struct ovs_header),
-                      attrs, OVS_DP_ATTR_MAX,
-                      NULL) < 0) {
-        LOG_ERROR("failed to parse datapath message");
-        abort();
-    }
-
-    assert(attrs[OVS_DP_ATTR_STATS]);
-    struct ovs_dp_stats dp_stats = *(struct ovs_dp_stats *)nla_data(attrs[OVS_DP_ATTR_STATS]);
-    free(reply);
-
     of_table_stats_reply_t *table_stats_reply = of_table_stats_reply_new(version);
     if (table_stats_reply == NULL) {
         indigo_core_table_stats_get_callback(INDIGO_ERROR_RESOURCE,
@@ -432,8 +412,9 @@ indigo_fwd_table_stats_get(of_table_stats_request_t *table_stats_request,
         of_table_stats_entry_wildcards_set(entry, 0x3fffff); /* All wildcards */
     }
     of_table_stats_entry_active_count_set(entry, active_count);
-    of_table_stats_entry_lookup_count_set(entry, lookup_count + dp_stats.n_hit);
-    of_table_stats_entry_matched_count_set(entry, matched_count + dp_stats.n_hit);
+    of_table_stats_entry_lookup_count_set(entry,
+        ind_ovs_matched_stats.packets + ind_ovs_missed_stats.packets);
+    of_table_stats_entry_matched_count_set(entry, ind_ovs_matched_stats.packets);
 
     indigo_core_table_stats_get_callback(INDIGO_ERROR_NONE,
                                          table_stats_reply,
@@ -526,15 +507,12 @@ ind_ovs_lookup_flow(const struct ind_ovs_parsed_key *pkey,
     ind_ovs_dump_cfr(&cfr);
 #endif
 
-    ++lookup_count;
-
     fte = flowtable_match(ind_ovs_ft, (struct flowtable_key *)&cfr);
     if (fte == NULL) {
         return INDIGO_ERROR_NOT_FOUND;
     }
 
     *flow = container_of(fte, fte, struct ind_ovs_flow);
-    ++matched_count;
 
     return INDIGO_ERROR_NONE;
 }
