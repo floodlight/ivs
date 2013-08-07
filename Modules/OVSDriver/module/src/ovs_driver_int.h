@@ -262,28 +262,19 @@ struct ind_ovs_flow {
  *
  * A kflow caches the actions for a particular openvswitch flow key. A kflow
  * may use multiple OpenFlow flows while traveling through the pipeline.
- * These are saved in the 'flows' array for stats purposes.
  */
 struct ind_ovs_kflow {
     struct list_links global_links; /* (global) kflows */
     struct list_links bucket_links; /* (global) kflow_buckets[] */
     struct ind_ovs_flow_stats stats; /* periodically synchronized with the kernel */
     uint16_t in_port;
-    uint16_t num_flows; /* size of flows array */
+    uint16_t num_stats_ptrs; /* size of stats_ptrs array */
     uint16_t actions_len; /* length of actions blob */
     uint64_t last_used; /* monotonic time in ms */
     void *actions; /* payload of actions nlattr */
+    struct ind_ovs_flow_stats **stats_ptrs;
     struct nlattr key[0];
-    /* struct ind_ovs_flow *flows[0]; */
 };
-
-static inline struct ind_ovs_flow **
-ind_ovs_kflow_flows(struct ind_ovs_kflow *kflow)
-{
-    /* 'flows' starts at the first 8-byte aligned address after 'key' */
-    size_t offset = ALIGN8(offsetof(struct ind_ovs_kflow, key) + kflow->key->nla_len);
-    return (struct ind_ovs_flow **) ((char *)kflow + offset);
-}
 
 /* Configuration for the bsn_pktin_suppression extension */
 struct ind_ovs_pktin_suppression_cfg {

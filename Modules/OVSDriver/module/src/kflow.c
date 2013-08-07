@@ -71,8 +71,7 @@ ind_ovs_kflow_add(struct ind_ovs_flow *flow,
         }
     }
 
-    struct ind_ovs_kflow *kflow = malloc(ALIGN8(sizeof(*kflow) + key->nla_len) +
-                                         sizeof(struct ind_ovs_flow *));
+    struct ind_ovs_kflow *kflow = malloc(sizeof(*kflow) + key->nla_len);
     if (kflow == NULL) {
         return INDIGO_ERROR_RESOURCE;
     }
@@ -95,8 +94,9 @@ ind_ovs_kflow_add(struct ind_ovs_flow *flow,
 
     memcpy(kflow->key, key, key->nla_len);
 
-    kflow->num_flows = 1;
-    ind_ovs_kflow_flows(kflow)[0] = flow;
+    kflow->num_stats_ptrs = 1;
+    kflow->stats_ptrs = malloc(sizeof(*kflow->stats_ptrs) * kflow->num_stats_ptrs);
+    kflow->stats_ptrs[0] = &flow->stats;
 
     list_push(&ind_ovs_kflows, &kflow->global_links);
     list_push(bucket, &kflow->bucket_links);
@@ -135,10 +135,10 @@ ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow)
 
         if (packet_diff > 0 || byte_diff > 0) {
             int i;
-            struct ind_ovs_flow **flows = ind_ovs_kflow_flows(kflow);
-            for (i = 0; i < kflow->num_flows; i++) {
-                __sync_fetch_and_add(&flows[i]->stats.packets, packet_diff);
-                __sync_fetch_and_add(&flows[i]->stats.bytes, byte_diff);
+            for (i = 0; i < kflow->num_stats_ptrs; i++) {
+                struct ind_ovs_flow_stats *stats_ptr = kflow->stats_ptrs[i];
+                __sync_fetch_and_add(&stats_ptr->packets, packet_diff);
+                __sync_fetch_and_add(&stats_ptr->bytes, byte_diff);
             }
 
             kflow->stats.packets = stats->n_packets;
@@ -187,6 +187,7 @@ ind_ovs_kflow_delete(struct ind_ovs_kflow *kflow)
     list_remove(&kflow->global_links);
     list_remove(&kflow->bucket_links);
     free(kflow->actions);
+    free(kflow->stats_ptrs);
     free(kflow);
 }
 
@@ -207,7 +208,7 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
         return;
     }
 
-    if (flow != ind_ovs_kflow_flows(kflow)[0]) {
+    if (&flow->stats != kflow->stats_ptrs[0]) {
         /* Synchronize stats to previous OpenFlow flow */
         ind_ovs_kflow_sync_stats(kflow);
     }
@@ -235,7 +236,7 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
         ind_ovs_nlmsg_freelist_free(msg);
     }
 
-    ind_ovs_kflow_flows(kflow)[0] = flow;
+    kflow->stats_ptrs[0] = &flow->stats;
 }
 
 /*
