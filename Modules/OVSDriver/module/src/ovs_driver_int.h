@@ -38,6 +38,8 @@
 
 #define IND_OVS_MAX_PORTS 1024
 
+#define IND_OVS_NUM_TABLES 1
+
 /*
  * Special pre-created ports.
  */
@@ -285,6 +287,14 @@ struct ind_ovs_pktin_suppression_cfg {
     uint64_t cookie;
 };
 
+/* An OpenFlow table */
+struct ind_ovs_table {
+    struct flowtable *ft;
+    unsigned num_flows;
+    struct ind_ovs_flow_stats matched_stats;
+    struct ind_ovs_flow_stats missed_stats;
+};
+
 /* Internal functions */
 
 /* Translate an OVS key into a flat struct */
@@ -429,15 +439,9 @@ extern uint32_t ind_ovs_salt;
 extern int ind_ovs_version;
 
 /*
- * Flowtable. Protected by ind_ovs_fwd_{read,write}_{lock,unlock}.
+ * OpenFlow tables. Protected by ind_ovs_fwd_{read,write}_{lock,unlock}.
  */
-extern struct flowtable *ind_ovs_ft;
-
-/*
- * Flowtable stats
- */
-extern struct ind_ovs_flow_stats ind_ovs_matched_stats;
-extern struct ind_ovs_flow_stats ind_ovs_missed_stats;
+struct ind_ovs_table ind_ovs_tables[IND_OVS_NUM_TABLES];
 
 /*
  * Configuration for the bsn_pktin_suppression extension.

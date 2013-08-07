@@ -97,7 +97,7 @@ ind_ovs_kflow_add(struct ind_ovs_flow *flow,
     kflow->num_stats_ptrs = 2;
     kflow->stats_ptrs = malloc(sizeof(*kflow->stats_ptrs) * kflow->num_stats_ptrs);
     kflow->stats_ptrs[0] = &flow->stats;
-    kflow->stats_ptrs[1] = &ind_ovs_matched_stats;
+    kflow->stats_ptrs[1] = &ind_ovs_tables[0].matched_stats;
 
     list_push(&ind_ovs_kflows, &kflow->global_links);
     list_push(bucket, &kflow->bucket_links);

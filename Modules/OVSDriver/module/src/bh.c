@@ -158,14 +158,10 @@ ind_ovs_bh_run()
             struct ind_ovs_parsed_key pkey;
             ind_ovs_parse_key(key, &pkey);
 
-            struct ind_ovs_cfr cfr;
-            ind_ovs_key_to_cfr(&pkey, &cfr);
-
             /* Lookup the flow in the userspace flowtable. */
-            struct flowtable_entry *fte =
-                flowtable_match(ind_ovs_ft, (struct flowtable_key *)&cfr);
-            if (fte != NULL) {
-                struct ind_ovs_flow *flow = container_of(fte, fte, struct ind_ovs_flow);
+            /* XXX need to retranslate actions */
+            struct ind_ovs_flow *flow;
+            if (ind_ovs_lookup_flow(&pkey, &flow) == 0) {
                 if (ind_ovs_kflow_add(flow, key, actions) < 0) {
                     LOG_ERROR("Failed to insert kernel flow");
                 }

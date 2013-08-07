@@ -31,13 +31,9 @@
 #include <pthread.h>
 #include <errno.h>
 
-struct flowtable *ind_ovs_ft;
+struct ind_ovs_table ind_ovs_tables[IND_OVS_NUM_TABLES];
 
 static struct list_head ind_ovs_flow_id_buckets[64];
-
-static unsigned active_count;   /**< Number of flows defined */
-struct ind_ovs_flow_stats ind_ovs_matched_stats;
-struct ind_ovs_flow_stats ind_ovs_missed_stats;
 
 static pthread_rwlock_t ind_ovs_fwd_rwlock;
 
@@ -251,13 +247,15 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
     struct list_head *flow_id_bucket = ind_ovs_flow_id_bucket(flow->flow_id);
     list_push(flow_id_bucket, &flow->flow_id_links);
 
+    struct ind_ovs_table *table = &ind_ovs_tables[0];
+
     ind_ovs_fwd_write_lock();
-    flowtable_insert(ind_ovs_ft, &flow->fte);
+    flowtable_insert(table->ft, &flow->fte);
     ind_ovs_fwd_write_unlock();
 
     ind_ovs_kflow_invalidate_all();
 
-    ++active_count;
+    ++table->num_flows;
 
  done:
     if (INDIGO_FAILURE(result)) {
@@ -326,8 +324,10 @@ indigo_fwd_flow_delete(indigo_cookie_t flow_id,
        goto done;
     }
 
+    struct ind_ovs_table *table = &ind_ovs_tables[0];
+
     ind_ovs_fwd_write_lock();
-    flowtable_remove(ind_ovs_ft, &flow->fte);
+    flowtable_remove(table->ft, &flow->fte);
     ind_ovs_fwd_write_unlock();
 
     ind_ovs_kflow_invalidate_all();
@@ -343,7 +343,7 @@ indigo_fwd_flow_delete(indigo_cookie_t flow_id,
 
     INDIGO_MEM_FREE(flow);
 
-    --active_count;
+    --table->num_flows;
 
 done:
     indigo_core_flow_delete_callback(result, &flow_stats, callback_cookie);
@@ -403,6 +403,9 @@ indigo_fwd_table_stats_get(of_table_stats_request_t *table_stats_request,
     uint32_t xid;
     of_table_stats_request_xid_get(table_stats_request, &xid);
     of_table_stats_reply_xid_set(table_stats_reply, xid);
+
+    struct ind_ovs_table *table = &ind_ovs_tables[0];
+
     of_table_stats_entry_table_id_set(entry, 0);
     if (version < OF_VERSION_1_3) {
         of_table_stats_entry_name_set(entry, "Table 0");
@@ -411,10 +414,10 @@ indigo_fwd_table_stats_get(of_table_stats_request_t *table_stats_request,
     if (version < OF_VERSION_1_2) {
         of_table_stats_entry_wildcards_set(entry, 0x3fffff); /* All wildcards */
     }
-    of_table_stats_entry_active_count_set(entry, active_count);
+    of_table_stats_entry_active_count_set(entry, table->num_flows);
     of_table_stats_entry_lookup_count_set(entry,
-        ind_ovs_matched_stats.packets + ind_ovs_missed_stats.packets);
-    of_table_stats_entry_matched_count_set(entry, ind_ovs_matched_stats.packets);
+        table->matched_stats.packets + table->missed_stats.packets);
+    of_table_stats_entry_matched_count_set(entry, table->matched_stats.packets);
 
     indigo_core_table_stats_get_callback(INDIGO_ERROR_NONE,
                                          table_stats_reply,
@@ -507,7 +510,9 @@ ind_ovs_lookup_flow(const struct ind_ovs_parsed_key *pkey,
     ind_ovs_dump_cfr(&cfr);
 #endif
 
-    fte = flowtable_match(ind_ovs_ft, (struct flowtable_key *)&cfr);
+    struct ind_ovs_table *table = &ind_ovs_tables[0];
+
+    fte = flowtable_match(table->ft, (struct flowtable_key *)&cfr);
     if (fte == NULL) {
         return INDIGO_ERROR_NOT_FOUND;
     }
@@ -658,9 +663,13 @@ ind_ovs_fwd_init(void)
         list_init(bucket);
     }
 
-    ind_ovs_ft = flowtable_create();
-    if (!ind_ovs_ft) {
-        return INDIGO_ERROR_RESOURCE;
+    for (i = 0; i < IND_OVS_NUM_TABLES; i++) {
+        struct ind_ovs_table *table = &ind_ovs_tables[i];
+        memset(table, 0, sizeof(*table));
+        table->ft = flowtable_create();
+        if (table->ft == NULL) {
+            abort();
+        }
     }
 
     aim_ratelimiter_init(&ind_ovs_pktin_limiter, PKTIN_INTERVAL,
@@ -689,7 +698,10 @@ ind_ovs_fwd_finish(void)
     /* Hold this forever. */
     ind_ovs_fwd_write_lock();
 
-    flowtable_destroy(ind_ovs_ft);
+    for (i = 0; i < IND_OVS_NUM_TABLES; i++) {
+        struct ind_ovs_table *table = &ind_ovs_tables[i];
+        flowtable_destroy(table->ft);
+    }
 
     /* Free all the flows */
     for (i = 0; i < ARRAY_SIZE(ind_ovs_flow_id_buckets); i++) {
