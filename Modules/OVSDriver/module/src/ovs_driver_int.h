@@ -290,9 +290,11 @@ struct ind_ovs_pktin_suppression_cfg {
 /* An OpenFlow table */
 struct ind_ovs_table {
     struct flowtable *ft;
-    unsigned num_flows;
+    uint32_t num_flows;
+    uint32_t max_flows;
     struct ind_ovs_flow_stats matched_stats;
     struct ind_ovs_flow_stats missed_stats;
+    of_table_name_t name;
 };
 
 /* Internal functions */

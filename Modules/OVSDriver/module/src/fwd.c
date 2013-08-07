@@ -393,31 +393,34 @@ indigo_fwd_table_stats_get(of_table_stats_request_t *table_stats_request,
         return;
     }
 
-    of_list_table_stats_entry_t list[1];
-    of_table_stats_reply_entries_bind(table_stats_reply, list);
-
-    of_table_stats_entry_t entry[1];
-    of_table_stats_entry_init(entry, version, -1, 1);
-    (void) of_list_table_stats_entry_append_bind(list, entry);
-
     uint32_t xid;
     of_table_stats_request_xid_get(table_stats_request, &xid);
     of_table_stats_reply_xid_set(table_stats_reply, xid);
 
-    struct ind_ovs_table *table = &ind_ovs_tables[0];
+    of_list_table_stats_entry_t list[1];
+    of_table_stats_reply_entries_bind(table_stats_reply, list);
 
-    of_table_stats_entry_table_id_set(entry, 0);
-    if (version < OF_VERSION_1_3) {
-        of_table_stats_entry_name_set(entry, "Table 0");
-        of_table_stats_entry_max_entries_set(entry, 16384);
+    int i;
+    for (i = 0; i < IND_OVS_NUM_TABLES; i++) {
+        struct ind_ovs_table *table = &ind_ovs_tables[i];
+
+        of_table_stats_entry_t entry[1];
+        of_table_stats_entry_init(entry, version, -1, 1);
+        (void) of_list_table_stats_entry_append_bind(list, entry);
+
+        of_table_stats_entry_table_id_set(entry, i);
+        if (version < OF_VERSION_1_3) {
+            of_table_stats_entry_name_set(entry, table->name);
+            of_table_stats_entry_max_entries_set(entry, table->max_flows);
+        }
+        if (version < OF_VERSION_1_2) {
+            of_table_stats_entry_wildcards_set(entry, 0x3fffff); /* All wildcards */
+        }
+        of_table_stats_entry_active_count_set(entry, table->num_flows);
+        of_table_stats_entry_lookup_count_set(entry,
+            table->matched_stats.packets + table->missed_stats.packets);
+        of_table_stats_entry_matched_count_set(entry, table->matched_stats.packets);
     }
-    if (version < OF_VERSION_1_2) {
-        of_table_stats_entry_wildcards_set(entry, 0x3fffff); /* All wildcards */
-    }
-    of_table_stats_entry_active_count_set(entry, table->num_flows);
-    of_table_stats_entry_lookup_count_set(entry,
-        table->matched_stats.packets + table->missed_stats.packets);
-    of_table_stats_entry_matched_count_set(entry, table->matched_stats.packets);
 
     indigo_core_table_stats_get_callback(INDIGO_ERROR_NONE,
                                          table_stats_reply,
@@ -666,6 +669,8 @@ ind_ovs_fwd_init(void)
     for (i = 0; i < IND_OVS_NUM_TABLES; i++) {
         struct ind_ovs_table *table = &ind_ovs_tables[i];
         memset(table, 0, sizeof(*table));
+        snprintf(table->name, sizeof(table->name), "Table %d", i);
+        table->max_flows = 16384; /* XXX */
         table->ft = flowtable_create();
         if (table->ft == NULL) {
             abort();
