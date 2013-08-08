@@ -341,7 +341,7 @@ void ind_ovs_fwd_write_lock();
 void ind_ovs_fwd_write_unlock();
 
 /* Management of the kernel flow table */
-indigo_error_t ind_ovs_kflow_add(struct ind_ovs_flow *flow, const struct nlattr *key, const struct nlattr *actions);
+indigo_error_t ind_ovs_kflow_add(const struct nlattr *key);
 void ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow);
 void ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow);
 void ind_ovs_kflow_invalidate_all(void);
@@ -365,7 +365,7 @@ void ind_ovs_upcall_quiesce(struct ind_ovs_port *port);
 
 /* Interface of the bottom-half submodule */
 void ind_ovs_bh_init();
-void ind_ovs_bh_request_kflow(struct nlattr *key, struct nlattr *actions);
+void ind_ovs_bh_request_kflow(struct nlattr *key);
 void ind_ovs_bh_request_pktin(uint32_t in_port, struct nlattr *packet, struct nlattr *key, int reason);
 
 /* Interface of the multicast submodule */

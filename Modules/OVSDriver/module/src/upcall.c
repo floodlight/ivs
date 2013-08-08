@@ -266,7 +266,6 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     __sync_fetch_and_add(&flow->stats.packets, 1);
     __sync_fetch_and_add(&flow->stats.bytes, nla_len(packet));
 
-    /* Reuse the translated actions for adding the kflow. */
     struct nlattr *actions = nlmsg_find_attr(nlmsg_hdr(msg),
         sizeof(struct genlmsghdr) + sizeof(struct ovs_header),
         OVS_PACKET_ATTR_ACTIONS);
@@ -288,7 +287,7 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     /* See the comment for ind_ovs_upcall_seen_key. */
     if (ind_ovs_upcall_seen_key(thread, key)) {
         /* Create a kflow with the given key and actions. */
-        ind_ovs_bh_request_kflow(key, actions);
+        ind_ovs_bh_request_kflow(key);
     }
 }
 
