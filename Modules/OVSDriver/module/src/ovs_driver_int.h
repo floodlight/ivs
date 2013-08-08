@@ -308,7 +308,7 @@ void ind_ovs_parse_key(struct nlattr *key, struct ind_ovs_parsed_key *pkey);
 indigo_error_t ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf);
 
 /* Translate IVS actions into OVS actions */
-void ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey, struct xbuf *actions, struct nl_msg *msg, int attr_type);
+void ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey, struct xbuf *actions, struct nl_msg *msg);
 
 /* Translate an OVS key into an OpenFlow match object */
 void ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey, of_match_t *match);
@@ -396,6 +396,7 @@ uint64_t monotonic_us(void);
 struct nl_sock *ind_ovs_create_nlsock(void);
 struct nl_msg* ind_ovs_create_nlmsg(int family, int cmd);
 struct nl_msg *ind_ovs_recv_nlmsg(struct nl_sock *sk);
+void ind_ovs_nla_nest_end(struct nl_msg *msg, struct nlattr *start);
 void ind_ovs_nlmsg_freelist_init(void);
 void ind_ovs_nlmsg_freelist_finish(void);
 struct nl_msg *ind_ovs_nlmsg_freelist_alloc(void);

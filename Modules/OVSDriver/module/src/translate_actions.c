@@ -344,15 +344,12 @@ ind_ovs_action_set_tunnel_dst(struct nlattr *attr, struct translate_context *ctx
 
 void
 ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
-                          struct xbuf *xbuf,
-                          struct nl_msg *msg, int attr_type)
+                          struct xbuf *xbuf, struct nl_msg *msg)
 {
     struct translate_context ctx;
     memcpy(&ctx.current_key, pkey, sizeof(*pkey));
     ctx.modified_attrs = 0;
     ctx.msg = msg;
-
-    struct nlattr *actions_attr = nla_nest_start(msg, attr_type);
 
     struct nlattr *attr;
     XBUF_FOREACH(xbuf_data(xbuf), xbuf_length(xbuf), attr) {
@@ -429,7 +426,7 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
                 ATTR_BITMAP_SET(ctx.modified_attrs, OVS_KEY_ATTR_IPV4);
                 if (ctx.current_key.ipv4.ipv4_ttl == 0
                     || --ctx.current_key.ipv4.ipv4_ttl == 0) {
-                    goto finish;
+                    return;
                 }
             }
             break;
@@ -440,15 +437,6 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
             assert(0);
             break;
         }
-    }
-
-finish:
-    nla_nest_end(msg, actions_attr);
-
-    if (nlmsg_tail(nlmsg_hdr(msg)) == actions_attr) {
-        /* HACK OVS expects an empty nested attribute */
-        /* Not technically legal netlink before 2.6.29 */
-        nla_put(msg, attr_type, 0, NULL);
     }
 }
 

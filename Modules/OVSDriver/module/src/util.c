@@ -265,6 +265,23 @@ ind_ovs_recv_nlmsg(struct nl_sock *sk)
     return msg;
 }
 
+/*
+ * Wrap nla_nest_end, ensuring an attribute is created even if it would be
+ * empty.
+ */
+void
+ind_ovs_nla_nest_end(struct nl_msg *msg, struct nlattr *start)
+{
+    if (nlmsg_tail(nlmsg_hdr(msg)) == (start + 1)) {
+        /* HACK OVS expects an empty nested attribute */
+        /* Not technically legal netlink before 2.6.29 */
+        assert(start->nla_len == NLA_HDRLEN);
+        return;
+    }
+
+    nla_nest_end(msg, start);
+}
+
 void
 ind_ovs_nlmsg_freelist_init(void)
 {

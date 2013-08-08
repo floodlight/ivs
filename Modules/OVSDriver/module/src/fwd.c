@@ -626,7 +626,9 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
     struct xbuf xbuf;
     xbuf_init(&xbuf);
     ind_ovs_translate_openflow_actions(of_list_action, &xbuf);
-    ind_ovs_translate_actions(&pkey, &xbuf, msg, OVS_PACKET_ATTR_ACTIONS);
+    struct nlattr *actions_attr = nla_nest_start(msg, OVS_PACKET_ATTR_ACTIONS);
+    ind_ovs_translate_actions(&pkey, &xbuf, msg);
+    ind_ovs_nla_nest_end(msg, actions_attr);
     xbuf_cleanup(&xbuf);
 
     /* Send the second message */

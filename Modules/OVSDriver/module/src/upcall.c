@@ -260,15 +260,13 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
 
     /* Reuse the incoming message for the packet execute */
     gnlh->cmd = OVS_PACKET_CMD_EXECUTE;
-    ind_ovs_translate_actions(&pkey, &flow->effects.apply_actions,
-                              msg, OVS_PACKET_ATTR_ACTIONS);
+
+    struct nlattr *actions = nla_nest_start(msg, OVS_PACKET_ATTR_ACTIONS);
+    ind_ovs_translate_actions(&pkey, &flow->effects.apply_actions, msg);
+    ind_ovs_nla_nest_end(msg, actions);
 
     __sync_fetch_and_add(&flow->stats.packets, 1);
     __sync_fetch_and_add(&flow->stats.bytes, nla_len(packet));
-
-    struct nlattr *actions = nlmsg_find_attr(nlmsg_hdr(msg),
-        sizeof(struct genlmsghdr) + sizeof(struct ovs_header),
-        OVS_PACKET_ATTR_ACTIONS);
 
     /* Don't send the packet back out if it would be dropped. */
     if (nla_len(actions) > 0) {
@@ -338,15 +336,12 @@ ind_ovs_handle_packet_table(struct ind_ovs_upcall_thread *thread,
     struct nl_msg *reply = ind_ovs_create_nlmsg(ovs_packet_family,
                                                 OVS_PACKET_CMD_EXECUTE);
 
-    ind_ovs_translate_actions(&pkey, &flow->effects.apply_actions,
-                              reply, OVS_PACKET_ATTR_ACTIONS);
+    struct nlattr *actions = nla_nest_start(reply, OVS_PACKET_ATTR_ACTIONS);
+    ind_ovs_translate_actions(&pkey, &flow->effects.apply_actions, reply);
+    ind_ovs_nla_nest_end(reply, actions);
 
     nla_put(reply, OVS_PACKET_ATTR_KEY, nla_len(key), nla_data(key));
     nla_put(reply, OVS_PACKET_ATTR_PACKET, nla_len(packet), nla_data(packet));
-
-    struct nlattr *actions = nlmsg_find_attr(nlmsg_hdr(reply),
-        sizeof(struct genlmsghdr) + sizeof(struct ovs_header),
-        OVS_PACKET_ATTR_ACTIONS);
 
     /* Don't send the packet back out if it would be dropped. */
     if (nla_len(actions) > 0) {

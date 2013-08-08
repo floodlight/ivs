@@ -75,7 +75,7 @@ ind_ovs_kflow_add(const struct nlattr *key)
     /* Lookup the flow in the userspace flowtable. */
     struct ind_ovs_flow *flow;
     if (ind_ovs_lookup_flow(&pkey, &flow) != 0) {
-        /* Flow was deleted after the packet was queued to userspace. */
+        /* Flow was deleted after the BH request was queued. */
         return INDIGO_ERROR_NONE;
     }
 
@@ -87,12 +87,9 @@ ind_ovs_kflow_add(const struct nlattr *key)
     struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_NEW);
     nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(key), nla_data(key));
 
-    ind_ovs_translate_actions(&pkey, &flow->effects.apply_actions,
-                              msg, OVS_FLOW_ATTR_ACTIONS);
-
-    struct nlattr *actions = nlmsg_find_attr(nlmsg_hdr(msg),
-        sizeof(struct genlmsghdr) + sizeof(struct ovs_header),
-        OVS_FLOW_ATTR_ACTIONS);
+    struct nlattr *actions = nla_nest_start(msg, OVS_FLOW_ATTR_ACTIONS);
+    ind_ovs_translate_actions(&pkey, &flow->effects.apply_actions, msg);
+    ind_ovs_nla_nest_end(msg, actions);
 
     /* Copy actions before ind_ovs_transact() frees msg */
     kflow->actions = malloc(nla_len(actions));
@@ -235,12 +232,9 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
 
     nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(kflow->key), nla_data(kflow->key));
 
-    ind_ovs_translate_actions(&pkey, &flow->effects.apply_actions,
-                              msg, OVS_FLOW_ATTR_ACTIONS);
-
-    struct nlattr *actions = nlmsg_find_attr(nlmsg_hdr(msg),
-        sizeof(struct genlmsghdr) + sizeof(struct ovs_header),
-        OVS_FLOW_ATTR_ACTIONS);
+    struct nlattr *actions = nla_nest_start(msg, OVS_FLOW_ATTR_ACTIONS);
+    ind_ovs_translate_actions(&pkey, &flow->effects.apply_actions, msg);
+    ind_ovs_nla_nest_end(msg, actions);
 
     if (nla_len(actions) != kflow->actions_len ||
             memcmp(nla_data(actions), kflow->actions, nla_len(actions))) {
