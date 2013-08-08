@@ -271,7 +271,7 @@ del_port(const char *datapath, const char *interface)
      * returned random values on success. Work around this by assuming the
      * operation was successful if the kernel returned an invalid errno.
      */
-    if (err > 0 || err < -1024) {
+    if (err > 0 || err < -4095) {
         err = 0;
     }
 
