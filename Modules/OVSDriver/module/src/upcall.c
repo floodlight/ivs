@@ -82,7 +82,6 @@ static void ind_ovs_handle_port_upcalls(struct ind_ovs_upcall_thread *thread, st
 static void ind_ovs_handle_one_upcall(struct ind_ovs_upcall_thread *thread, struct ind_ovs_port *port, struct nl_msg *msg);
 static void ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread, struct ind_ovs_port *port, struct nl_msg *msg, struct nlattr **attrs);
 static void ind_ovs_handle_packet_action(struct ind_ovs_upcall_thread *thread, struct ind_ovs_port *port, struct nl_msg *msg, struct nlattr **attrs);
-static void ind_ovs_handle_packet_table(struct ind_ovs_upcall_thread *thread, struct ind_ovs_port *port, struct nl_msg *msg, struct nlattr **attrs);
 static void ind_ovs_upcall_request_pktin(uint32_t port_no, struct ind_ovs_port *port, struct nlattr *packet, struct nlattr *key, int reason);
 static bool ind_ovs_upcall_seen_key(struct ind_ovs_upcall_thread *thread, struct nlattr *key);
 static void ind_ovs_upcall_rearm(struct ind_ovs_port *port);
@@ -222,10 +221,8 @@ ind_ovs_handle_one_upcall(struct ind_ovs_upcall_thread *thread,
 
     if (gnlh->cmd == OVS_PACKET_CMD_MISS) {
         ind_ovs_handle_packet_miss(thread, port, msg, attrs);
-    } else if (!attrs[OVS_PACKET_ATTR_USERDATA]) {
-        ind_ovs_handle_packet_action(thread, port, msg, attrs);
     } else {
-        ind_ovs_handle_packet_table(thread, port, msg, attrs);
+        ind_ovs_handle_packet_action(thread, port, msg, attrs);
     }
 }
 
@@ -303,52 +300,6 @@ ind_ovs_handle_packet_action(struct ind_ovs_upcall_thread *thread,
 
     /* Send packet-in to controller */
     ind_ovs_upcall_request_pktin(pkey.in_port, port, packet, key, OF_PACKET_IN_REASON_ACTION);
-}
-
-/*
- * See the OF_PORT_DEST_USE_TABLE comment in ind_ovs_translate_actions.
- * This is mostly the same as ind_ovs_handle_packet_miss but does
- * not reuse the original message for the execute command since
- * the incoming message has a userdata attribute.
- * It also doesn't install a kflow or update flow stats.
- */
-static void
-ind_ovs_handle_packet_table(struct ind_ovs_upcall_thread *thread,
-                            struct ind_ovs_port *port,
-                            struct nl_msg *msg, struct nlattr **attrs)
-{
-    struct nlattr *key = attrs[OVS_PACKET_ATTR_KEY];
-    struct nlattr *packet = attrs[OVS_PACKET_ATTR_PACKET];
-    assert(key && packet);
-
-    struct ind_ovs_parsed_key pkey;
-    ind_ovs_parse_key(key, &pkey);
-
-    /* Lookup the flow in the userspace flowtable. */
-    struct ind_ovs_flow *flow;
-    if (ind_ovs_lookup_flow(&pkey, &flow) != 0) {
-        ind_ovs_upcall_request_pktin(pkey.in_port, port, packet, key, OF_PACKET_IN_REASON_NO_MATCH);
-        return;
-    }
-
-    /* Send OVS_PACKET_CMD_EXECUTE. */
-    /* TODO ensure the message is large enough */
-    struct nl_msg *reply = ind_ovs_create_nlmsg(ovs_packet_family,
-                                                OVS_PACKET_CMD_EXECUTE);
-
-    struct nlattr *actions = nla_nest_start(reply, OVS_PACKET_ATTR_ACTIONS);
-    ind_ovs_translate_actions(&pkey, &flow->effects.apply_actions, reply);
-    ind_ovs_nla_nest_end(reply, actions);
-
-    nla_put(reply, OVS_PACKET_ATTR_KEY, nla_len(key), nla_data(key));
-    nla_put(reply, OVS_PACKET_ATTR_PACKET, nla_len(packet), nla_data(packet));
-
-    /* Don't send the packet back out if it would be dropped. */
-    if (nla_len(actions) > 0) {
-        nl_send_auto(port->notify_socket, reply);
-    }
-
-    ind_ovs_nlmsg_freelist_free(reply);
 }
 
 static void

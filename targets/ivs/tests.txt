@@ -9,3 +9,6 @@ bsn_ipmask
 
 # OVS kernel module bug
 ^pktact.DirectLlcPackets
+
+# IVS does not support OFPP_TABLE
+^actions.ForwardTable

@@ -151,21 +151,6 @@ ind_ovs_action_all(struct nlattr *attr, struct translate_context *ctx)
 }
 
 static void
-ind_ovs_action_table(struct nlattr *attr, struct translate_context *ctx)
-{
-    /* HACK send the packet through the datapath to have all its
-     * actions executed, then back to userspace to be treated
-     * as a table miss (but with no flow install). */
-    uint32_t ingress_port_no = ctx->current_key.in_port;
-    ind_ovs_commit_set_field_actions(ctx);
-    struct nlattr *action_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_USERSPACE);
-    struct nl_sock *sk = ind_ovs_ports[ingress_port_no]->notify_socket;
-    nla_put_u32(ctx->msg, OVS_USERSPACE_ATTR_PID, nl_socket_get_local_port(sk));
-    nla_put_u64(ctx->msg, OVS_USERSPACE_ATTR_USERDATA, -1);
-    nla_nest_end(ctx->msg, action_attr);
-}
-
-static void
 ind_ovs_action_local(struct nlattr *attr, struct translate_context *ctx)
 {
     ind_ovs_commit_set_field_actions(ctx);
@@ -366,9 +351,6 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
         case IND_OVS_ACTION_ALL:
             ind_ovs_action_all(attr, &ctx);
             break;
-        case IND_OVS_ACTION_TABLE:
-            ind_ovs_action_table(attr, &ctx);
-            break;
         case IND_OVS_ACTION_LOCAL:
             ind_ovs_action_local(attr, &ctx);
             break;
@@ -470,8 +452,8 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf)
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_ALL, NULL, 0);
                     break;
                 case OF_PORT_DEST_USE_TABLE:
-                    xbuf_append_attr(xbuf, IND_OVS_ACTION_TABLE, NULL, 0);
-                    break;
+                    LOG_ERROR("unsupported output port OFPP_TABLE");
+                    return INDIGO_ERROR_COMPAT;
                 case OF_PORT_DEST_LOCAL:
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_LOCAL, NULL, 0);
                     break;
