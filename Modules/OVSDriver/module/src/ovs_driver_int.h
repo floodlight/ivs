@@ -270,7 +270,9 @@ struct ind_ovs_kflow {
     struct ind_ovs_flow_stats stats; /* periodically synchronized with the kernel */
     uint16_t in_port;
     uint16_t num_flows; /* size of flows array */
+    uint16_t actions_len; /* length of actions blob */
     uint64_t last_used; /* monotonic time in ms */
+    void *actions; /* payload of actions nlattr */
     struct nlattr key[0];
     /* struct ind_ovs_flow *flows[0]; */
 };
