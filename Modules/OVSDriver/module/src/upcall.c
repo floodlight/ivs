@@ -298,13 +298,16 @@ ind_ovs_handle_packet_action(struct ind_ovs_upcall_thread *thread,
 {
     struct nlattr *key = attrs[OVS_PACKET_ATTR_KEY];
     struct nlattr *packet = attrs[OVS_PACKET_ATTR_PACKET];
-    assert(key && packet);
+    struct nlattr *userdata = attrs[OVS_PACKET_ATTR_USERDATA];
+    assert(key && packet && userdata);
 
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key(key, &pkey);
 
+    uint8_t reason = (uint8_t)nla_get_u64(userdata);
+
     /* Send packet-in to controller */
-    ind_ovs_upcall_request_pktin(pkey.in_port, port, packet, key, OF_PACKET_IN_REASON_ACTION);
+    ind_ovs_upcall_request_pktin(pkey.in_port, port, packet, key, reason);
 }
 
 static void

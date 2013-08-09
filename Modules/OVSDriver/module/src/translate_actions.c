@@ -114,10 +114,12 @@ static void
 ind_ovs_action_controller(struct nlattr *attr, struct translate_context *ctx)
 {
     uint32_t ingress_port_no = ctx->current_key.in_port;
+    uint8_t reason = *XBUF_PAYLOAD(attr, uint8_t);
     ind_ovs_commit_set_field_actions(ctx);
     struct nlattr *action_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_USERSPACE);
     struct nl_sock *sk = ind_ovs_ports[ingress_port_no]->notify_socket;
     nla_put_u32(ctx->msg, OVS_USERSPACE_ATTR_PID, nl_socket_get_local_port(sk));
+    nla_put_u64(ctx->msg, OVS_USERSPACE_ATTR_USERDATA, reason);
     nla_nest_end(ctx->msg, action_attr);
 }
 
@@ -543,9 +545,12 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf)
             of_port_no_t port_no;
             of_action_output_port_get(&act.output, &port_no);
             switch (port_no) {
-                case OF_PORT_DEST_CONTROLLER:
-                    xbuf_append_attr(xbuf, IND_OVS_ACTION_CONTROLLER, NULL, 0);
+                case OF_PORT_DEST_CONTROLLER: {
+                    /* TODO use OF_PACKET_IN_REASON_NO_MATCH for table-miss */
+                    uint8_t reason = OF_PACKET_IN_REASON_ACTION;
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_CONTROLLER, &reason, sizeof(reason));
                     break;
+                }
                 case OF_PORT_DEST_FLOOD:
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_FLOOD, NULL, 0);
                     break;
