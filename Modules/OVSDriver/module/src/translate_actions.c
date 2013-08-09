@@ -518,6 +518,14 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
                     goto finish;
                 }
             }
+
+            if (ATTR_BITMAP_TEST(ctx.current_key.populated, OVS_KEY_ATTR_IPV6)) {
+                ATTR_BITMAP_SET(ctx.modified_attrs, OVS_KEY_ATTR_IPV6);
+                if (ctx.current_key.ipv6.ipv6_hlimit == 0
+                    || --ctx.current_key.ipv6.ipv6_hlimit == 0) {
+                    goto finish;
+                }
+            }
             break;
         case IND_OVS_ACTION_SET_NW_TTL:
             ind_ovs_action_set_nw_ttl(attr, &ctx);
