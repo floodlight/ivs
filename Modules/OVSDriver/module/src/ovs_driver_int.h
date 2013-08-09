@@ -38,7 +38,7 @@
 
 #define IND_OVS_MAX_PORTS 1024
 
-#define IND_OVS_NUM_TABLES 1
+#define IND_OVS_NUM_TABLES 16
 
 /*
  * Special pre-created ports.

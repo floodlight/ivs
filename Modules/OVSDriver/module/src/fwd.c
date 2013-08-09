@@ -147,6 +147,9 @@ init_effects(struct ind_ovs_flow_effects *effects,
         of_instruction_t inst;
         of_flow_modify_instructions_bind(flow_mod, &insts);
 
+        uint8_t table_id;
+        of_flow_modify_table_id_get(flow_mod, &table_id);
+
         OF_LIST_INSTRUCTION_ITER(&insts, &inst, rv) {
             switch (inst.header.object_id) {
             case OF_INSTRUCTION_APPLY_ACTIONS:
@@ -170,6 +173,11 @@ init_effects(struct ind_ovs_flow_effects *effects,
                 break;
             case OF_INSTRUCTION_GOTO_TABLE:
                 of_instruction_goto_table_table_id_get(&inst.goto_table, &effects->next_table_id);
+                if (effects->next_table_id <= table_id ||
+                        effects->next_table_id >= IND_OVS_NUM_TABLES) {
+                    LOG_WARN("invalid goto next_table_id %u", effects->next_table_id);
+                    return INDIGO_ERROR_RANGE;
+                }
                 break;
             case OF_INSTRUCTION_METER:
                 of_instruction_meter_meter_id_get(&inst.meter, &effects->meter_id);
@@ -521,30 +529,35 @@ ind_ovs_fwd_process(const struct ind_ovs_parsed_key *pkey,
                     struct ind_ovs_fwd_result *result)
 {
     struct flowtable_entry *fte;
+    uint8_t table_id = 0;
 
     struct ind_ovs_cfr cfr;
     ind_ovs_key_to_cfr(pkey, &cfr);
 
-    struct ind_ovs_table *table = &ind_ovs_tables[0];
+    while (table_id != (uint8_t)-1) {
+        struct ind_ovs_table *table = &ind_ovs_tables[table_id];
 
 #ifndef NDEBUG
-    LOG_VERBOSE("Looking up flow in %s", table->name);
-    ind_ovs_dump_cfr(&cfr);
+        LOG_VERBOSE("Looking up flow in %s", table->name);
+        ind_ovs_dump_cfr(&cfr);
 #endif
 
-    fte = flowtable_match(table->ft, (struct flowtable_key *)&cfr);
-    if (fte == NULL) {
-        result->stats_ptrs[result->num_stats_ptrs++] = &table->missed_stats;
-        return INDIGO_ERROR_NOT_FOUND;
+        fte = flowtable_match(table->ft, (struct flowtable_key *)&cfr);
+        if (fte == NULL) {
+            result->stats_ptrs[result->num_stats_ptrs++] = &table->missed_stats;
+            return INDIGO_ERROR_NOT_FOUND;
+        }
+
+        struct ind_ovs_flow *flow = container_of(fte, fte, struct ind_ovs_flow);
+
+        result->stats_ptrs[result->num_stats_ptrs++] = &table->matched_stats;
+        result->stats_ptrs[result->num_stats_ptrs++] = &flow->stats;
+
+        xbuf_append(&result->actions, xbuf_data(&flow->effects.apply_actions),
+                    xbuf_length(&flow->effects.apply_actions));
+
+        table_id = flow->effects.next_table_id;
     }
-
-    struct ind_ovs_flow *flow = container_of(fte, fte, struct ind_ovs_flow);
-
-    result->stats_ptrs[result->num_stats_ptrs++] = &table->matched_stats;
-    result->stats_ptrs[result->num_stats_ptrs++] = &flow->stats;
-
-    xbuf_append(&result->actions, xbuf_data(&flow->effects.apply_actions),
-                xbuf_length(&flow->effects.apply_actions));
 
     return INDIGO_ERROR_NONE;
 }
