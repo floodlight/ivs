@@ -18,6 +18,7 @@
  ****************************************************************/
 
 #include "ovs_driver_int.h"
+#include "actions.h"
 #include <unistd.h>
 #include <indigo/memory.h>
 #include <indigo/forwarding.h>
@@ -563,7 +564,11 @@ ind_ovs_fwd_process(const struct ind_ovs_parsed_key *pkey,
         fte = flowtable_match(table->ft, (struct flowtable_key *)&cfr);
         if (fte == NULL) {
             result->stats_ptrs[result->num_stats_ptrs++] = &table->missed_stats;
-            return INDIGO_ERROR_NOT_FOUND;
+            if (ind_ovs_version < OF_VERSION_1_3) {
+                uint8_t reason = OF_PACKET_IN_REASON_NO_MATCH;
+                xbuf_append_attr(&result->actions, IND_OVS_ACTION_CONTROLLER, &reason, sizeof(reason));
+            }
+            break;
         }
 
         struct ind_ovs_flow *flow = container_of(fte, fte, struct ind_ovs_flow);

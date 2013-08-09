@@ -247,7 +247,7 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     struct ind_ovs_fwd_result *result = &thread->result;
     ind_ovs_fwd_result_reset(result);
     indigo_error_t err = ind_ovs_fwd_process(&pkey, result);
-    if (err < 0 && err != INDIGO_ERROR_NOT_FOUND) {
+    if (err < 0) {
         return;
     }
 
@@ -256,11 +256,6 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
         struct ind_ovs_flow_stats *stats = result->stats_ptrs[i];
         __sync_fetch_and_add(&stats->packets, 1);
         __sync_fetch_and_add(&stats->bytes, nla_len(packet));
-    }
-
-    if (err == INDIGO_ERROR_NOT_FOUND) {
-        ind_ovs_upcall_request_pktin(pkey.in_port, port, packet, key, OF_PACKET_IN_REASON_NO_MATCH);
-        return;
     }
 
     /* Reuse the incoming message for the packet execute */
