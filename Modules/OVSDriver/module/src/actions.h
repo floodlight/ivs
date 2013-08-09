@@ -41,8 +41,8 @@ enum {
     IND_OVS_ACTION_SET_ETH_SRC, /* of_mac_addr_t */
     IND_OVS_ACTION_SET_IPV4_DST, /* uint32_t */
     IND_OVS_ACTION_SET_IPV4_SRC, /* uint32_t */
-    IND_OVS_ACTION_SET_IP_DSCP, /* uint8_t */
-    IND_OVS_ACTION_SET_IP_ECN,  /* uint8_t */
+    IND_OVS_ACTION_SET_IP_DSCP, /* uint8_t , Upper 6 bits */
+    IND_OVS_ACTION_SET_IP_ECN,  /* uint8_t , Lower 2 bits */
     IND_OVS_ACTION_SET_TCP_DST, /* uint16_t */
     IND_OVS_ACTION_SET_TCP_SRC, /* uint16_t */
     IND_OVS_ACTION_SET_UDP_DST, /* uint16_t */

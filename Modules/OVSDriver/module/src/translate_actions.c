@@ -230,6 +230,7 @@ ind_ovs_action_set_ipv4_src(struct nlattr *attr, struct translate_context *ctx)
 
 #define IP_DSCP_MASK 0xfc
 #define IP_ECN_MASK 0x03
+#define IPV6_FLABEL_MASK 0x000fffff
 
 static void
 ind_ovs_action_set_ip_dscp(struct nlattr *attr, struct translate_context *ctx)
@@ -238,9 +239,7 @@ ind_ovs_action_set_ip_dscp(struct nlattr *attr, struct translate_context *ctx)
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV4);
         ctx->current_key.ipv4.ipv4_tos &= (uint8_t)(~IP_DSCP_MASK);
         ctx->current_key.ipv4.ipv4_tos |= *XBUF_PAYLOAD(attr, uint8_t);
-    }
-
-    if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV6)) {
+    } else if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV6)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV6);
         ctx->current_key.ipv6.ipv6_tclass &= (uint8_t)(~IP_DSCP_MASK);
         ctx->current_key.ipv6.ipv6_tclass |= *XBUF_PAYLOAD(attr, uint8_t);
@@ -254,9 +253,7 @@ ind_ovs_action_set_ip_ecn(struct nlattr *attr, struct translate_context *ctx)
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV4);
         ctx->current_key.ipv4.ipv4_tos &= (uint8_t)(~IP_ECN_MASK);
         ctx->current_key.ipv4.ipv4_tos |= *XBUF_PAYLOAD(attr, uint8_t);
-    }
-
-    if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV6)) {
+    } else if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV6)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV6);
         ctx->current_key.ipv6.ipv6_tclass &= (uint8_t)(~IP_ECN_MASK);
         ctx->current_key.ipv6.ipv6_tclass |= *XBUF_PAYLOAD(attr, uint8_t);
@@ -269,9 +266,7 @@ ind_ovs_action_set_nw_ttl(struct nlattr *attr, struct translate_context *ctx)
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV4)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV4);
         ctx->current_key.ipv4.ipv4_ttl = *XBUF_PAYLOAD(attr, uint8_t);
-    }
-
-    if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV6)) {
+    } else if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV6)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV6);
         ctx->current_key.ipv6.ipv6_hlimit = *XBUF_PAYLOAD(attr, uint8_t);
     }
@@ -376,7 +371,7 @@ ind_ovs_action_push_vlan(struct nlattr *attr, struct translate_context *ctx)
     if (!ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_VLAN)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_VLAN);
         ATTR_BITMAP_SET(ctx->current_key.populated, OVS_KEY_ATTR_VLAN);
-        ctx->current_key.vlan = htons(VLAN_TCI(VLAN_VID(0), 0) | VLAN_CFI_BIT);
+        ctx->current_key.vlan = htons(VLAN_CFI_BIT);
     }
 }
 
@@ -663,6 +658,13 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf)
                 case OF_OXM_IP_DSCP: {
                     uint8_t ip_dscp;
                     of_oxm_ip_dscp_value_get(&oxm.ip_dscp, &ip_dscp);
+
+                    if (ip_dscp > ((uint8_t)IP_DSCP_MASK >> 2)) {
+                        LOG_ERROR("invalid dscp %d in action %s", ip_dscp,
+                                of_object_id_str[act.header.object_id]);
+                        return INDIGO_ERROR_COMPAT;
+                    }
+
                     ip_dscp <<= 2;
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IP_DSCP, &ip_dscp, sizeof(ip_dscp));
                     break;
@@ -670,6 +672,13 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf)
                 case OF_OXM_IP_ECN: {
                     uint8_t ip_ecn;
                     of_oxm_ip_ecn_value_get(&oxm.ip_ecn, &ip_ecn);
+
+                    if (ip_ecn > IP_ECN_MASK) {
+                        LOG_ERROR("invalid ecn %d in action %s", ip_ecn,
+                                of_object_id_str[act.header.object_id]);
+                        return INDIGO_ERROR_COMPAT;
+                    }
+
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IP_ECN, &ip_ecn, sizeof(ip_ecn));
                     break;
                 }
@@ -688,6 +697,13 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf)
                 case OF_OXM_IPV6_FLABEL: {
                     uint32_t flabel;
                     of_oxm_ipv6_flabel_value_get(&oxm.ipv6_flabel, &flabel);
+
+                    if (flabel > IPV6_FLABEL_MASK) {
+                        LOG_ERROR("invalid flabel 0x%04x in action %s", flabel,
+                                of_object_id_str[act.header.object_id]);
+                        return INDIGO_ERROR_COMPAT;
+                    }
+
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IPV6_FLABEL, &flabel, sizeof(flabel));
                     break;
                 }
@@ -785,7 +801,7 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf)
             of_action_push_vlan_ethertype_get(&act.push_vlan, &eth_type);
 
             if (eth_type != ETH_P_8021Q) {
-                LOG_ERROR("unsupported eth_type 0x%04x in action", eth_type,
+                LOG_ERROR("unsupported eth_type 0x%04x in action %s", eth_type,
                            of_object_id_str[act.header.object_id]);
                 return INDIGO_ERROR_COMPAT;
             }
