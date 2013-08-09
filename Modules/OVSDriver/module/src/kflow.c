@@ -97,6 +97,7 @@ ind_ovs_kflow_add(const struct nlattr *key)
     /* Copy actions before ind_ovs_transact() frees msg */
     kflow->actions = malloc(nla_len(actions));
     memcpy(kflow->actions, nla_data(actions), nla_len(actions));
+    kflow->actions_len = nla_len(actions);
 
     if (ind_ovs_transact(msg) < 0) {
         free(kflow->actions);
@@ -255,6 +256,7 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
         }
         kflow->actions = realloc(kflow->actions, nla_len(actions));
         memcpy(kflow->actions, nla_data(actions), nla_len(actions));
+        kflow->actions_len = nla_len(actions);
     } else {
         ind_ovs_nlmsg_freelist_free(msg);
     }
