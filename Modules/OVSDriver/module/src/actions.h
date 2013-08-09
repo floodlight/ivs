@@ -40,18 +40,24 @@ enum {
     IND_OVS_ACTION_SET_ETH_SRC, /* of_mac_addr_t */
     IND_OVS_ACTION_SET_IPV4_DST, /* uint32_t */
     IND_OVS_ACTION_SET_IPV4_SRC, /* uint32_t */
-    IND_OVS_ACTION_SET_IPV4_DSCP, /* uint8_t */
+    IND_OVS_ACTION_SET_IP_DSCP, /* uint8_t , Upper 6 bits */
+    IND_OVS_ACTION_SET_IP_ECN,  /* uint8_t , Lower 2 bits */
     IND_OVS_ACTION_SET_TCP_DST, /* uint16_t */
     IND_OVS_ACTION_SET_TCP_SRC, /* uint16_t */
     IND_OVS_ACTION_SET_UDP_DST, /* uint16_t */
     IND_OVS_ACTION_SET_UDP_SRC, /* uint16_t */
-    IND_OVS_ACTION_SET_TP_DST, /* uint16_t */
-    IND_OVS_ACTION_SET_TP_SRC, /* uint16_t */
+    IND_OVS_ACTION_SET_TP_DST,  /* uint16_t */
+    IND_OVS_ACTION_SET_TP_SRC,  /* uint16_t */
     IND_OVS_ACTION_SET_VLAN_VID, /* uint16_t */
     IND_OVS_ACTION_SET_VLAN_PCP, /* uint8_t */
     IND_OVS_ACTION_POP_VLAN,
+    IND_OVS_ACTION_PUSH_VLAN,    /* uint16_t */
     IND_OVS_ACTION_DEC_NW_TTL,
+    IND_OVS_ACTION_SET_NW_TTL,   /* uint8_t */
     IND_OVS_ACTION_SET_TUNNEL_DST, /* uint32_t */
+    IND_OVS_ACTION_SET_IPV6_DST,    /* of_ipv6_t */
+    IND_OVS_ACTION_SET_IPV6_SRC,    /* of_ipv6_t */
+    IND_OVS_ACTION_SET_IPV6_FLABEL, /* uint32_t */
 };
 
 #endif
