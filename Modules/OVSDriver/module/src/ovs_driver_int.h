@@ -299,6 +299,30 @@ struct ind_ovs_table {
     of_table_name_t name;
 };
 
+/*
+ * Result of the forwarding pipeline (ind_ovs_fwd_process)
+ *
+ * See ind_ovs_fwd_result_{init,reset,cleanup}.
+ */
+struct ind_ovs_fwd_result {
+    /*
+     * List of IVS actions.
+     */
+    struct xbuf actions;
+
+    /*
+     * These stats objects may belong to flows or tables (and in the future
+     * meters or groups). For example, every table a packet matched in will
+     * have its matched_stats field added here.
+     *
+     * This is sized at 2x the number of tables because each table can
+     * contribute a table stats and flow stats entry. This will have to
+     * change when we add meters and groups.
+     */
+    int num_stats_ptrs;
+    struct ind_ovs_flow_stats *stats_ptrs[IND_OVS_NUM_TABLES*2];
+};
+
 /* Internal functions */
 
 /* Translate an OVS key into a flat struct */
@@ -322,7 +346,10 @@ void ind_ovs_match_to_cfr(const of_match_t *match, struct ind_ovs_cfr *cfr, stru
 /* Internal interfaces to the forwarding module */
 indigo_error_t ind_ovs_fwd_init(void);
 void ind_ovs_fwd_finish(void);
-indigo_error_t ind_ovs_lookup_flow(const struct ind_ovs_parsed_key *pkey, struct ind_ovs_flow **flow);
+indigo_error_t ind_ovs_fwd_process(const struct ind_ovs_parsed_key *pkey, struct ind_ovs_fwd_result *result);
+void ind_ovs_fwd_result_init(struct ind_ovs_fwd_result *result);
+void ind_ovs_fwd_result_reset(struct ind_ovs_fwd_result *result);
+void ind_ovs_fwd_result_cleanup(struct ind_ovs_fwd_result *result);
 indigo_error_t ind_fwd_pkt_in(of_port_no_t of_port_num, uint8_t *data, unsigned int len, unsigned reason, of_match_t *match);
 
 /*

@@ -26,6 +26,7 @@
 
 static struct list_head ind_ovs_kflows;
 static struct list_head ind_ovs_kflow_buckets[NUM_KFLOW_BUCKETS];
+static struct ind_ovs_fwd_result ind_ovs_kflow_fwd_result;
 
 static inline uint32_t
 key_hash(const struct nlattr *key)
@@ -72,11 +73,13 @@ ind_ovs_kflow_add(const struct nlattr *key)
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key((struct nlattr *)key, &pkey);
 
-    /* Lookup the flow in the userspace flowtable. */
-    struct ind_ovs_flow *flow;
-    if (ind_ovs_lookup_flow(&pkey, &flow) != 0) {
+    struct ind_ovs_fwd_result *result = &ind_ovs_kflow_fwd_result;
+    ind_ovs_fwd_result_reset(result);
+
+    indigo_error_t err = ind_ovs_fwd_process(&pkey, result);
+    if (err < 0) {
         /* Flow was deleted after the BH request was queued. */
-        return INDIGO_ERROR_NONE;
+        return err;
     }
 
     struct ind_ovs_kflow *kflow = malloc(sizeof(*kflow) + key->nla_len);
@@ -88,7 +91,7 @@ ind_ovs_kflow_add(const struct nlattr *key)
     nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(key), nla_data(key));
 
     struct nlattr *actions = nla_nest_start(msg, OVS_FLOW_ATTR_ACTIONS);
-    ind_ovs_translate_actions(&pkey, &flow->effects.apply_actions, msg);
+    ind_ovs_translate_actions(&pkey, &result->actions, msg);
     ind_ovs_nla_nest_end(msg, actions);
 
     /* Copy actions before ind_ovs_transact() frees msg */
@@ -108,10 +111,10 @@ ind_ovs_kflow_add(const struct nlattr *key)
 
     memcpy(kflow->key, key, key->nla_len);
 
-    kflow->num_stats_ptrs = 2;
-    kflow->stats_ptrs = malloc(sizeof(*kflow->stats_ptrs) * kflow->num_stats_ptrs);
-    kflow->stats_ptrs[0] = &flow->stats;
-    kflow->stats_ptrs[1] = &ind_ovs_tables[0].matched_stats;
+    kflow->num_stats_ptrs = result->num_stats_ptrs;
+    kflow->stats_ptrs = aim_memdup(
+        result->stats_ptrs,
+        result->num_stats_ptrs * sizeof(*result->stats_ptrs));
 
     list_push(&ind_ovs_kflows, &kflow->global_links);
     list_push(bucket, &kflow->bucket_links);
@@ -216,16 +219,24 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key(kflow->key, &pkey);
 
-    /* Lookup the flow in the userspace flowtable. */
-    struct ind_ovs_flow *flow;
-    if (ind_ovs_lookup_flow(&pkey, &flow) != 0) {
+    struct ind_ovs_fwd_result *result = &ind_ovs_kflow_fwd_result;
+    ind_ovs_fwd_result_reset(result);
+
+    indigo_error_t err = ind_ovs_fwd_process(&pkey, result);
+    if (err < 0) {
         ind_ovs_kflow_delete(kflow);
         return;
     }
 
-    if (&flow->stats != kflow->stats_ptrs[0]) {
+    size_t stats_ptrs_len = result->num_stats_ptrs * sizeof(*result->stats_ptrs);
+    if (result->num_stats_ptrs != kflow->num_stats_ptrs ||
+            memcmp(result->stats_ptrs, kflow->stats_ptrs, stats_ptrs_len)) {
         /* Synchronize stats to previous OpenFlow flow */
         ind_ovs_kflow_sync_stats(kflow);
+        if (result->num_stats_ptrs != kflow->num_stats_ptrs) {
+            kflow->stats_ptrs = realloc(kflow->stats_ptrs, stats_ptrs_len);
+        }
+        memcpy(kflow->stats_ptrs, result->stats_ptrs, stats_ptrs_len);
     }
 
     struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_SET);
@@ -233,7 +244,7 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
     nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(kflow->key), nla_data(kflow->key));
 
     struct nlattr *actions = nla_nest_start(msg, OVS_FLOW_ATTR_ACTIONS);
-    ind_ovs_translate_actions(&pkey, &flow->effects.apply_actions, msg);
+    ind_ovs_translate_actions(&pkey, &result->actions, msg);
     ind_ovs_nla_nest_end(msg, actions);
 
     if (nla_len(actions) != kflow->actions_len ||
@@ -247,8 +258,6 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
     } else {
         ind_ovs_nlmsg_freelist_free(msg);
     }
-
-    kflow->stats_ptrs[0] = &flow->stats;
 }
 
 /*
@@ -315,4 +324,6 @@ ind_ovs_kflow_module_init(void)
     for (i = 0; i < NUM_KFLOW_BUCKETS; i++) {
         list_init(&ind_ovs_kflow_buckets[i]);
     }
+
+    ind_ovs_fwd_result_init(&ind_ovs_kflow_fwd_result);
 }

@@ -48,6 +48,9 @@ struct ind_ovs_upcall_thread {
     /* Epoll set containing all upcall netlink sockets assigned to this thread */
     int epfd;
 
+    /* Cached here so we don't need to reallocate it every time */
+    struct ind_ovs_fwd_result result;
+
     /* Preallocated messages used by the upcall thread for send and recv. */
     struct nl_msg *msgs[NUM_UPCALL_BUFFERS];
 
@@ -241,29 +244,31 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key(key, &pkey);
 
-    struct ind_ovs_table *table = &ind_ovs_tables[0];
-
-    /* Lookup the flow in the userspace flowtable. */
-    struct ind_ovs_flow *flow;
-    if (ind_ovs_lookup_flow(&pkey, &flow) != 0) {
-        __sync_fetch_and_add(&table->missed_stats.packets, 1);
-        __sync_fetch_and_add(&table->missed_stats.bytes, nla_len(packet));
-        ind_ovs_upcall_request_pktin(pkey.in_port, port, packet, key, OF_PACKET_IN_REASON_NO_MATCH);
+    struct ind_ovs_fwd_result *result = &thread->result;
+    ind_ovs_fwd_result_reset(result);
+    indigo_error_t err = ind_ovs_fwd_process(&pkey, result);
+    if (err < 0 && err != INDIGO_ERROR_NOT_FOUND) {
         return;
     }
 
-    __sync_fetch_and_add(&table->matched_stats.packets, 1);
-    __sync_fetch_and_add(&table->matched_stats.bytes, nla_len(packet));
+    int i;
+    for (i = 0; i < result->num_stats_ptrs; i++) {
+        struct ind_ovs_flow_stats *stats = result->stats_ptrs[i];
+        __sync_fetch_and_add(&stats->packets, 1);
+        __sync_fetch_and_add(&stats->bytes, nla_len(packet));
+    }
+
+    if (err == INDIGO_ERROR_NOT_FOUND) {
+        ind_ovs_upcall_request_pktin(pkey.in_port, port, packet, key, OF_PACKET_IN_REASON_NO_MATCH);
+        return;
+    }
 
     /* Reuse the incoming message for the packet execute */
     gnlh->cmd = OVS_PACKET_CMD_EXECUTE;
 
     struct nlattr *actions = nla_nest_start(msg, OVS_PACKET_ATTR_ACTIONS);
-    ind_ovs_translate_actions(&pkey, &flow->effects.apply_actions, msg);
+    ind_ovs_translate_actions(&pkey, &result->actions, msg);
     ind_ovs_nla_nest_end(msg, actions);
-
-    __sync_fetch_and_add(&flow->stats.packets, 1);
-    __sync_fetch_and_add(&flow->stats.bytes, nla_len(packet));
 
     /* Don't send the packet back out if it would be dropped. */
     if (nla_len(actions) > 0) {
@@ -457,6 +462,8 @@ ind_ovs_upcall_init(void)
             abort();
         }
 
+        ind_ovs_fwd_result_init(&thread->result);
+
         for (j = 0; j < NUM_UPCALL_BUFFERS; j++) {
             thread->msgs[j] = nlmsg_alloc();
             if (thread->msgs[j] == NULL) {
@@ -499,6 +506,7 @@ ind_ovs_upcall_finish(void)
         struct ind_ovs_upcall_thread *thread = ind_ovs_upcall_threads[i];
         pthread_join(thread->pthread, NULL);
         close(thread->epfd);
+        ind_ovs_fwd_result_cleanup(&thread->result);
         for (j = 0; j < NUM_UPCALL_BUFFERS; j++) {
             nlmsg_free(thread->msgs[j]);
         }

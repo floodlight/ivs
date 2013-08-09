@@ -512,31 +512,62 @@ ind_fwd_pkt_in(of_port_no_t in_port,
 }
 
 /*
- * Finds the flowtable entry matching the given fields.
+ * Send a packet through the forwarding pipeline.
+ *
+ * 'result' should be initialized with ind_ovs_fwd_result_init.
  */
 indigo_error_t
-ind_ovs_lookup_flow(const struct ind_ovs_parsed_key *pkey,
-                    struct ind_ovs_flow **flow)
+ind_ovs_fwd_process(const struct ind_ovs_parsed_key *pkey,
+                    struct ind_ovs_fwd_result *result)
 {
     struct flowtable_entry *fte;
+
     struct ind_ovs_cfr cfr;
     ind_ovs_key_to_cfr(pkey, &cfr);
 
+    struct ind_ovs_table *table = &ind_ovs_tables[0];
+
 #ifndef NDEBUG
-    LOG_VERBOSE("Looking up flow:");
+    LOG_VERBOSE("Looking up flow in %s", table->name);
     ind_ovs_dump_cfr(&cfr);
 #endif
 
-    struct ind_ovs_table *table = &ind_ovs_tables[0];
-
     fte = flowtable_match(table->ft, (struct flowtable_key *)&cfr);
     if (fte == NULL) {
+        result->stats_ptrs[result->num_stats_ptrs++] = &table->missed_stats;
         return INDIGO_ERROR_NOT_FOUND;
     }
 
-    *flow = container_of(fte, fte, struct ind_ovs_flow);
+    struct ind_ovs_flow *flow = container_of(fte, fte, struct ind_ovs_flow);
+
+    result->stats_ptrs[result->num_stats_ptrs++] = &table->matched_stats;
+    result->stats_ptrs[result->num_stats_ptrs++] = &flow->stats;
+
+    xbuf_append(&result->actions, xbuf_data(&flow->effects.apply_actions),
+                xbuf_length(&flow->effects.apply_actions));
 
     return INDIGO_ERROR_NONE;
+}
+
+void
+ind_ovs_fwd_result_init(struct ind_ovs_fwd_result *result)
+{
+    xbuf_init(&result->actions);
+    result->num_stats_ptrs = 0;
+}
+
+/* Reinitialize without reallocating memory */
+void
+ind_ovs_fwd_result_reset(struct ind_ovs_fwd_result *result)
+{
+    xbuf_reset(&result->actions);
+    result->num_stats_ptrs = 0;
+}
+
+void
+ind_ovs_fwd_result_cleanup(struct ind_ovs_fwd_result *result)
+{
+    xbuf_cleanup(&result->actions);
 }
 
 /** \brief Handle packet out request from Core */
