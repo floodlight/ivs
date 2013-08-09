@@ -535,7 +535,7 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
  * The actions are written to 'xbuf'.
  */
 indigo_error_t
-ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf)
+ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf, bool table_miss)
 {
     of_action_t act;
     int rv;
@@ -546,8 +546,8 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf)
             of_action_output_port_get(&act.output, &port_no);
             switch (port_no) {
                 case OF_PORT_DEST_CONTROLLER: {
-                    /* TODO use OF_PACKET_IN_REASON_NO_MATCH for table-miss */
-                    uint8_t reason = OF_PACKET_IN_REASON_ACTION;
+                    uint8_t reason = table_miss ? OF_PACKET_IN_REASON_NO_MATCH :
+                                                  OF_PACKET_IN_REASON_ACTION;
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_CONTROLLER, &reason, sizeof(reason));
                     break;
                 }
