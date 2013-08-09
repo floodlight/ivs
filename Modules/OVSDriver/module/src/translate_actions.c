@@ -228,12 +228,47 @@ ind_ovs_action_set_ipv4_src(struct nlattr *attr, struct translate_context *ctx)
     }
 }
 
+#define IP_DSCP_MASK 0xfc
+#define IP_ECN_MASK 0x03
+#define IPV6_FLABEL_MASK 0x000fffff
+
 static void
-ind_ovs_action_set_ipv4_dscp(struct nlattr *attr, struct translate_context *ctx)
+ind_ovs_action_set_ip_dscp(struct nlattr *attr, struct translate_context *ctx)
 {
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV4)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV4);
-        ctx->current_key.ipv4.ipv4_tos = *XBUF_PAYLOAD(attr, uint8_t);
+        ctx->current_key.ipv4.ipv4_tos &= (uint8_t)(~IP_DSCP_MASK);
+        ctx->current_key.ipv4.ipv4_tos |= *XBUF_PAYLOAD(attr, uint8_t);
+    } else if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV6)) {
+        ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV6);
+        ctx->current_key.ipv6.ipv6_tclass &= (uint8_t)(~IP_DSCP_MASK);
+        ctx->current_key.ipv6.ipv6_tclass |= *XBUF_PAYLOAD(attr, uint8_t);
+    }
+}
+
+static void
+ind_ovs_action_set_ip_ecn(struct nlattr *attr, struct translate_context *ctx)
+{
+    if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV4)) {
+        ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV4);
+        ctx->current_key.ipv4.ipv4_tos &= (uint8_t)(~IP_ECN_MASK);
+        ctx->current_key.ipv4.ipv4_tos |= *XBUF_PAYLOAD(attr, uint8_t);
+    } else if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV6)) {
+        ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV6);
+        ctx->current_key.ipv6.ipv6_tclass &= (uint8_t)(~IP_ECN_MASK);
+        ctx->current_key.ipv6.ipv6_tclass |= *XBUF_PAYLOAD(attr, uint8_t);
+    }
+}
+
+static void
+ind_ovs_action_set_nw_ttl(struct nlattr *attr, struct translate_context *ctx)
+{
+    if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV4)) {
+        ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV4);
+        ctx->current_key.ipv4.ipv4_ttl = *XBUF_PAYLOAD(attr, uint8_t);
+    } else if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV6)) {
+        ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV6);
+        ctx->current_key.ipv6.ipv6_hlimit = *XBUF_PAYLOAD(attr, uint8_t);
     }
 }
 
@@ -330,6 +365,16 @@ ind_ovs_action_pop_vlan(struct nlattr *attr, struct translate_context *ctx)
     }
 }
 
+static void
+ind_ovs_action_push_vlan(struct nlattr *attr, struct translate_context *ctx)
+{
+    if (!ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_VLAN)) {
+        ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_VLAN);
+        ATTR_BITMAP_SET(ctx->current_key.populated, OVS_KEY_ATTR_VLAN);
+        ctx->current_key.vlan = htons(VLAN_CFI_BIT);
+    }
+}
+
 /*
  * Extension actions
  */
@@ -341,6 +386,36 @@ ind_ovs_action_set_tunnel_dst(struct nlattr *attr, struct translate_context *ctx
     ctx->current_key.tunnel.ipv4_dst = htonl(*XBUF_PAYLOAD(attr, uint32_t));
 }
 
+/*
+ * IPv6 Actions
+ */
+
+static void
+ind_ovs_action_set_ipv6_dst(struct nlattr *attr, struct translate_context *ctx)
+{
+    if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV6)) {
+        ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV6);
+        memcpy(ctx->current_key.ipv6.ipv6_dst, XBUF_PAYLOAD(attr, of_ipv6_t), sizeof(of_ipv6_t));
+    }
+}
+
+static void
+ind_ovs_action_set_ipv6_src(struct nlattr *attr, struct translate_context *ctx)
+{
+    if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV6)) {
+        ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV6);
+        memcpy(ctx->current_key.ipv6.ipv6_src, XBUF_PAYLOAD(attr, of_ipv6_t), sizeof(of_ipv6_t));
+    }
+}
+
+static void
+ind_ovs_action_set_ipv6_flabel(struct nlattr *attr, struct translate_context *ctx)
+{
+    if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV6)) {
+        ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV6);
+        ctx->current_key.ipv6.ipv6_label = htonl(*XBUF_PAYLOAD(attr, uint32_t));
+    }
+}
 
 void
 ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
@@ -393,8 +468,11 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
         case IND_OVS_ACTION_SET_IPV4_SRC:
             ind_ovs_action_set_ipv4_src(attr, &ctx);
             break;
-        case IND_OVS_ACTION_SET_IPV4_DSCP:
-            ind_ovs_action_set_ipv4_dscp(attr, &ctx);
+        case IND_OVS_ACTION_SET_IP_DSCP:
+            ind_ovs_action_set_ip_dscp(attr, &ctx);
+            break;
+        case IND_OVS_ACTION_SET_IP_ECN:
+            ind_ovs_action_set_ip_ecn(attr, &ctx);
             break;
         case IND_OVS_ACTION_SET_TCP_DST:
             ind_ovs_action_set_tcp_dst(attr, &ctx);
@@ -423,6 +501,9 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
         case IND_OVS_ACTION_POP_VLAN:
             ind_ovs_action_pop_vlan(attr, &ctx);
             break;
+        case IND_OVS_ACTION_PUSH_VLAN:
+            ind_ovs_action_push_vlan(attr, &ctx);
+            break;
         case IND_OVS_ACTION_DEC_NW_TTL:
             /* Special cased because it can drop the packet */
             if (ATTR_BITMAP_TEST(ctx.current_key.populated, OVS_KEY_ATTR_IPV4)) {
@@ -432,9 +513,29 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
                     goto finish;
                 }
             }
+
+            if (ATTR_BITMAP_TEST(ctx.current_key.populated, OVS_KEY_ATTR_IPV6)) {
+                ATTR_BITMAP_SET(ctx.modified_attrs, OVS_KEY_ATTR_IPV6);
+                if (ctx.current_key.ipv6.ipv6_hlimit == 0
+                    || --ctx.current_key.ipv6.ipv6_hlimit == 0) {
+                    goto finish;
+                }
+            }
+            break;
+        case IND_OVS_ACTION_SET_NW_TTL:
+            ind_ovs_action_set_nw_ttl(attr, &ctx);
             break;
         case OF_ACTION_BSN_SET_TUNNEL_DST:
             ind_ovs_action_set_tunnel_dst(attr, &ctx);
+            break;
+        case IND_OVS_ACTION_SET_IPV6_DST:
+            ind_ovs_action_set_ipv6_dst(attr, &ctx);
+            break;
+        case IND_OVS_ACTION_SET_IPV6_SRC:
+            ind_ovs_action_set_ipv6_src(attr, &ctx);
+            break;
+        case IND_OVS_ACTION_SET_IPV6_FLABEL:
+            ind_ovs_action_set_ipv6_flabel(attr, &ctx);
             break;
         default:
             assert(0);
@@ -524,6 +625,112 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf)
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_VLAN_VID, &vlan_vid, sizeof(vlan_vid));
                     break;
                 }
+                case OF_OXM_VLAN_PCP: {
+                    uint8_t vlan_pcp;
+                    of_oxm_vlan_pcp_value_get(&oxm.vlan_pcp, &vlan_pcp);
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_VLAN_PCP, &vlan_pcp, sizeof(vlan_pcp));
+                    break;
+                }
+                case OF_OXM_ETH_SRC: {
+                    of_mac_addr_t mac;
+                    of_oxm_eth_src_value_get(&oxm.eth_src, &mac);
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_ETH_SRC, &mac, sizeof(mac));
+                    break;
+                }
+                case OF_OXM_ETH_DST: {
+                    of_mac_addr_t mac;
+                    of_oxm_eth_dst_value_get(&oxm.eth_dst, &mac);
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_ETH_DST, &mac, sizeof(mac));
+                    break;
+                }
+                case OF_OXM_IPV4_SRC: {
+                    uint32_t ipv4;
+                    of_oxm_ipv4_src_value_get(&oxm.ipv4_src, &ipv4);
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IPV4_SRC, &ipv4, sizeof(ipv4));
+                    break;
+                }
+                case OF_OXM_IPV4_DST: {
+                    uint32_t ipv4;
+                    of_oxm_ipv4_dst_value_get(&oxm.ipv4_dst, &ipv4);
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IPV4_DST, &ipv4, sizeof(ipv4));
+                    break;
+                }
+                case OF_OXM_IP_DSCP: {
+                    uint8_t ip_dscp;
+                    of_oxm_ip_dscp_value_get(&oxm.ip_dscp, &ip_dscp);
+
+                    if (ip_dscp > ((uint8_t)IP_DSCP_MASK >> 2)) {
+                        LOG_ERROR("invalid dscp %d in action %s", ip_dscp,
+                                of_object_id_str[act.header.object_id]);
+                        return INDIGO_ERROR_COMPAT;
+                    }
+
+                    ip_dscp <<= 2;
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IP_DSCP, &ip_dscp, sizeof(ip_dscp));
+                    break;
+                }
+                case OF_OXM_IP_ECN: {
+                    uint8_t ip_ecn;
+                    of_oxm_ip_ecn_value_get(&oxm.ip_ecn, &ip_ecn);
+
+                    if (ip_ecn > IP_ECN_MASK) {
+                        LOG_ERROR("invalid ecn %d in action %s", ip_ecn,
+                                of_object_id_str[act.header.object_id]);
+                        return INDIGO_ERROR_COMPAT;
+                    }
+
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IP_ECN, &ip_ecn, sizeof(ip_ecn));
+                    break;
+                }
+                case OF_OXM_IPV6_SRC: {
+                    of_ipv6_t ipv6;
+                    of_oxm_ipv6_src_value_get(&oxm.ipv6_src, &ipv6);
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IPV6_SRC, &ipv6, sizeof(ipv6));
+                    break;
+                }
+                case OF_OXM_IPV6_DST: {
+                    of_ipv6_t ipv6;
+                    of_oxm_ipv6_dst_value_get(&oxm.ipv6_dst, &ipv6);
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IPV6_DST, &ipv6, sizeof(ipv6));
+                    break;
+                }
+                case OF_OXM_IPV6_FLABEL: {
+                    uint32_t flabel;
+                    of_oxm_ipv6_flabel_value_get(&oxm.ipv6_flabel, &flabel);
+
+                    if (flabel > IPV6_FLABEL_MASK) {
+                        LOG_ERROR("invalid flabel 0x%04x in action %s", flabel,
+                                of_object_id_str[act.header.object_id]);
+                        return INDIGO_ERROR_COMPAT;
+                    }
+
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IPV6_FLABEL, &flabel, sizeof(flabel));
+                    break;
+                }
+                case OF_OXM_TCP_SRC: {
+                    uint16_t port;
+                    of_oxm_tcp_src_value_get(&oxm.tcp_src, &port);
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_TCP_SRC, &port, sizeof(port));
+                    break;
+                }
+                case OF_OXM_TCP_DST: {
+                    uint16_t port;
+                    of_oxm_tcp_dst_value_get(&oxm.tcp_dst, &port);
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_TCP_DST, &port, sizeof(port));
+                    break;
+                }
+                case OF_OXM_UDP_SRC: {
+                    uint16_t port;
+                    of_oxm_udp_src_value_get(&oxm.udp_src, &port);
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_UDP_SRC, &port, sizeof(port));
+                    break;
+                }
+                case OF_OXM_UDP_DST: {
+                    uint16_t port;
+                    of_oxm_udp_dst_value_get(&oxm.udp_dst, &port);
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_UDP_DST, &port, sizeof(port));
+                    break;
+                }
                 default:
                     LOG_ERROR("unsupported set-field oxm %s", of_object_id_str[oxm.header.object_id]);
                     return INDIGO_ERROR_COMPAT;
@@ -557,7 +764,7 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf)
         case OF_ACTION_SET_NW_TOS: {
             uint8_t tos;
             of_action_set_nw_tos_nw_tos_get(&act.set_nw_tos, &tos);
-            xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IPV4_DSCP, &tos, sizeof(tos));
+            xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IP_DSCP, &tos, sizeof(tos));
             break;
         }
         case OF_ACTION_SET_TP_DST: {
@@ -584,12 +791,33 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf)
             xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_VLAN_PCP, &vlan_pcp, sizeof(vlan_pcp));
             break;
         }
+        case OF_ACTION_POP_VLAN:
         case OF_ACTION_STRIP_VLAN: {
             xbuf_append_attr(xbuf, IND_OVS_ACTION_POP_VLAN, NULL, 0);
             break;
         }
+        case OF_ACTION_PUSH_VLAN: {
+            uint16_t eth_type;
+            of_action_push_vlan_ethertype_get(&act.push_vlan, &eth_type);
+
+            if (eth_type != ETH_P_8021Q) {
+                LOG_ERROR("unsupported eth_type 0x%04x in action %s", eth_type,
+                           of_object_id_str[act.header.object_id]);
+                return INDIGO_ERROR_COMPAT;
+            }
+
+            xbuf_append_attr(xbuf, IND_OVS_ACTION_PUSH_VLAN, &eth_type, sizeof(eth_type));
+            break;
+        }
+        case OF_ACTION_DEC_NW_TTL:
         case OF_ACTION_NICIRA_DEC_TTL: {
             xbuf_append_attr(xbuf, IND_OVS_ACTION_DEC_NW_TTL, NULL, 0);
+            break;
+        }
+        case OF_ACTION_SET_NW_TTL: {
+            uint8_t ttl;
+            of_action_set_nw_ttl_nw_ttl_get(&act.set_nw_ttl, &ttl);
+            xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_NW_TTL, &ttl, sizeof(ttl));
             break;
         }
         case OF_ACTION_BSN_SET_TUNNEL_DST: {
