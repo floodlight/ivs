@@ -48,6 +48,9 @@ struct ind_ovs_upcall_thread {
     /* Epoll set containing all upcall netlink sockets assigned to this thread */
     int epfd;
 
+    /* Cached here so we don't need to reallocate it every time */
+    struct ind_ovs_fwd_result result;
+
     /* Preallocated messages used by the upcall thread for send and recv. */
     struct nl_msg *msgs[NUM_UPCALL_BUFFERS];
 
@@ -82,7 +85,6 @@ static void ind_ovs_handle_port_upcalls(struct ind_ovs_upcall_thread *thread, st
 static void ind_ovs_handle_one_upcall(struct ind_ovs_upcall_thread *thread, struct ind_ovs_port *port, struct nl_msg *msg);
 static void ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread, struct ind_ovs_port *port, struct nl_msg *msg, struct nlattr **attrs);
 static void ind_ovs_handle_packet_action(struct ind_ovs_upcall_thread *thread, struct ind_ovs_port *port, struct nl_msg *msg, struct nlattr **attrs);
-static void ind_ovs_handle_packet_table(struct ind_ovs_upcall_thread *thread, struct ind_ovs_port *port, struct nl_msg *msg, struct nlattr **attrs);
 static void ind_ovs_upcall_request_pktin(uint32_t port_no, struct ind_ovs_port *port, struct nlattr *packet, struct nlattr *key, int reason);
 static bool ind_ovs_upcall_seen_key(struct ind_ovs_upcall_thread *thread, struct nlattr *key);
 static void ind_ovs_upcall_rearm(struct ind_ovs_port *port);
@@ -222,10 +224,8 @@ ind_ovs_handle_one_upcall(struct ind_ovs_upcall_thread *thread,
 
     if (gnlh->cmd == OVS_PACKET_CMD_MISS) {
         ind_ovs_handle_packet_miss(thread, port, msg, attrs);
-    } else if (!attrs[OVS_PACKET_ATTR_USERDATA]) {
-        ind_ovs_handle_packet_action(thread, port, msg, attrs);
     } else {
-        ind_ovs_handle_packet_table(thread, port, msg, attrs);
+        ind_ovs_handle_packet_action(thread, port, msg, attrs);
     }
 }
 
@@ -244,25 +244,31 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key(key, &pkey);
 
-    /* Lookup the flow in the userspace flowtable. */
-    struct ind_ovs_flow *flow;
-    if (ind_ovs_lookup_flow(&pkey, &flow) != 0) {
+    struct ind_ovs_fwd_result *result = &thread->result;
+    ind_ovs_fwd_result_reset(result);
+    indigo_error_t err = ind_ovs_fwd_process(&pkey, result);
+    if (err < 0 && err != INDIGO_ERROR_NOT_FOUND) {
+        return;
+    }
+
+    int i;
+    for (i = 0; i < result->num_stats_ptrs; i++) {
+        struct ind_ovs_flow_stats *stats = result->stats_ptrs[i];
+        __sync_fetch_and_add(&stats->packets, 1);
+        __sync_fetch_and_add(&stats->bytes, nla_len(packet));
+    }
+
+    if (err == INDIGO_ERROR_NOT_FOUND) {
         ind_ovs_upcall_request_pktin(pkey.in_port, port, packet, key, OF_PACKET_IN_REASON_NO_MATCH);
         return;
     }
 
     /* Reuse the incoming message for the packet execute */
     gnlh->cmd = OVS_PACKET_CMD_EXECUTE;
-    ind_ovs_translate_actions(&pkey, &flow->effects.apply_actions,
-                              msg, OVS_PACKET_ATTR_ACTIONS);
 
-    __sync_fetch_and_add(&flow->stats.packets, 1);
-    __sync_fetch_and_add(&flow->stats.bytes, nla_len(packet));
-
-    /* Reuse the translated actions for adding the kflow. */
-    struct nlattr *actions = nlmsg_find_attr(nlmsg_hdr(msg),
-        sizeof(struct genlmsghdr) + sizeof(struct ovs_header),
-        OVS_PACKET_ATTR_ACTIONS);
+    struct nlattr *actions = nla_nest_start(msg, OVS_PACKET_ATTR_ACTIONS);
+    ind_ovs_translate_actions(&pkey, &result->actions, msg);
+    ind_ovs_nla_nest_end(msg, actions);
 
     /* Don't send the packet back out if it would be dropped. */
     if (nla_len(actions) > 0) {
@@ -281,7 +287,7 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     /* See the comment for ind_ovs_upcall_seen_key. */
     if (ind_ovs_upcall_seen_key(thread, key)) {
         /* Create a kflow with the given key and actions. */
-        ind_ovs_bh_request_kflow(key, actions);
+        ind_ovs_bh_request_kflow(key);
     }
 }
 
@@ -299,55 +305,6 @@ ind_ovs_handle_packet_action(struct ind_ovs_upcall_thread *thread,
 
     /* Send packet-in to controller */
     ind_ovs_upcall_request_pktin(pkey.in_port, port, packet, key, OF_PACKET_IN_REASON_ACTION);
-}
-
-/*
- * See the OF_PORT_DEST_USE_TABLE comment in ind_ovs_translate_actions.
- * This is mostly the same as ind_ovs_handle_packet_miss but does
- * not reuse the original message for the execute command since
- * the incoming message has a userdata attribute.
- * It also doesn't install a kflow or update flow stats.
- */
-static void
-ind_ovs_handle_packet_table(struct ind_ovs_upcall_thread *thread,
-                            struct ind_ovs_port *port,
-                            struct nl_msg *msg, struct nlattr **attrs)
-{
-    struct nlattr *key = attrs[OVS_PACKET_ATTR_KEY];
-    struct nlattr *packet = attrs[OVS_PACKET_ATTR_PACKET];
-    assert(key && packet);
-
-    struct ind_ovs_parsed_key pkey;
-    ind_ovs_parse_key(key, &pkey);
-
-    /* Lookup the flow in the userspace flowtable. */
-    struct ind_ovs_flow *flow;
-    if (ind_ovs_lookup_flow(&pkey, &flow) != 0) {
-        ind_ovs_upcall_request_pktin(pkey.in_port, port, packet, key, OF_PACKET_IN_REASON_NO_MATCH);
-        return;
-    }
-
-    /* Send OVS_PACKET_CMD_EXECUTE. */
-    /* TODO ensure the message is large enough */
-    struct nl_msg *reply = ind_ovs_create_nlmsg(ovs_packet_family,
-                                                OVS_PACKET_CMD_EXECUTE);
-
-    ind_ovs_translate_actions(&pkey, &flow->effects.apply_actions,
-                              reply, OVS_PACKET_ATTR_ACTIONS);
-
-    nla_put(reply, OVS_PACKET_ATTR_KEY, nla_len(key), nla_data(key));
-    nla_put(reply, OVS_PACKET_ATTR_PACKET, nla_len(packet), nla_data(packet));
-
-    struct nlattr *actions = nlmsg_find_attr(nlmsg_hdr(reply),
-        sizeof(struct genlmsghdr) + sizeof(struct ovs_header),
-        OVS_PACKET_ATTR_ACTIONS);
-
-    /* Don't send the packet back out if it would be dropped. */
-    if (nla_len(actions) > 0) {
-        nl_send_auto(port->notify_socket, reply);
-    }
-
-    ind_ovs_nlmsg_freelist_free(reply);
 }
 
 static void
@@ -505,6 +462,8 @@ ind_ovs_upcall_init(void)
             abort();
         }
 
+        ind_ovs_fwd_result_init(&thread->result);
+
         for (j = 0; j < NUM_UPCALL_BUFFERS; j++) {
             thread->msgs[j] = nlmsg_alloc();
             if (thread->msgs[j] == NULL) {
@@ -547,6 +506,7 @@ ind_ovs_upcall_finish(void)
         struct ind_ovs_upcall_thread *thread = ind_ovs_upcall_threads[i];
         pthread_join(thread->pthread, NULL);
         close(thread->epfd);
+        ind_ovs_fwd_result_cleanup(&thread->result);
         for (j = 0; j < NUM_UPCALL_BUFFERS; j++) {
             nlmsg_free(thread->msgs[j]);
         }

@@ -31,13 +31,9 @@
 #include <pthread.h>
 #include <errno.h>
 
-struct flowtable *ind_ovs_ft;
+struct ind_ovs_table ind_ovs_tables[IND_OVS_NUM_TABLES];
 
 static struct list_head ind_ovs_flow_id_buckets[64];
-
-static unsigned active_count;   /**< Number of flows defined */
-static uint64_t lookup_count;   /**< Number of packets looked up */
-static uint64_t matched_count;  /**< Number of packets matched */
 
 static pthread_rwlock_t ind_ovs_fwd_rwlock;
 
@@ -151,6 +147,9 @@ init_effects(struct ind_ovs_flow_effects *effects,
         of_instruction_t inst;
         of_flow_modify_instructions_bind(flow_mod, &insts);
 
+        uint8_t table_id;
+        of_flow_modify_table_id_get(flow_mod, &table_id);
+
         OF_LIST_INSTRUCTION_ITER(&insts, &inst, rv) {
             switch (inst.header.object_id) {
             case OF_INSTRUCTION_APPLY_ACTIONS:
@@ -174,6 +173,11 @@ init_effects(struct ind_ovs_flow_effects *effects,
                 break;
             case OF_INSTRUCTION_GOTO_TABLE:
                 of_instruction_goto_table_table_id_get(&inst.goto_table, &effects->next_table_id);
+                if (effects->next_table_id <= table_id ||
+                        effects->next_table_id >= IND_OVS_NUM_TABLES) {
+                    LOG_WARN("invalid goto next_table_id %u", effects->next_table_id);
+                    return INDIGO_ERROR_RANGE;
+                }
                 break;
             case OF_INSTRUCTION_METER:
                 of_instruction_meter_meter_id_get(&inst.meter, &effects->meter_id);
@@ -251,13 +255,26 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
     struct list_head *flow_id_bucket = ind_ovs_flow_id_bucket(flow->flow_id);
     list_push(flow_id_bucket, &flow->flow_id_links);
 
+    if (flow_add->version > OF_VERSION_1_0) {
+        of_flow_add_table_id_get(flow_add, &flow->table_id);
+        if (flow->table_id >= IND_OVS_NUM_TABLES) {
+            LOG_WARN("Failed to add flow: invalid table_id %u", flow->table_id);
+            result = INDIGO_ERROR_RANGE;
+            goto done;
+        }
+    } else {
+        flow->table_id = 0;
+    }
+
+    struct ind_ovs_table *table = &ind_ovs_tables[flow->table_id];
+
     ind_ovs_fwd_write_lock();
-    flowtable_insert(ind_ovs_ft, &flow->fte);
+    flowtable_insert(table->ft, &flow->fte);
     ind_ovs_fwd_write_unlock();
 
     ind_ovs_kflow_invalidate_all();
 
-    ++active_count;
+    ++table->num_flows;
 
  done:
     if (INDIGO_FAILURE(result)) {
@@ -265,7 +282,10 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
         free(flow);
     }
 
-    indigo_core_flow_create_callback(result, flow_id, 0, callback_cookie);
+    indigo_core_flow_create_callback(
+        result, flow_id,
+        result == INDIGO_ERROR_NONE ? flow->table_id : 0,
+        callback_cookie);
 }
 
 
@@ -326,8 +346,10 @@ indigo_fwd_flow_delete(indigo_cookie_t flow_id,
        goto done;
     }
 
+    struct ind_ovs_table *table = &ind_ovs_tables[flow->table_id];
+
     ind_ovs_fwd_write_lock();
-    flowtable_remove(ind_ovs_ft, &flow->fte);
+    flowtable_remove(table->ft, &flow->fte);
     ind_ovs_fwd_write_unlock();
 
     ind_ovs_kflow_invalidate_all();
@@ -343,7 +365,7 @@ indigo_fwd_flow_delete(indigo_cookie_t flow_id,
 
     INDIGO_MEM_FREE(flow);
 
-    --active_count;
+    --table->num_flows;
 
 done:
     indigo_core_flow_delete_callback(result, &flow_stats, callback_cookie);
@@ -386,26 +408,6 @@ indigo_fwd_table_stats_get(of_table_stats_request_t *table_stats_request,
 {
     of_version_t version = table_stats_request->version;
 
-    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_datapath_family, OVS_DP_CMD_GET);
-    struct nlmsghdr *reply;
-    if (ind_ovs_transact_reply(msg, &reply) < 0) {
-        indigo_core_table_stats_get_callback(INDIGO_ERROR_UNKNOWN,
-                                             NULL, callback_cookie);
-        return;
-    }
-
-    struct nlattr *attrs[OVS_DP_ATTR_MAX+1];
-    if (genlmsg_parse(reply, sizeof(struct ovs_header),
-                      attrs, OVS_DP_ATTR_MAX,
-                      NULL) < 0) {
-        LOG_ERROR("failed to parse datapath message");
-        abort();
-    }
-
-    assert(attrs[OVS_DP_ATTR_STATS]);
-    struct ovs_dp_stats dp_stats = *(struct ovs_dp_stats *)nla_data(attrs[OVS_DP_ATTR_STATS]);
-    free(reply);
-
     of_table_stats_reply_t *table_stats_reply = of_table_stats_reply_new(version);
     if (table_stats_reply == NULL) {
         indigo_core_table_stats_get_callback(INDIGO_ERROR_RESOURCE,
@@ -413,27 +415,34 @@ indigo_fwd_table_stats_get(of_table_stats_request_t *table_stats_request,
         return;
     }
 
-    of_list_table_stats_entry_t list[1];
-    of_table_stats_reply_entries_bind(table_stats_reply, list);
-
-    of_table_stats_entry_t entry[1];
-    of_table_stats_entry_init(entry, version, -1, 1);
-    (void) of_list_table_stats_entry_append_bind(list, entry);
-
     uint32_t xid;
     of_table_stats_request_xid_get(table_stats_request, &xid);
     of_table_stats_reply_xid_set(table_stats_reply, xid);
-    of_table_stats_entry_table_id_set(entry, 0);
-    if (version < OF_VERSION_1_3) {
-        of_table_stats_entry_name_set(entry, "Table 0");
-        of_table_stats_entry_max_entries_set(entry, 16384);
+
+    of_list_table_stats_entry_t list[1];
+    of_table_stats_reply_entries_bind(table_stats_reply, list);
+
+    int i;
+    for (i = 0; i < IND_OVS_NUM_TABLES; i++) {
+        struct ind_ovs_table *table = &ind_ovs_tables[i];
+
+        of_table_stats_entry_t entry[1];
+        of_table_stats_entry_init(entry, version, -1, 1);
+        (void) of_list_table_stats_entry_append_bind(list, entry);
+
+        of_table_stats_entry_table_id_set(entry, i);
+        if (version < OF_VERSION_1_3) {
+            of_table_stats_entry_name_set(entry, table->name);
+            of_table_stats_entry_max_entries_set(entry, table->max_flows);
+        }
+        if (version < OF_VERSION_1_2) {
+            of_table_stats_entry_wildcards_set(entry, 0x3fffff); /* All wildcards */
+        }
+        of_table_stats_entry_active_count_set(entry, table->num_flows);
+        of_table_stats_entry_lookup_count_set(entry,
+            table->matched_stats.packets + table->missed_stats.packets);
+        of_table_stats_entry_matched_count_set(entry, table->matched_stats.packets);
     }
-    if (version < OF_VERSION_1_2) {
-        of_table_stats_entry_wildcards_set(entry, 0x3fffff); /* All wildcards */
-    }
-    of_table_stats_entry_active_count_set(entry, active_count);
-    of_table_stats_entry_lookup_count_set(entry, lookup_count + dp_stats.n_hit);
-    of_table_stats_entry_matched_count_set(entry, matched_count + dp_stats.n_hit);
 
     indigo_core_table_stats_get_callback(INDIGO_ERROR_NONE,
                                          table_stats_reply,
@@ -511,32 +520,67 @@ ind_fwd_pkt_in(of_port_no_t in_port,
 }
 
 /*
- * Finds the flowtable entry matching the given fields.
+ * Send a packet through the forwarding pipeline.
+ *
+ * 'result' should be initialized with ind_ovs_fwd_result_init.
  */
 indigo_error_t
-ind_ovs_lookup_flow(const struct ind_ovs_parsed_key *pkey,
-                    struct ind_ovs_flow **flow)
+ind_ovs_fwd_process(const struct ind_ovs_parsed_key *pkey,
+                    struct ind_ovs_fwd_result *result)
 {
     struct flowtable_entry *fte;
+    uint8_t table_id = 0;
+
     struct ind_ovs_cfr cfr;
     ind_ovs_key_to_cfr(pkey, &cfr);
 
+    while (table_id != (uint8_t)-1) {
+        struct ind_ovs_table *table = &ind_ovs_tables[table_id];
+
 #ifndef NDEBUG
-    LOG_VERBOSE("Looking up flow:");
-    ind_ovs_dump_cfr(&cfr);
+        LOG_VERBOSE("Looking up flow in %s", table->name);
+        ind_ovs_dump_cfr(&cfr);
 #endif
 
-    ++lookup_count;
+        fte = flowtable_match(table->ft, (struct flowtable_key *)&cfr);
+        if (fte == NULL) {
+            result->stats_ptrs[result->num_stats_ptrs++] = &table->missed_stats;
+            return INDIGO_ERROR_NOT_FOUND;
+        }
 
-    fte = flowtable_match(ind_ovs_ft, (struct flowtable_key *)&cfr);
-    if (fte == NULL) {
-        return INDIGO_ERROR_NOT_FOUND;
+        struct ind_ovs_flow *flow = container_of(fte, fte, struct ind_ovs_flow);
+
+        result->stats_ptrs[result->num_stats_ptrs++] = &table->matched_stats;
+        result->stats_ptrs[result->num_stats_ptrs++] = &flow->stats;
+
+        xbuf_append(&result->actions, xbuf_data(&flow->effects.apply_actions),
+                    xbuf_length(&flow->effects.apply_actions));
+
+        table_id = flow->effects.next_table_id;
     }
 
-    *flow = container_of(fte, fte, struct ind_ovs_flow);
-    ++matched_count;
-
     return INDIGO_ERROR_NONE;
+}
+
+void
+ind_ovs_fwd_result_init(struct ind_ovs_fwd_result *result)
+{
+    xbuf_init(&result->actions);
+    result->num_stats_ptrs = 0;
+}
+
+/* Reinitialize without reallocating memory */
+void
+ind_ovs_fwd_result_reset(struct ind_ovs_fwd_result *result)
+{
+    xbuf_reset(&result->actions);
+    result->num_stats_ptrs = 0;
+}
+
+void
+ind_ovs_fwd_result_cleanup(struct ind_ovs_fwd_result *result)
+{
+    xbuf_cleanup(&result->actions);
 }
 
 /** \brief Handle packet out request from Core */
@@ -626,7 +670,9 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
     struct xbuf xbuf;
     xbuf_init(&xbuf);
     ind_ovs_translate_openflow_actions(of_list_action, &xbuf);
-    ind_ovs_translate_actions(&pkey, &xbuf, msg, OVS_PACKET_ATTR_ACTIONS);
+    struct nlattr *actions_attr = nla_nest_start(msg, OVS_PACKET_ATTR_ACTIONS);
+    ind_ovs_translate_actions(&pkey, &xbuf, msg);
+    ind_ovs_nla_nest_end(msg, actions_attr);
     xbuf_cleanup(&xbuf);
 
     /* Send the second message */
@@ -680,9 +726,15 @@ ind_ovs_fwd_init(void)
         list_init(bucket);
     }
 
-    ind_ovs_ft = flowtable_create();
-    if (!ind_ovs_ft) {
-        return INDIGO_ERROR_RESOURCE;
+    for (i = 0; i < IND_OVS_NUM_TABLES; i++) {
+        struct ind_ovs_table *table = &ind_ovs_tables[i];
+        memset(table, 0, sizeof(*table));
+        snprintf(table->name, sizeof(table->name), "Table %d", i);
+        table->max_flows = 16384; /* XXX */
+        table->ft = flowtable_create();
+        if (table->ft == NULL) {
+            abort();
+        }
     }
 
     aim_ratelimiter_init(&ind_ovs_pktin_limiter, PKTIN_INTERVAL,
@@ -711,7 +763,10 @@ ind_ovs_fwd_finish(void)
     /* Hold this forever. */
     ind_ovs_fwd_write_lock();
 
-    flowtable_destroy(ind_ovs_ft);
+    for (i = 0; i < IND_OVS_NUM_TABLES; i++) {
+        struct ind_ovs_table *table = &ind_ovs_tables[i];
+        flowtable_destroy(table->ft);
+    }
 
     /* Free all the flows */
     for (i = 0; i < ARRAY_SIZE(ind_ovs_flow_id_buckets); i++) {

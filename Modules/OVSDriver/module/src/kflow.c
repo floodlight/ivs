@@ -26,6 +26,7 @@
 
 static struct list_head ind_ovs_kflows;
 static struct list_head ind_ovs_kflow_buckets[NUM_KFLOW_BUCKETS];
+static struct ind_ovs_fwd_result ind_ovs_kflow_fwd_result;
 
 static inline uint32_t
 key_hash(const struct nlattr *key)
@@ -34,9 +35,7 @@ key_hash(const struct nlattr *key)
 }
 
 indigo_error_t
-ind_ovs_kflow_add(struct ind_ovs_flow *flow,
-                  const struct nlattr *key,
-                  const struct nlattr *actions)
+ind_ovs_kflow_add(const struct nlattr *key)
 {
     /* Check input port accounting */
     struct nlattr *in_port_attr = nla_find(nla_data(key), nla_len(key), OVS_KEY_ATTR_IN_PORT);
@@ -71,16 +70,37 @@ ind_ovs_kflow_add(struct ind_ovs_flow *flow,
         }
     }
 
-    struct ind_ovs_kflow *kflow = malloc(ALIGN8(sizeof(*kflow) + key->nla_len) +
-                                         sizeof(struct ind_ovs_flow *));
+    struct ind_ovs_parsed_key pkey;
+    ind_ovs_parse_key((struct nlattr *)key, &pkey);
+
+    struct ind_ovs_fwd_result *result = &ind_ovs_kflow_fwd_result;
+    ind_ovs_fwd_result_reset(result);
+
+    indigo_error_t err = ind_ovs_fwd_process(&pkey, result);
+    if (err < 0) {
+        /* Flow was deleted after the BH request was queued. */
+        return err;
+    }
+
+    struct ind_ovs_kflow *kflow = malloc(sizeof(*kflow) + key->nla_len);
     if (kflow == NULL) {
         return INDIGO_ERROR_RESOURCE;
     }
 
     struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_NEW);
     nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(key), nla_data(key));
-    nla_put(msg, OVS_FLOW_ATTR_ACTIONS, nla_len(actions), nla_data(actions));
+
+    struct nlattr *actions = nla_nest_start(msg, OVS_FLOW_ATTR_ACTIONS);
+    ind_ovs_translate_actions(&pkey, &result->actions, msg);
+    ind_ovs_nla_nest_end(msg, actions);
+
+    /* Copy actions before ind_ovs_transact() frees msg */
+    kflow->actions = malloc(nla_len(actions));
+    memcpy(kflow->actions, nla_data(actions), nla_len(actions));
+    kflow->actions_len = nla_len(actions);
+
     if (ind_ovs_transact(msg) < 0) {
+        free(kflow->actions);
         free(kflow);
         return INDIGO_ERROR_UNKNOWN;
     }
@@ -90,13 +110,12 @@ ind_ovs_kflow_add(struct ind_ovs_flow *flow,
     kflow->stats.packets = 0;
     kflow->stats.bytes = 0;
 
-    kflow->actions = malloc(nla_len(actions));
-    memcpy(kflow->actions, nla_data(actions), nla_len(actions));
-
     memcpy(kflow->key, key, key->nla_len);
 
-    kflow->num_flows = 1;
-    ind_ovs_kflow_flows(kflow)[0] = flow;
+    kflow->num_stats_ptrs = result->num_stats_ptrs;
+    kflow->stats_ptrs = aim_memdup(
+        result->stats_ptrs,
+        result->num_stats_ptrs * sizeof(*result->stats_ptrs));
 
     list_push(&ind_ovs_kflows, &kflow->global_links);
     list_push(bucket, &kflow->bucket_links);
@@ -135,10 +154,10 @@ ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow)
 
         if (packet_diff > 0 || byte_diff > 0) {
             int i;
-            struct ind_ovs_flow **flows = ind_ovs_kflow_flows(kflow);
-            for (i = 0; i < kflow->num_flows; i++) {
-                __sync_fetch_and_add(&flows[i]->stats.packets, packet_diff);
-                __sync_fetch_and_add(&flows[i]->stats.bytes, byte_diff);
+            for (i = 0; i < kflow->num_stats_ptrs; i++) {
+                struct ind_ovs_flow_stats *stats_ptr = kflow->stats_ptrs[i];
+                __sync_fetch_and_add(&stats_ptr->packets, packet_diff);
+                __sync_fetch_and_add(&stats_ptr->bytes, byte_diff);
             }
 
             kflow->stats.packets = stats->n_packets;
@@ -187,6 +206,7 @@ ind_ovs_kflow_delete(struct ind_ovs_kflow *kflow)
     list_remove(&kflow->global_links);
     list_remove(&kflow->bucket_links);
     free(kflow->actions);
+    free(kflow->stats_ptrs);
     free(kflow);
 }
 
@@ -200,28 +220,33 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key(kflow->key, &pkey);
 
-    /* Lookup the flow in the userspace flowtable. */
-    struct ind_ovs_flow *flow;
-    if (ind_ovs_lookup_flow(&pkey, &flow) != 0) {
+    struct ind_ovs_fwd_result *result = &ind_ovs_kflow_fwd_result;
+    ind_ovs_fwd_result_reset(result);
+
+    indigo_error_t err = ind_ovs_fwd_process(&pkey, result);
+    if (err < 0) {
         ind_ovs_kflow_delete(kflow);
         return;
     }
 
-    if (flow != ind_ovs_kflow_flows(kflow)[0]) {
+    size_t stats_ptrs_len = result->num_stats_ptrs * sizeof(*result->stats_ptrs);
+    if (result->num_stats_ptrs != kflow->num_stats_ptrs ||
+            memcmp(result->stats_ptrs, kflow->stats_ptrs, stats_ptrs_len)) {
         /* Synchronize stats to previous OpenFlow flow */
         ind_ovs_kflow_sync_stats(kflow);
+        if (result->num_stats_ptrs != kflow->num_stats_ptrs) {
+            kflow->stats_ptrs = realloc(kflow->stats_ptrs, stats_ptrs_len);
+        }
+        memcpy(kflow->stats_ptrs, result->stats_ptrs, stats_ptrs_len);
     }
 
     struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_SET);
 
     nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(kflow->key), nla_data(kflow->key));
 
-    ind_ovs_translate_actions(&pkey, &flow->effects.apply_actions,
-                              msg, OVS_FLOW_ATTR_ACTIONS);
-
-    struct nlattr *actions = nlmsg_find_attr(nlmsg_hdr(msg),
-        sizeof(struct genlmsghdr) + sizeof(struct ovs_header),
-        OVS_FLOW_ATTR_ACTIONS);
+    struct nlattr *actions = nla_nest_start(msg, OVS_FLOW_ATTR_ACTIONS);
+    ind_ovs_translate_actions(&pkey, &result->actions, msg);
+    ind_ovs_nla_nest_end(msg, actions);
 
     if (nla_len(actions) != kflow->actions_len ||
             memcmp(nla_data(actions), kflow->actions, nla_len(actions))) {
@@ -231,11 +256,10 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
         }
         kflow->actions = realloc(kflow->actions, nla_len(actions));
         memcpy(kflow->actions, nla_data(actions), nla_len(actions));
+        kflow->actions_len = nla_len(actions);
     } else {
         ind_ovs_nlmsg_freelist_free(msg);
     }
-
-    ind_ovs_kflow_flows(kflow)[0] = flow;
 }
 
 /*
@@ -302,4 +326,6 @@ ind_ovs_kflow_module_init(void)
     for (i = 0; i < NUM_KFLOW_BUCKETS; i++) {
         list_init(&ind_ovs_kflow_buckets[i]);
     }
+
+    ind_ovs_fwd_result_init(&ind_ovs_kflow_fwd_result);
 }

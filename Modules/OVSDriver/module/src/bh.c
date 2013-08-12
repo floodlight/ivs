@@ -65,20 +65,18 @@ static pthread_mutex_t ind_ovs_bh_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /* TODO figure out interaction with flow-mods, need a generation counter? */
 void
-ind_ovs_bh_request_kflow(struct nlattr *key, struct nlattr *actions)
+ind_ovs_bh_request_kflow(struct nlattr *key)
 {
     int key_size = nla_total_size(nla_len(key));
-    int actions_size = nla_total_size(nla_len(actions));
-    struct ind_ovs_bh_request *req = malloc(sizeof(*req) + key_size + actions_size);
+    struct ind_ovs_bh_request *req = malloc(sizeof(*req) + key_size);
     if (req == NULL) {
         LOG_ERROR("failed to allocate bottom-half request");
         return;
     }
 
     req->type = IND_OVS_BH_REQUEST_KFLOW;
-    req->len = key_size + actions_size;
+    req->len = key_size;
     memcpy(req->attr_head, key, key_size);
-    memcpy(((void *)(req->attr_head)) + key_size, actions, actions_size);
 
     ind_ovs_bh_enqueue(req);
 }
@@ -153,24 +151,8 @@ ind_ovs_bh_run()
         assert(ret == 0);
         if (req->type == IND_OVS_BH_REQUEST_KFLOW) {
             struct nlattr *key = attrs[OVS_PACKET_ATTR_KEY];
-            struct nlattr *actions = attrs[OVS_PACKET_ATTR_ACTIONS];
-
-            struct ind_ovs_parsed_key pkey;
-            ind_ovs_parse_key(key, &pkey);
-
-            struct ind_ovs_cfr cfr;
-            ind_ovs_key_to_cfr(&pkey, &cfr);
-
-            /* Lookup the flow in the userspace flowtable. */
-            struct flowtable_entry *fte =
-                flowtable_match(ind_ovs_ft, (struct flowtable_key *)&cfr);
-            if (fte != NULL) {
-                struct ind_ovs_flow *flow = container_of(fte, fte, struct ind_ovs_flow);
-                if (ind_ovs_kflow_add(flow, key, actions) < 0) {
-                    LOG_ERROR("Failed to insert kernel flow");
-                }
-            } else {
-                LOG_ERROR("Failed to find flow");
+            if (ind_ovs_kflow_add(key) < 0) {
+                LOG_ERROR("Failed to insert kernel flow");
             }
         } else if (req->type == IND_OVS_BH_REQUEST_PKTIN) {
             struct nlattr *packet = attrs[OVS_PACKET_ATTR_PACKET];

@@ -38,6 +38,8 @@
 
 #define IND_OVS_MAX_PORTS 1024
 
+#define IND_OVS_NUM_TABLES 16
+
 /*
  * Special pre-created ports.
  */
@@ -255,6 +257,8 @@ struct ind_ovs_flow {
 
     /* Modified by of_flow_modify messages */
     struct ind_ovs_flow_effects effects;
+
+    uint8_t table_id;
 };
 
 /*
@@ -262,28 +266,19 @@ struct ind_ovs_flow {
  *
  * A kflow caches the actions for a particular openvswitch flow key. A kflow
  * may use multiple OpenFlow flows while traveling through the pipeline.
- * These are saved in the 'flows' array for stats purposes.
  */
 struct ind_ovs_kflow {
     struct list_links global_links; /* (global) kflows */
     struct list_links bucket_links; /* (global) kflow_buckets[] */
     struct ind_ovs_flow_stats stats; /* periodically synchronized with the kernel */
     uint16_t in_port;
-    uint16_t num_flows; /* size of flows array */
+    uint16_t num_stats_ptrs; /* size of stats_ptrs array */
     uint16_t actions_len; /* length of actions blob */
     uint64_t last_used; /* monotonic time in ms */
     void *actions; /* payload of actions nlattr */
+    struct ind_ovs_flow_stats **stats_ptrs;
     struct nlattr key[0];
-    /* struct ind_ovs_flow *flows[0]; */
 };
-
-static inline struct ind_ovs_flow **
-ind_ovs_kflow_flows(struct ind_ovs_kflow *kflow)
-{
-    /* 'flows' starts at the first 8-byte aligned address after 'key' */
-    size_t offset = ALIGN8(offsetof(struct ind_ovs_kflow, key) + kflow->key->nla_len);
-    return (struct ind_ovs_flow **) ((char *)kflow + offset);
-}
 
 /* Configuration for the bsn_pktin_suppression extension */
 struct ind_ovs_pktin_suppression_cfg {
@@ -292,6 +287,40 @@ struct ind_ovs_pktin_suppression_cfg {
     uint16_t hard_timeout;
     uint16_t priority;
     uint64_t cookie;
+};
+
+/* An OpenFlow table */
+struct ind_ovs_table {
+    struct flowtable *ft;
+    uint32_t num_flows;
+    uint32_t max_flows;
+    struct ind_ovs_flow_stats matched_stats;
+    struct ind_ovs_flow_stats missed_stats;
+    of_table_name_t name;
+};
+
+/*
+ * Result of the forwarding pipeline (ind_ovs_fwd_process)
+ *
+ * See ind_ovs_fwd_result_{init,reset,cleanup}.
+ */
+struct ind_ovs_fwd_result {
+    /*
+     * List of IVS actions.
+     */
+    struct xbuf actions;
+
+    /*
+     * These stats objects may belong to flows or tables (and in the future
+     * meters or groups). For example, every table a packet matched in will
+     * have its matched_stats field added here.
+     *
+     * This is sized at 2x the number of tables because each table can
+     * contribute a table stats and flow stats entry. This will have to
+     * change when we add meters and groups.
+     */
+    int num_stats_ptrs;
+    struct ind_ovs_flow_stats *stats_ptrs[IND_OVS_NUM_TABLES*2];
 };
 
 /* Internal functions */
@@ -303,7 +332,7 @@ void ind_ovs_parse_key(struct nlattr *key, struct ind_ovs_parsed_key *pkey);
 indigo_error_t ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf);
 
 /* Translate IVS actions into OVS actions */
-void ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey, struct xbuf *actions, struct nl_msg *msg, int attr_type);
+void ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey, struct xbuf *actions, struct nl_msg *msg);
 
 /* Translate an OVS key into an OpenFlow match object */
 void ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey, of_match_t *match);
@@ -317,7 +346,10 @@ void ind_ovs_match_to_cfr(const of_match_t *match, struct ind_ovs_cfr *cfr, stru
 /* Internal interfaces to the forwarding module */
 indigo_error_t ind_ovs_fwd_init(void);
 void ind_ovs_fwd_finish(void);
-indigo_error_t ind_ovs_lookup_flow(const struct ind_ovs_parsed_key *pkey, struct ind_ovs_flow **flow);
+indigo_error_t ind_ovs_fwd_process(const struct ind_ovs_parsed_key *pkey, struct ind_ovs_fwd_result *result);
+void ind_ovs_fwd_result_init(struct ind_ovs_fwd_result *result);
+void ind_ovs_fwd_result_reset(struct ind_ovs_fwd_result *result);
+void ind_ovs_fwd_result_cleanup(struct ind_ovs_fwd_result *result);
 indigo_error_t ind_fwd_pkt_in(of_port_no_t of_port_num, uint8_t *data, unsigned int len, unsigned reason, of_match_t *match);
 
 /*
@@ -336,7 +368,7 @@ void ind_ovs_fwd_write_lock();
 void ind_ovs_fwd_write_unlock();
 
 /* Management of the kernel flow table */
-indigo_error_t ind_ovs_kflow_add(struct ind_ovs_flow *flow, const struct nlattr *key, const struct nlattr *actions);
+indigo_error_t ind_ovs_kflow_add(const struct nlattr *key);
 void ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow);
 void ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow);
 void ind_ovs_kflow_invalidate_all(void);
@@ -360,7 +392,7 @@ void ind_ovs_upcall_quiesce(struct ind_ovs_port *port);
 
 /* Interface of the bottom-half submodule */
 void ind_ovs_bh_init();
-void ind_ovs_bh_request_kflow(struct nlattr *key, struct nlattr *actions);
+void ind_ovs_bh_request_kflow(struct nlattr *key);
 void ind_ovs_bh_request_pktin(uint32_t in_port, struct nlattr *packet, struct nlattr *key, int reason);
 
 /* Interface of the multicast submodule */
@@ -391,6 +423,7 @@ uint64_t monotonic_us(void);
 struct nl_sock *ind_ovs_create_nlsock(void);
 struct nl_msg* ind_ovs_create_nlmsg(int family, int cmd);
 struct nl_msg *ind_ovs_recv_nlmsg(struct nl_sock *sk);
+void ind_ovs_nla_nest_end(struct nl_msg *msg, struct nlattr *start);
 void ind_ovs_nlmsg_freelist_init(void);
 void ind_ovs_nlmsg_freelist_finish(void);
 struct nl_msg *ind_ovs_nlmsg_freelist_alloc(void);
@@ -438,9 +471,9 @@ extern uint32_t ind_ovs_salt;
 extern int ind_ovs_version;
 
 /*
- * Flowtable. Protected by ind_ovs_fwd_{read,write}_{lock,unlock}.
+ * OpenFlow tables. Protected by ind_ovs_fwd_{read,write}_{lock,unlock}.
  */
-extern struct flowtable *ind_ovs_ft;
+struct ind_ovs_table ind_ovs_tables[IND_OVS_NUM_TABLES];
 
 /*
  * Configuration for the bsn_pktin_suppression extension.
