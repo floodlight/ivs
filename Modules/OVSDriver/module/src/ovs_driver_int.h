@@ -329,7 +329,7 @@ struct ind_ovs_fwd_result {
 void ind_ovs_parse_key(struct nlattr *key, struct ind_ovs_parsed_key *pkey);
 
 /* Translate OpenFlow actions into IVS actions */
-indigo_error_t ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf);
+indigo_error_t ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf, bool table_miss);
 
 /* Translate IVS actions into OVS actions */
 void ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey, struct xbuf *actions, struct nl_msg *msg);

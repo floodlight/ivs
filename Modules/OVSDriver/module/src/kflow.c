@@ -235,6 +235,7 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
         /* Synchronize stats to previous OpenFlow flow */
         ind_ovs_kflow_sync_stats(kflow);
         if (result->num_stats_ptrs != kflow->num_stats_ptrs) {
+            kflow->num_stats_ptrs = result->num_stats_ptrs;
             kflow->stats_ptrs = realloc(kflow->stats_ptrs, stats_ptrs_len);
         }
         memcpy(kflow->stats_ptrs, result->stats_ptrs, stats_ptrs_len);

@@ -18,6 +18,7 @@
  ****************************************************************/
 
 #include "ovs_driver_int.h"
+#include "actions.h"
 #include <unistd.h>
 #include <indigo/memory.h>
 #include <indigo/forwarding.h>
@@ -123,7 +124,7 @@ ind_ovs_flow_lookup(indigo_cookie_t flow_id)
 
 static indigo_error_t
 init_effects(struct ind_ovs_flow_effects *effects,
-             of_flow_modify_t *flow_mod)
+             of_flow_modify_t *flow_mod, bool table_miss)
 {
     of_list_action_t openflow_actions;
     indigo_error_t err;
@@ -138,7 +139,8 @@ init_effects(struct ind_ovs_flow_effects *effects,
     if (flow_mod->version == OF_VERSION_1_0) {
         of_flow_modify_actions_bind(flow_mod, &openflow_actions);
         if ((err = ind_ovs_translate_openflow_actions(&openflow_actions,
-                                                      &effects->apply_actions)) < 0) {
+                                                      &effects->apply_actions,
+                                                      table_miss)) < 0) {
             return err;
         }
     } else {
@@ -156,7 +158,8 @@ init_effects(struct ind_ovs_flow_effects *effects,
                 of_instruction_apply_actions_actions_bind(&inst.apply_actions,
                                                           &openflow_actions);
                 if ((err = ind_ovs_translate_openflow_actions(&openflow_actions,
-                                                              &effects->apply_actions)) < 0) {
+                                                              &effects->apply_actions,
+                                                              table_miss)) < 0) {
                     return err;
                 }
                 break;
@@ -164,7 +167,8 @@ init_effects(struct ind_ovs_flow_effects *effects,
                 of_instruction_write_actions_actions_bind(&inst.write_actions,
                                                           &openflow_actions);
                 if ((err = ind_ovs_translate_openflow_actions(&openflow_actions,
-                                                              &effects->write_actions)) < 0) {
+                                                              &effects->write_actions,
+                                                              table_miss)) < 0) {
                     return err;
                 }
                 break;
@@ -199,6 +203,15 @@ cleanup_effects(struct ind_ovs_flow_effects *effects)
 {
     xbuf_cleanup(&effects->apply_actions);
     xbuf_cleanup(&effects->write_actions);
+}
+
+static bool
+is_table_miss(int version, const struct ind_ovs_cfr *mask, uint16_t priority)
+{
+    static struct ind_ovs_cfr table_miss_mask; /* all zeroes */
+    return version >= OF_VERSION_1_3 &&
+           priority == 0 &&
+           memcmp(mask, &table_miss_mask, sizeof(table_miss_mask)) == 0;
 }
 
 /** \brief Create a flow */
@@ -242,12 +255,14 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
     uint16_t priority;
     of_flow_add_priority_get(flow_add, &priority);
 
+    bool table_miss = is_table_miss(flow_add->version, &masks, priority);
+
     flowtable_entry_init(&flow->fte,
                          (struct flowtable_key *)&fields,
                          (struct flowtable_key *)&masks,
                          priority);
 
-    if ((result = init_effects(&flow->effects, flow_add)) < 0) {
+    if ((result = init_effects(&flow->effects, flow_add, table_miss)) < 0) {
         goto done;
     }
 
@@ -307,8 +322,12 @@ indigo_fwd_flow_modify(indigo_cookie_t flow_id,
 
     LOG_TRACE("Flow modify called\n");
 
+    bool table_miss = is_table_miss(flow_modify->version,
+                                    (struct ind_ovs_cfr *)&flow->fte.mask,
+                                    flow->fte.priority);
+
     struct ind_ovs_flow_effects effects, old_effects;
-    if ((result = init_effects(&effects, flow_modify)) < 0) {
+    if ((result = init_effects(&effects, flow_modify, table_miss)) < 0) {
         cleanup_effects(&effects);
         goto done;
     }
@@ -545,7 +564,11 @@ ind_ovs_fwd_process(const struct ind_ovs_parsed_key *pkey,
         fte = flowtable_match(table->ft, (struct flowtable_key *)&cfr);
         if (fte == NULL) {
             result->stats_ptrs[result->num_stats_ptrs++] = &table->missed_stats;
-            return INDIGO_ERROR_NOT_FOUND;
+            if (ind_ovs_version < OF_VERSION_1_3) {
+                uint8_t reason = OF_PACKET_IN_REASON_NO_MATCH;
+                xbuf_append_attr(&result->actions, IND_OVS_ACTION_CONTROLLER, &reason, sizeof(reason));
+            }
+            break;
         }
 
         struct ind_ovs_flow *flow = container_of(fte, fte, struct ind_ovs_flow);
@@ -669,7 +692,7 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
     /* Add the real actions generated from the kernel's flow key */
     struct xbuf xbuf;
     xbuf_init(&xbuf);
-    ind_ovs_translate_openflow_actions(of_list_action, &xbuf);
+    ind_ovs_translate_openflow_actions(of_list_action, &xbuf, false);
     struct nlattr *actions_attr = nla_nest_start(msg, OVS_PACKET_ATTR_ACTIONS);
     ind_ovs_translate_actions(&pkey, &xbuf, msg);
     ind_ovs_nla_nest_end(msg, actions_attr);

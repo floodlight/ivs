@@ -20,6 +20,7 @@
 #pragma GCC optimize (4)
 #define AIM_CONFIG_INCLUDE_GNU_SOURCE 1
 #include "ovs_driver_int.h"
+#include "actions.h"
 #include "indigo/forwarding.h"
 #include "indigo/port_manager.h"
 #include "indigo/of_state_manager.h"
@@ -247,7 +248,7 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     struct ind_ovs_fwd_result *result = &thread->result;
     ind_ovs_fwd_result_reset(result);
     indigo_error_t err = ind_ovs_fwd_process(&pkey, result);
-    if (err < 0 && err != INDIGO_ERROR_NOT_FOUND) {
+    if (err < 0) {
         return;
     }
 
@@ -258,9 +259,23 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
         __sync_fetch_and_add(&stats->bytes, nla_len(packet));
     }
 
-    if (err == INDIGO_ERROR_NOT_FOUND) {
-        ind_ovs_upcall_request_pktin(pkey.in_port, port, packet, key, OF_PACKET_IN_REASON_NO_MATCH);
-        return;
+    /* Check for a single controller action */
+    {
+        uint32_t actions_length = xbuf_length(&result->actions);
+        struct nlattr *first_action = xbuf_data(&result->actions);
+        if (actions_length >= NLA_HDRLEN &&
+                actions_length == NLA_ALIGN(first_action->nla_len) &&
+                first_action->nla_type == IND_OVS_ACTION_CONTROLLER) {
+            /*
+             * The only action is sending the packet to the controller.
+             * It's wasteful to send it all the way through the kernel
+             * to be received as another upcall, so request a pktin
+             * directly here.
+             */
+            uint8_t reason = *XBUF_PAYLOAD(first_action, uint8_t);
+            ind_ovs_upcall_request_pktin(pkey.in_port, port, packet, key, reason);
+            return;
+        }
     }
 
     /* Reuse the incoming message for the packet execute */
@@ -298,13 +313,16 @@ ind_ovs_handle_packet_action(struct ind_ovs_upcall_thread *thread,
 {
     struct nlattr *key = attrs[OVS_PACKET_ATTR_KEY];
     struct nlattr *packet = attrs[OVS_PACKET_ATTR_PACKET];
-    assert(key && packet);
+    struct nlattr *userdata = attrs[OVS_PACKET_ATTR_USERDATA];
+    assert(key && packet && userdata);
 
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key(key, &pkey);
 
+    uint8_t reason = (uint8_t)nla_get_u64(userdata);
+
     /* Send packet-in to controller */
-    ind_ovs_upcall_request_pktin(pkey.in_port, port, packet, key, OF_PACKET_IN_REASON_ACTION);
+    ind_ovs_upcall_request_pktin(pkey.in_port, port, packet, key, reason);
 }
 
 static void
