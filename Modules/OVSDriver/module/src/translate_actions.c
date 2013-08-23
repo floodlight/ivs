@@ -215,10 +215,6 @@ ind_ovs_action_set_ipv4_src(struct nlattr *attr, struct translate_context *ctx)
     }
 }
 
-#define IP_DSCP_MASK 0xfc
-#define IP_ECN_MASK 0x03
-#define IPV6_FLABEL_MASK 0x000fffff
-
 static void
 ind_ovs_action_set_ip_dscp(struct nlattr *attr, struct translate_context *ctx)
 {

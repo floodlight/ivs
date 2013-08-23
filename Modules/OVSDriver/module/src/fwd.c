@@ -539,6 +539,68 @@ ind_fwd_pkt_in(of_port_no_t in_port,
 }
 
 /*
+ * Scan actions list for field modifications and update the CFR accordingly
+ */
+void
+ind_ovs_fwd_update_cfr(struct ind_ovs_cfr *cfr, struct xbuf *actions)
+{
+    struct nlattr *attr;
+    XBUF_FOREACH(xbuf_data(actions), xbuf_length(actions), attr) {
+        switch (attr->nla_type) {
+        case IND_OVS_ACTION_SET_ETH_DST:
+            memcpy(&cfr->dl_dst, xbuf_payload(attr), sizeof(cfr->dl_dst));
+            break;
+        case IND_OVS_ACTION_SET_ETH_SRC:
+            memcpy(&cfr->dl_src, xbuf_payload(attr), sizeof(cfr->dl_src));
+            break;
+        case IND_OVS_ACTION_SET_IPV4_DST:
+            cfr->nw_dst = *XBUF_PAYLOAD(attr, uint32_t);
+            break;
+        case IND_OVS_ACTION_SET_IPV4_SRC:
+            cfr->nw_src = *XBUF_PAYLOAD(attr, uint32_t);
+            break;
+        case IND_OVS_ACTION_SET_IP_DSCP:
+            cfr->nw_tos &= ~IP_DSCP_MASK;
+            cfr->nw_tos |= *XBUF_PAYLOAD(attr, uint8_t);
+            break;
+        case IND_OVS_ACTION_SET_IP_ECN:
+            cfr->nw_tos &= ~IP_ECN_MASK;
+            cfr->nw_tos |= *XBUF_PAYLOAD(attr, uint8_t);
+            break;
+        case IND_OVS_ACTION_SET_TCP_DST:
+        case IND_OVS_ACTION_SET_UDP_DST:
+        case IND_OVS_ACTION_SET_TP_DST:
+            cfr->tp_dst = *XBUF_PAYLOAD(attr, uint16_t);
+            break;
+        case IND_OVS_ACTION_SET_TCP_SRC:
+        case IND_OVS_ACTION_SET_UDP_SRC:
+        case IND_OVS_ACTION_SET_TP_SRC:
+            cfr->tp_src = *XBUF_PAYLOAD(attr, uint16_t);
+            break;
+        case IND_OVS_ACTION_SET_VLAN_VID: {
+            uint16_t vlan_vid = *XBUF_PAYLOAD(attr, uint16_t);
+            cfr->dl_vlan = htons(VLAN_TCI(vlan_vid, VLAN_PCP(ntohs(cfr->dl_vlan))) | VLAN_CFI_BIT);
+            break;
+        }
+        case IND_OVS_ACTION_SET_VLAN_PCP: {
+            uint8_t vlan_pcp = *XBUF_PAYLOAD(attr, uint8_t);
+            cfr->dl_vlan = htons(VLAN_TCI(VLAN_VID(ntohs(cfr->dl_vlan)), vlan_pcp) | VLAN_CFI_BIT);
+            break;
+        }
+        case IND_OVS_ACTION_SET_IPV6_DST:
+            memcpy(&cfr->ipv6_dst, xbuf_payload(attr), sizeof(cfr->ipv6_dst));
+            break;
+        case IND_OVS_ACTION_SET_IPV6_SRC:
+            memcpy(&cfr->ipv6_src, xbuf_payload(attr), sizeof(cfr->ipv6_src));
+            break;
+        /* Not implemented: IND_OVS_ACTION_SET_IPV6_FLABEL */
+        default:
+            break;
+        }
+    }
+}
+
+/*
  * Send a packet through the forwarding pipeline.
  *
  * 'result' should be initialized with ind_ovs_fwd_result_init.
@@ -580,6 +642,10 @@ ind_ovs_fwd_process(const struct ind_ovs_parsed_key *pkey,
                     xbuf_length(&flow->effects.apply_actions));
 
         table_id = flow->effects.next_table_id;
+
+        if (table_id != (uint8_t)-1) {
+            ind_ovs_fwd_update_cfr(&cfr, &flow->effects.apply_actions);
+        }
     }
 
     return INDIGO_ERROR_NONE;

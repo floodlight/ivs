@@ -108,6 +108,10 @@
 /* Same as VLAN_TCI above except the vid includes the CFI bit */
 #define VLAN_TCI_WITH_CFI(vid, pcp) ( (((pcp) & 0x7) << 13) | ((vid) & 0x1fff) )
 
+#define IP_DSCP_MASK 0xfc
+#define IP_ECN_MASK 0x03
+#define IPV6_FLABEL_MASK 0x000fffff
+
 
 /* Internal datastructures */
 
