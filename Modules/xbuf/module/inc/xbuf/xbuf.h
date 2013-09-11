@@ -227,6 +227,17 @@ xbuf_end_nest(struct xbuf *xbuf, uint32_t offset)
          (_attr) = (struct nlattr *)((char *)(_attr) + NLA_ALIGN((_attr)->nla_len)))
 
 /**
+ * Iterate over attributes (simplified)
+ *
+ * '_xbuf' is evaluated multiple times so it should be free of side effects.
+ * '_attr' should be a 'struct nlattr *' lvalue.
+ */
+#define XBUF_FOREACH2(_xbuf, _attr) \
+    for ((_attr) = (struct nlattr *)((_xbuf)->data); \
+         (char *)(_attr) < (char *)((_xbuf)->data) + (_xbuf)->length; \
+         (_attr) = (struct nlattr *)((char *)(_attr) + NLA_ALIGN((_attr)->nla_len)))
+
+/**
  * Iterate over child attributes
  *
  * '_parent' should be a 'struct nlattr *'. '_attr' is as in XBUF_FOREACH.
