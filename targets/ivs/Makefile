@@ -86,7 +86,7 @@ MODULEMANIFEST := $(INDIGO)/Modules/Manifest.mk
 # Set the modules we want to automatically build for this binary
 #
 DEPENDMODULES := SocketManager OFConnectionManager OFStateManager OVSDriver \
-                 Configuration loci indigo BigList flowtable xbuf \
+                 Configuration loci indigo BigList pipeline flowtable xbuf \
                  AIM murmur cjson
 
 ifdef USE_LUAJIT
