@@ -248,9 +248,12 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key(key, &pkey);
 
+    struct ind_ovs_cfr cfr;
+    ind_ovs_key_to_cfr(&pkey, &cfr);
+
     struct ind_ovs_fwd_result *result = &thread->result;
     ind_ovs_fwd_result_reset(result);
-    indigo_error_t err = pipeline_process(thread->pipeline, &pkey, result);
+    indigo_error_t err = pipeline_process(thread->pipeline, &cfr, result);
     if (err < 0) {
         return;
     }

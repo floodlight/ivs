@@ -51,17 +51,14 @@ pipeline_destroy(struct pipeline *pipeline)
 
 indigo_error_t
 pipeline_process(struct pipeline *pipeline,
-                 const struct ind_ovs_parsed_key *pkey,
+                 struct ind_ovs_cfr *cfr,
                  struct ind_ovs_fwd_result *result)
 {
     uint8_t table_id = 0;
 
-    struct ind_ovs_cfr cfr;
-    ind_ovs_key_to_cfr(pkey, &cfr);
-
     while (table_id != (uint8_t)-1) {
         struct ind_ovs_flow_effects *effects =
-            pipeline->lookup(table_id, &cfr, result, true);
+            pipeline->lookup(table_id, cfr, result, true);
         if (effects == NULL) {
             if (pipeline->openflow_version < OF_VERSION_1_3) {
                 uint8_t reason = OF_PACKET_IN_REASON_NO_MATCH;
@@ -76,7 +73,7 @@ pipeline_process(struct pipeline *pipeline,
         table_id = effects->next_table_id;
 
         if (table_id != (uint8_t)-1) {
-            ind_ovs_fwd_update_cfr(&cfr, &effects->apply_actions);
+            ind_ovs_fwd_update_cfr(cfr, &effects->apply_actions);
         }
     }
 

@@ -28,7 +28,6 @@
 #include "indigo/error.h"
 
 struct pipeline;
-struct ind_ovs_parsed_key;
 struct ind_ovs_fwd_result;
 struct ind_ovs_cfr;
 
@@ -49,7 +48,7 @@ void pipeline_destroy(struct pipeline *pipeline);
  */
 indigo_error_t
 pipeline_process(struct pipeline *pipeline,
-                 const struct ind_ovs_parsed_key *pkey,
+                 struct ind_ovs_cfr *cfr,
                  struct ind_ovs_fwd_result *result);
 
 #endif
