@@ -330,5 +330,6 @@ ind_ovs_kflow_module_init(void)
     }
 
     ind_ovs_fwd_result_init(&ind_ovs_kflow_fwd_result);
-    ind_ovs_kflow_pipeline = pipeline_create(ind_ovs_fwd_pipeline_lookup);
+    ind_ovs_kflow_pipeline =
+        pipeline_create(ind_ovs_version, ind_ovs_fwd_pipeline_lookup);
 }

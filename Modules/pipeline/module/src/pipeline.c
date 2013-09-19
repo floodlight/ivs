@@ -25,18 +25,20 @@
 #include "../../../OVSDriver/module/src/ovs_driver_int.h"
 
 struct pipeline {
+    int openflow_version;
     pipeline_lookup_f lookup;
 };
 
 void ind_ovs_fwd_update_cfr(struct ind_ovs_cfr *cfr, struct xbuf *actions);
 
 struct pipeline *
-pipeline_create(pipeline_lookup_f lookup)
+pipeline_create(int openflow_version, pipeline_lookup_f lookup)
 {
     struct pipeline *pipeline = malloc(sizeof(*pipeline));
     if (pipeline == NULL) {
         AIM_DIE("failed to allocate pipeline");
     }
+    pipeline->openflow_version = openflow_version;
     pipeline->lookup = lookup;
     return pipeline;
 }
@@ -61,7 +63,7 @@ pipeline_process(struct pipeline *pipeline,
         struct ind_ovs_flow_effects *effects =
             pipeline->lookup(table_id, &cfr, result, true);
         if (effects == NULL) {
-            if (ind_ovs_version < OF_VERSION_1_3) {
+            if (pipeline->openflow_version < OF_VERSION_1_3) {
                 uint8_t reason = OF_PACKET_IN_REASON_NO_MATCH;
                 xbuf_append_attr(&result->actions, IND_OVS_ACTION_CONTROLLER, &reason, sizeof(reason));
             }

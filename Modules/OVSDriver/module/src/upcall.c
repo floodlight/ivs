@@ -497,7 +497,8 @@ ind_ovs_upcall_init(void)
             thread->msgvec[j].msg_hdr.msg_iovlen = 1;
         }
 
-        thread->pipeline = pipeline_create(ind_ovs_fwd_pipeline_lookup);
+        thread->pipeline =
+            pipeline_create(ind_ovs_version, ind_ovs_fwd_pipeline_lookup);
 
         if (pthread_create(&thread->pthread, NULL,
                         ind_ovs_upcall_thread_main, thread) < 0) {

@@ -39,7 +39,7 @@ typedef struct ind_ovs_flow_effects *(* pipeline_lookup_f)(
         int table_id, struct ind_ovs_cfr *cfr,
         struct ind_ovs_fwd_result *result, bool update_stats);
 
-struct pipeline *pipeline_create(pipeline_lookup_f lookup);
+struct pipeline *pipeline_create(int openflow_version, pipeline_lookup_f lookup);
 void pipeline_destroy(struct pipeline *pipeline);
 
 /*
