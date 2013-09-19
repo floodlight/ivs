@@ -19,10 +19,11 @@
 
 #include <pipeline/pipeline.h>
 #include <stdlib.h>
+#include <arpa/inet.h>
 
-/* HACK */
-#include "../../../OVSDriver/module/src/actions.h"
-#include "../../../OVSDriver/module/src/ovs_driver_int.h"
+#include <ivs/ivs.h>
+#include <ivs/actions.h>
+#include <loci/loci.h>
 
 struct pipeline {
     int openflow_version;

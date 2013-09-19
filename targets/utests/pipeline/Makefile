@@ -27,7 +27,7 @@
 MODULE := pipeline_utest
 NOMODULEMAKE := 1
 TEST_MODULE :=  pipeline
-DEPENDMODULES := AIM indigo xbuf OVSDriver loci flowtable SocketManager OFStateManager murmur cjson Configuration BigList OFConnectionManager
+DEPENDMODULES := AIM indigo xbuf loci ivs_common
 GLOBAL_CFLAGS += -DAIM_CONFIG_INCLUDE_POSIX=1
 GLOBAL_CFLAGS += -DAIM_CONFIG_INCLUDE_MAIN=1
 GLOBAL_CFLAGS += -DINDIGO_LINUX_LOGGING
@@ -39,24 +39,7 @@ GLOBAL_CFLAGS += -DAIM_CONFIG_INCLUDE_MAIN=1
 GLOBAL_CFLAGS += -DAIM_CONFIG_INCLUDE_PVS_SYSLOG=1
 GLOBAL_CFLAGS += -DAIM_CONFIG_LOG_INCLUDE_ENV_VARIABLES=0
 GLOBAL_CFLAGS += -D_BSD_SOURCE
-#OS_MAKE_CONFIG_AUTOSELECT := 1
+OS_MAKE_CONFIG_AUTOSELECT := 1
 #PEDANTIC := 1
-
-# Disable uCLI
-GLOBAL_CFLAGS += $(foreach mod,$(DEPENDMODULES_UPPER),-D$(mod)_CONFIG_INCLUDE_UCLI=0)
-
-
-GLOBAL_LINK_LIBS += -lpthread -lrt -lm
-
-LIBNL_CFLAGS := $(shell pkg-config --cflags libnl-3.0)
-LIBNL_CFLAGS += $(shell pkg-config --cflags --silence-errors libnl-genl-3.0)
-LIBNL_CFLAGS += $(shell pkg-config --cflags --silence-errors libnl-route-3.0)
-LIBNL_LIBS := $(shell pkg-config --libs libnl-3.0)
-LIBNL_LIBS += $(shell pkg-config --libs --silence-errors libnl-genl-3.0)
-LIBNL_LIBS += $(shell pkg-config --libs --silence-errors libnl-route-3.0)
-GLOBAL_CFLAGS += $(LIBNL_CFLAGS)
-GLOBAL_LINK_LIBS += $(LIBNL_LIBS)
-
-GLOBAL_CFLAGS += -I $(ROOT)/openvswitch
 
 include ../make/utestmodule.mk

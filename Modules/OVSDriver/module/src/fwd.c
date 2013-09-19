@@ -18,7 +18,6 @@
  ****************************************************************/
 
 #include "ovs_driver_int.h"
-#include "actions.h"
 #include <unistd.h>
 #include <indigo/memory.h>
 #include <indigo/forwarding.h>

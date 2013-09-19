@@ -20,7 +20,6 @@
 #pragma GCC optimize (4)
 #define AIM_CONFIG_INCLUDE_GNU_SOURCE 1
 #include "ovs_driver_int.h"
-#include "actions.h"
 #include "indigo/forwarding.h"
 #include "indigo/port_manager.h"
 #include "indigo/of_state_manager.h"
