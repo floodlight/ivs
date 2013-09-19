@@ -668,9 +668,8 @@ ind_ovs_fwd_write_unlock(void)
 
 struct ind_ovs_flow_effects *
 ind_ovs_fwd_pipeline_lookup(int table_id, struct ind_ovs_cfr *cfr,
-                            struct pipeline_result *result, bool update_stats)
+                            struct xbuf *stats)
 {
-
     struct ind_ovs_table *table = &ind_ovs_tables[table_id];
 
 #ifndef NDEBUG
@@ -681,17 +680,17 @@ ind_ovs_fwd_pipeline_lookup(int table_id, struct ind_ovs_cfr *cfr,
     struct flowtable_entry *fte = flowtable_match(table->ft,
                                                   (struct flowtable_key *)cfr);
     if (fte == NULL) {
-        if (update_stats) {
-            result->stats_ptrs[result->num_stats_ptrs++] = &table->missed_stats;
+        if (stats != NULL) {
+            xbuf_append_ptr(stats, &table->missed_stats);
         }
         return NULL;
     }
 
     struct ind_ovs_flow *flow = container_of(fte, fte, struct ind_ovs_flow);
 
-    if (update_stats) {
-        result->stats_ptrs[result->num_stats_ptrs++] = &table->matched_stats;
-        result->stats_ptrs[result->num_stats_ptrs++] = &flow->stats;
+    if (stats != NULL) {
+        xbuf_append_ptr(stats, &table->matched_stats);
+        xbuf_append_ptr(stats, &flow->stats);
     }
 
     return &flow->effects;

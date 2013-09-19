@@ -328,7 +328,7 @@ void ind_ovs_match_to_cfr(const of_match_t *match, struct ind_ovs_cfr *cfr, stru
 indigo_error_t ind_ovs_fwd_init(void);
 void ind_ovs_fwd_finish(void);
 indigo_error_t ind_fwd_pkt_in(of_port_no_t of_port_num, uint8_t *data, unsigned int len, unsigned reason, of_match_t *match);
-struct ind_ovs_flow_effects *ind_ovs_fwd_pipeline_lookup(int table_id, struct ind_ovs_cfr *cfr, struct pipeline_result *result, bool update_stats);
+struct ind_ovs_flow_effects *ind_ovs_fwd_pipeline_lookup(int table_id, struct ind_ovs_cfr *cfr, struct xbuf *stats);
 
 /*
  * Synchronization of the flow table between the main thread and upcall

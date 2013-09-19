@@ -258,9 +258,11 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
         return;
     }
 
+    struct ind_ovs_flow_stats **stats_ptrs = xbuf_data(&result->stats);
+    int num_stats_ptrs = xbuf_length(&result->stats) / sizeof(void *);
     int i;
-    for (i = 0; i < result->num_stats_ptrs; i++) {
-        struct ind_ovs_flow_stats *stats = result->stats_ptrs[i];
+    for (i = 0; i < num_stats_ptrs; i++) {
+        struct ind_ovs_flow_stats *stats = stats_ptrs[i];
         __sync_fetch_and_add(&stats->packets, 1);
         __sync_fetch_and_add(&stats->bytes, nla_len(packet));
     }

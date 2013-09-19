@@ -58,7 +58,7 @@ pipeline_process(struct pipeline *pipeline,
 
     while (table_id != (uint8_t)-1) {
         struct ind_ovs_flow_effects *effects =
-            pipeline->lookup(table_id, cfr, result, true);
+            pipeline->lookup(table_id, cfr, &result->stats);
         if (effects == NULL) {
             if (pipeline->openflow_version < OF_VERSION_1_3) {
                 uint8_t reason = OF_PACKET_IN_REASON_NO_MATCH;
@@ -146,7 +146,7 @@ void
 pipeline_result_init(struct pipeline_result *result)
 {
     xbuf_init(&result->actions);
-    result->num_stats_ptrs = 0;
+    xbuf_init(&result->stats);
 }
 
 /* Reinitialize without reallocating memory */
@@ -154,11 +154,12 @@ void
 pipeline_result_reset(struct pipeline_result *result)
 {
     xbuf_reset(&result->actions);
-    result->num_stats_ptrs = 0;
+    xbuf_reset(&result->stats);
 }
 
 void
 pipeline_result_cleanup(struct pipeline_result *result)
 {
     xbuf_cleanup(&result->actions);
+    xbuf_cleanup(&result->stats);
 }
