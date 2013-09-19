@@ -25,18 +25,19 @@
 #include "../../../OVSDriver/module/src/ovs_driver_int.h"
 
 struct pipeline {
-    int unused;
+    pipeline_lookup_f lookup;
 };
 
 void ind_ovs_fwd_update_cfr(struct ind_ovs_cfr *cfr, struct xbuf *actions);
 
 struct pipeline *
-pipeline_create(void)
+pipeline_create(pipeline_lookup_f lookup)
 {
     struct pipeline *pipeline = malloc(sizeof(*pipeline));
     if (pipeline == NULL) {
         AIM_DIE("failed to allocate pipeline");
     }
+    pipeline->lookup = lookup;
     return pipeline;
 }
 
@@ -51,23 +52,15 @@ pipeline_process(struct pipeline *pipeline,
                  const struct ind_ovs_parsed_key *pkey,
                  struct ind_ovs_fwd_result *result)
 {
-    struct flowtable_entry *fte;
     uint8_t table_id = 0;
 
     struct ind_ovs_cfr cfr;
     ind_ovs_key_to_cfr(pkey, &cfr);
 
     while (table_id != (uint8_t)-1) {
-        struct ind_ovs_table *table = &ind_ovs_tables[table_id];
-
-#ifndef NDEBUG
-        LOG_VERBOSE("Looking up flow in %s", table->name);
-        ind_ovs_dump_cfr(&cfr);
-#endif
-
-        fte = flowtable_match(table->ft, (struct flowtable_key *)&cfr);
-        if (fte == NULL) {
-            result->stats_ptrs[result->num_stats_ptrs++] = &table->missed_stats;
+        struct ind_ovs_flow_effects *effects =
+            pipeline->lookup(table_id, &cfr, result, true);
+        if (effects == NULL) {
             if (ind_ovs_version < OF_VERSION_1_3) {
                 uint8_t reason = OF_PACKET_IN_REASON_NO_MATCH;
                 xbuf_append_attr(&result->actions, IND_OVS_ACTION_CONTROLLER, &reason, sizeof(reason));
@@ -75,18 +68,13 @@ pipeline_process(struct pipeline *pipeline,
             break;
         }
 
-        struct ind_ovs_flow *flow = container_of(fte, fte, struct ind_ovs_flow);
+        xbuf_append(&result->actions, xbuf_data(&effects->apply_actions),
+                    xbuf_length(&effects->apply_actions));
 
-        result->stats_ptrs[result->num_stats_ptrs++] = &table->matched_stats;
-        result->stats_ptrs[result->num_stats_ptrs++] = &flow->stats;
-
-        xbuf_append(&result->actions, xbuf_data(&flow->effects.apply_actions),
-                    xbuf_length(&flow->effects.apply_actions));
-
-        table_id = flow->effects.next_table_id;
+        table_id = effects->next_table_id;
 
         if (table_id != (uint8_t)-1) {
-            ind_ovs_fwd_update_cfr(&cfr, &flow->effects.apply_actions);
+            ind_ovs_fwd_update_cfr(&cfr, &effects->apply_actions);
         }
     }
 

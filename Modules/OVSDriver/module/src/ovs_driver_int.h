@@ -355,6 +355,7 @@ void ind_ovs_fwd_result_init(struct ind_ovs_fwd_result *result);
 void ind_ovs_fwd_result_reset(struct ind_ovs_fwd_result *result);
 void ind_ovs_fwd_result_cleanup(struct ind_ovs_fwd_result *result);
 indigo_error_t ind_fwd_pkt_in(of_port_no_t of_port_num, uint8_t *data, unsigned int len, unsigned reason, of_match_t *match);
+struct ind_ovs_flow_effects *ind_ovs_fwd_pipeline_lookup(int table_id, struct ind_ovs_cfr *cfr, struct ind_ovs_fwd_result *result, bool update_stats);
 
 /*
  * Synchronization of the flow table between the main thread and upcall

@@ -687,6 +687,37 @@ ind_ovs_fwd_write_unlock(void)
     pthread_rwlock_unlock(&ind_ovs_fwd_rwlock);
 }
 
+struct ind_ovs_flow_effects *
+ind_ovs_fwd_pipeline_lookup(int table_id, struct ind_ovs_cfr *cfr,
+                            struct ind_ovs_fwd_result *result, bool update_stats)
+{
+
+    struct ind_ovs_table *table = &ind_ovs_tables[table_id];
+
+#ifndef NDEBUG
+    LOG_VERBOSE("Looking up flow in %s", table->name);
+    ind_ovs_dump_cfr(cfr);
+#endif
+
+    struct flowtable_entry *fte = flowtable_match(table->ft,
+                                                  (struct flowtable_key *)cfr);
+    if (fte == NULL) {
+        if (update_stats) {
+            result->stats_ptrs[result->num_stats_ptrs++] = &table->missed_stats;
+        }
+        return NULL;
+    }
+
+    struct ind_ovs_flow *flow = container_of(fte, fte, struct ind_ovs_flow);
+
+    if (update_stats) {
+        result->stats_ptrs[result->num_stats_ptrs++] = &table->matched_stats;
+        result->stats_ptrs[result->num_stats_ptrs++] = &flow->stats;
+    }
+
+    return &flow->effects;
+}
+
 
 /** \brief Intialize */
 

@@ -24,13 +24,22 @@
 #ifndef PIPELINE_H
 #define PIPELINE_H
 
+#include <stdbool.h>
 #include "indigo/error.h"
 
 struct pipeline;
 struct ind_ovs_parsed_key;
 struct ind_ovs_fwd_result;
+struct ind_ovs_cfr;
 
-struct pipeline *pipeline_create(void);
+/*
+ * Function provided to the pipeline to lookup in flowtables.
+ */
+typedef struct ind_ovs_flow_effects *(* pipeline_lookup_f)(
+        int table_id, struct ind_ovs_cfr *cfr,
+        struct ind_ovs_fwd_result *result, bool update_stats);
+
+struct pipeline *pipeline_create(pipeline_lookup_f lookup);
 void pipeline_destroy(struct pipeline *pipeline);
 
 /*
