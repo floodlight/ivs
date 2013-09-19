@@ -24,4 +24,23 @@
 #ifndef PIPELINE_H
 #define PIPELINE_H
 
+#include "indigo/error.h"
+
+struct pipeline;
+struct ind_ovs_parsed_key;
+struct ind_ovs_fwd_result;
+
+struct pipeline *pipeline_create(void);
+void pipeline_destroy(struct pipeline *pipeline);
+
+/*
+ * Send a packet through the pipeline.
+ *
+ * 'result' should be initialized with ind_ovs_fwd_result_init.
+ */
+indigo_error_t
+pipeline_process(struct pipeline *pipeline,
+                 const struct ind_ovs_parsed_key *pkey,
+                 struct ind_ovs_fwd_result *result);
+
 #endif

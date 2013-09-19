@@ -35,6 +35,7 @@
 #include "AIM/aim_utils.h"
 #include "flowtable/flowtable.h"
 #include "xbuf/xbuf.h"
+#include "pipeline/pipeline.h"
 
 #define IND_OVS_MAX_PORTS 1024
 
@@ -304,7 +305,7 @@ struct ind_ovs_table {
 };
 
 /*
- * Result of the forwarding pipeline (ind_ovs_fwd_process)
+ * Result of the forwarding pipeline (ind_ovs_pipeline_process)
  *
  * See ind_ovs_fwd_result_{init,reset,cleanup}.
  */
@@ -350,7 +351,6 @@ void ind_ovs_match_to_cfr(const of_match_t *match, struct ind_ovs_cfr *cfr, stru
 /* Internal interfaces to the forwarding module */
 indigo_error_t ind_ovs_fwd_init(void);
 void ind_ovs_fwd_finish(void);
-indigo_error_t ind_ovs_fwd_process(const struct ind_ovs_parsed_key *pkey, struct ind_ovs_fwd_result *result);
 void ind_ovs_fwd_result_init(struct ind_ovs_fwd_result *result);
 void ind_ovs_fwd_result_reset(struct ind_ovs_fwd_result *result);
 void ind_ovs_fwd_result_cleanup(struct ind_ovs_fwd_result *result);
