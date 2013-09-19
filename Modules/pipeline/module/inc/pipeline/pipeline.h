@@ -26,9 +26,10 @@
 
 #include <stdbool.h>
 #include "indigo/error.h"
+#include <xbuf/xbuf.h>
 
 struct pipeline;
-struct ind_ovs_fwd_result;
+struct pipeline_result;
 struct ind_ovs_cfr;
 
 /*
@@ -36,7 +37,33 @@ struct ind_ovs_cfr;
  */
 typedef struct ind_ovs_flow_effects *(* pipeline_lookup_f)(
         int table_id, struct ind_ovs_cfr *cfr,
-        struct ind_ovs_fwd_result *result, bool update_stats);
+        struct pipeline_result *result, bool update_stats);
+
+/*
+ * Result of the forwarding pipeline (ind_ovs_pipeline_process)
+ *
+ * See pipeline_result_{init,reset,cleanup}.
+ */
+struct pipeline_result {
+    /*
+     * List of IVS actions.
+     */
+    struct xbuf actions;
+
+    /*
+     * These stats objects may belong to flows or tables (and in the future
+     * meters or groups). For example, every table a packet matched in will
+     * have its matched_stats field added here.
+     *
+     * This is sized at 2x the number of tables because each table can
+     * contribute a table stats and flow stats entry. This will have to
+     * change when we add meters and groups.
+     *
+     * TODO make this an xbuf
+     */
+    int num_stats_ptrs;
+    struct ind_ovs_flow_stats *stats_ptrs[16*2];
+};
 
 struct pipeline *pipeline_create(int openflow_version, pipeline_lookup_f lookup);
 void pipeline_destroy(struct pipeline *pipeline);
@@ -44,11 +71,16 @@ void pipeline_destroy(struct pipeline *pipeline);
 /*
  * Send a packet through the pipeline.
  *
- * 'result' should be initialized with ind_ovs_fwd_result_init.
+ * 'result' should be initialized with pipeline_result_init.
  */
 indigo_error_t
 pipeline_process(struct pipeline *pipeline,
                  struct ind_ovs_cfr *cfr,
-                 struct ind_ovs_fwd_result *result);
+                 struct pipeline_result *result);
+
+/* Operations on a struct pipeline_result */
+void pipeline_result_init(struct pipeline_result *result);
+void pipeline_result_reset(struct pipeline_result *result);
+void pipeline_result_cleanup(struct pipeline_result *result);
 
 #endif

@@ -52,7 +52,7 @@ pipeline_destroy(struct pipeline *pipeline)
 indigo_error_t
 pipeline_process(struct pipeline *pipeline,
                  struct ind_ovs_cfr *cfr,
-                 struct ind_ovs_fwd_result *result)
+                 struct pipeline_result *result)
 {
     uint8_t table_id = 0;
 
@@ -140,4 +140,25 @@ ind_ovs_fwd_update_cfr(struct ind_ovs_cfr *cfr, struct xbuf *actions)
             break;
         }
     }
+}
+
+void
+pipeline_result_init(struct pipeline_result *result)
+{
+    xbuf_init(&result->actions);
+    result->num_stats_ptrs = 0;
+}
+
+/* Reinitialize without reallocating memory */
+void
+pipeline_result_reset(struct pipeline_result *result)
+{
+    xbuf_reset(&result->actions);
+    result->num_stats_ptrs = 0;
+}
+
+void
+pipeline_result_cleanup(struct pipeline_result *result)
+{
+    xbuf_cleanup(&result->actions);
 }

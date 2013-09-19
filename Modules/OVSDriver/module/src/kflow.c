@@ -26,7 +26,7 @@
 
 static struct list_head ind_ovs_kflows;
 static struct list_head ind_ovs_kflow_buckets[NUM_KFLOW_BUCKETS];
-static struct ind_ovs_fwd_result ind_ovs_kflow_fwd_result;
+static struct pipeline_result ind_ovs_kflow_pipeline_result;
 static struct pipeline *ind_ovs_kflow_pipeline;
 
 static inline uint32_t
@@ -77,8 +77,8 @@ ind_ovs_kflow_add(const struct nlattr *key)
     struct ind_ovs_cfr cfr;
     ind_ovs_key_to_cfr(&pkey, &cfr);
 
-    struct ind_ovs_fwd_result *result = &ind_ovs_kflow_fwd_result;
-    ind_ovs_fwd_result_reset(result);
+    struct pipeline_result *result = &ind_ovs_kflow_pipeline_result;
+    pipeline_result_reset(result);
 
     indigo_error_t err = pipeline_process(ind_ovs_kflow_pipeline, &cfr, result);
     if (err < 0) {
@@ -227,8 +227,8 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
     struct ind_ovs_cfr cfr;
     ind_ovs_key_to_cfr(&pkey, &cfr);
 
-    struct ind_ovs_fwd_result *result = &ind_ovs_kflow_fwd_result;
-    ind_ovs_fwd_result_reset(result);
+    struct pipeline_result *result = &ind_ovs_kflow_pipeline_result;
+    pipeline_result_reset(result);
 
     indigo_error_t err = pipeline_process(ind_ovs_kflow_pipeline, &cfr, result);
     if (err < 0) {
@@ -335,7 +335,7 @@ ind_ovs_kflow_module_init(void)
         list_init(&ind_ovs_kflow_buckets[i]);
     }
 
-    ind_ovs_fwd_result_init(&ind_ovs_kflow_fwd_result);
+    pipeline_result_init(&ind_ovs_kflow_pipeline_result);
     ind_ovs_kflow_pipeline =
         pipeline_create(ind_ovs_version, ind_ovs_fwd_pipeline_lookup);
 }

@@ -538,27 +538,6 @@ ind_fwd_pkt_in(of_port_no_t in_port,
     return indigo_core_packet_in(of_packet_in);
 }
 
-void
-ind_ovs_fwd_result_init(struct ind_ovs_fwd_result *result)
-{
-    xbuf_init(&result->actions);
-    result->num_stats_ptrs = 0;
-}
-
-/* Reinitialize without reallocating memory */
-void
-ind_ovs_fwd_result_reset(struct ind_ovs_fwd_result *result)
-{
-    xbuf_reset(&result->actions);
-    result->num_stats_ptrs = 0;
-}
-
-void
-ind_ovs_fwd_result_cleanup(struct ind_ovs_fwd_result *result)
-{
-    xbuf_cleanup(&result->actions);
-}
-
 /** \brief Handle packet out request from Core */
 
 indigo_error_t
@@ -689,7 +668,7 @@ ind_ovs_fwd_write_unlock(void)
 
 struct ind_ovs_flow_effects *
 ind_ovs_fwd_pipeline_lookup(int table_id, struct ind_ovs_cfr *cfr,
-                            struct ind_ovs_fwd_result *result, bool update_stats)
+                            struct pipeline_result *result, bool update_stats)
 {
 
     struct ind_ovs_table *table = &ind_ovs_tables[table_id];

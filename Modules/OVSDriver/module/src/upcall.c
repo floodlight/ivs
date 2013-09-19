@@ -50,7 +50,7 @@ struct ind_ovs_upcall_thread {
     int epfd;
 
     /* Cached here so we don't need to reallocate it every time */
-    struct ind_ovs_fwd_result result;
+    struct pipeline_result result;
 
     /* Packet pipeline */
     struct pipeline *pipeline;
@@ -251,8 +251,8 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     struct ind_ovs_cfr cfr;
     ind_ovs_key_to_cfr(&pkey, &cfr);
 
-    struct ind_ovs_fwd_result *result = &thread->result;
-    ind_ovs_fwd_result_reset(result);
+    struct pipeline_result *result = &thread->result;
+    pipeline_result_reset(result);
     indigo_error_t err = pipeline_process(thread->pipeline, &cfr, result);
     if (err < 0) {
         return;
@@ -486,7 +486,7 @@ ind_ovs_upcall_init(void)
             abort();
         }
 
-        ind_ovs_fwd_result_init(&thread->result);
+        pipeline_result_init(&thread->result);
 
         for (j = 0; j < NUM_UPCALL_BUFFERS; j++) {
             thread->msgs[j] = nlmsg_alloc();
@@ -533,7 +533,7 @@ ind_ovs_upcall_finish(void)
         struct ind_ovs_upcall_thread *thread = ind_ovs_upcall_threads[i];
         pthread_join(thread->pthread, NULL);
         close(thread->epfd);
-        ind_ovs_fwd_result_cleanup(&thread->result);
+        pipeline_result_cleanup(&thread->result);
         pipeline_destroy(thread->pipeline);
         for (j = 0; j < NUM_UPCALL_BUFFERS; j++) {
             nlmsg_free(thread->msgs[j]);
