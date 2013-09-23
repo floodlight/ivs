@@ -17,11 +17,6 @@
 #
 ################################################################
 
-BASEDIR := $(dir $(lastword $(MAKEFILE_LIST)))
-OVSDriver_BASEDIR := $(BASEDIR)/OVSDriver
-flowtable_BASEDIR := $(BASEDIR)/flowtable
-l2table_BASEDIR := $(BASEDIR)/l2table
-luajit_BASEDIR := $(BASEDIR)/luajit
-xbuf_BASEDIR := $(BASEDIR)/xbuf
-pipeline_BASEDIR := $(BASEDIR)/pipeline
-ivs_common_BASEDIR := $(BASEDIR)/ivs
+THIS_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+pipeline_INCLUDES := -I $(THIS_DIR)inc
+pipeline_INTERNAL_INCLUDES := -I $(THIS_DIR)src

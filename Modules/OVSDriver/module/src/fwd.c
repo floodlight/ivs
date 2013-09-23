@@ -18,7 +18,6 @@
  ****************************************************************/
 
 #include "ovs_driver_int.h"
-#include "actions.h"
 #include <unistd.h>
 #include <indigo/memory.h>
 #include <indigo/forwarding.h>
@@ -538,140 +537,6 @@ ind_fwd_pkt_in(of_port_no_t in_port,
     return indigo_core_packet_in(of_packet_in);
 }
 
-/*
- * Scan actions list for field modifications and update the CFR accordingly
- */
-void
-ind_ovs_fwd_update_cfr(struct ind_ovs_cfr *cfr, struct xbuf *actions)
-{
-    struct nlattr *attr;
-    XBUF_FOREACH(xbuf_data(actions), xbuf_length(actions), attr) {
-        switch (attr->nla_type) {
-        case IND_OVS_ACTION_SET_ETH_DST:
-            memcpy(&cfr->dl_dst, xbuf_payload(attr), sizeof(cfr->dl_dst));
-            break;
-        case IND_OVS_ACTION_SET_ETH_SRC:
-            memcpy(&cfr->dl_src, xbuf_payload(attr), sizeof(cfr->dl_src));
-            break;
-        case IND_OVS_ACTION_SET_IPV4_DST:
-            cfr->nw_dst = *XBUF_PAYLOAD(attr, uint32_t);
-            break;
-        case IND_OVS_ACTION_SET_IPV4_SRC:
-            cfr->nw_src = *XBUF_PAYLOAD(attr, uint32_t);
-            break;
-        case IND_OVS_ACTION_SET_IP_DSCP:
-            cfr->nw_tos &= ~IP_DSCP_MASK;
-            cfr->nw_tos |= *XBUF_PAYLOAD(attr, uint8_t);
-            break;
-        case IND_OVS_ACTION_SET_IP_ECN:
-            cfr->nw_tos &= ~IP_ECN_MASK;
-            cfr->nw_tos |= *XBUF_PAYLOAD(attr, uint8_t);
-            break;
-        case IND_OVS_ACTION_SET_TCP_DST:
-        case IND_OVS_ACTION_SET_UDP_DST:
-        case IND_OVS_ACTION_SET_TP_DST:
-            cfr->tp_dst = *XBUF_PAYLOAD(attr, uint16_t);
-            break;
-        case IND_OVS_ACTION_SET_TCP_SRC:
-        case IND_OVS_ACTION_SET_UDP_SRC:
-        case IND_OVS_ACTION_SET_TP_SRC:
-            cfr->tp_src = *XBUF_PAYLOAD(attr, uint16_t);
-            break;
-        case IND_OVS_ACTION_SET_VLAN_VID: {
-            uint16_t vlan_vid = *XBUF_PAYLOAD(attr, uint16_t);
-            cfr->dl_vlan = htons(VLAN_TCI(vlan_vid, VLAN_PCP(ntohs(cfr->dl_vlan))) | VLAN_CFI_BIT);
-            break;
-        }
-        case IND_OVS_ACTION_SET_VLAN_PCP: {
-            uint8_t vlan_pcp = *XBUF_PAYLOAD(attr, uint8_t);
-            cfr->dl_vlan = htons(VLAN_TCI(VLAN_VID(ntohs(cfr->dl_vlan)), vlan_pcp) | VLAN_CFI_BIT);
-            break;
-        }
-        case IND_OVS_ACTION_SET_IPV6_DST:
-            memcpy(&cfr->ipv6_dst, xbuf_payload(attr), sizeof(cfr->ipv6_dst));
-            break;
-        case IND_OVS_ACTION_SET_IPV6_SRC:
-            memcpy(&cfr->ipv6_src, xbuf_payload(attr), sizeof(cfr->ipv6_src));
-            break;
-        /* Not implemented: IND_OVS_ACTION_SET_IPV6_FLABEL */
-        default:
-            break;
-        }
-    }
-}
-
-/*
- * Send a packet through the forwarding pipeline.
- *
- * 'result' should be initialized with ind_ovs_fwd_result_init.
- */
-indigo_error_t
-ind_ovs_fwd_process(const struct ind_ovs_parsed_key *pkey,
-                    struct ind_ovs_fwd_result *result)
-{
-    struct flowtable_entry *fte;
-    uint8_t table_id = 0;
-
-    struct ind_ovs_cfr cfr;
-    ind_ovs_key_to_cfr(pkey, &cfr);
-
-    while (table_id != (uint8_t)-1) {
-        struct ind_ovs_table *table = &ind_ovs_tables[table_id];
-
-#ifndef NDEBUG
-        LOG_VERBOSE("Looking up flow in %s", table->name);
-        ind_ovs_dump_cfr(&cfr);
-#endif
-
-        fte = flowtable_match(table->ft, (struct flowtable_key *)&cfr);
-        if (fte == NULL) {
-            result->stats_ptrs[result->num_stats_ptrs++] = &table->missed_stats;
-            if (ind_ovs_version < OF_VERSION_1_3) {
-                uint8_t reason = OF_PACKET_IN_REASON_NO_MATCH;
-                xbuf_append_attr(&result->actions, IND_OVS_ACTION_CONTROLLER, &reason, sizeof(reason));
-            }
-            break;
-        }
-
-        struct ind_ovs_flow *flow = container_of(fte, fte, struct ind_ovs_flow);
-
-        result->stats_ptrs[result->num_stats_ptrs++] = &table->matched_stats;
-        result->stats_ptrs[result->num_stats_ptrs++] = &flow->stats;
-
-        xbuf_append(&result->actions, xbuf_data(&flow->effects.apply_actions),
-                    xbuf_length(&flow->effects.apply_actions));
-
-        table_id = flow->effects.next_table_id;
-
-        if (table_id != (uint8_t)-1) {
-            ind_ovs_fwd_update_cfr(&cfr, &flow->effects.apply_actions);
-        }
-    }
-
-    return INDIGO_ERROR_NONE;
-}
-
-void
-ind_ovs_fwd_result_init(struct ind_ovs_fwd_result *result)
-{
-    xbuf_init(&result->actions);
-    result->num_stats_ptrs = 0;
-}
-
-/* Reinitialize without reallocating memory */
-void
-ind_ovs_fwd_result_reset(struct ind_ovs_fwd_result *result)
-{
-    xbuf_reset(&result->actions);
-    result->num_stats_ptrs = 0;
-}
-
-void
-ind_ovs_fwd_result_cleanup(struct ind_ovs_fwd_result *result)
-{
-    xbuf_cleanup(&result->actions);
-}
-
 /** \brief Handle packet out request from Core */
 
 indigo_error_t
@@ -798,6 +663,36 @@ void
 ind_ovs_fwd_write_unlock(void)
 {
     pthread_rwlock_unlock(&ind_ovs_fwd_rwlock);
+}
+
+struct ind_ovs_flow_effects *
+ind_ovs_fwd_pipeline_lookup(int table_id, struct ind_ovs_cfr *cfr,
+                            struct xbuf *stats)
+{
+    struct ind_ovs_table *table = &ind_ovs_tables[table_id];
+
+#ifndef NDEBUG
+    LOG_VERBOSE("Looking up flow in %s", table->name);
+    ind_ovs_dump_cfr(cfr);
+#endif
+
+    struct flowtable_entry *fte = flowtable_match(table->ft,
+                                                  (struct flowtable_key *)cfr);
+    if (fte == NULL) {
+        if (stats != NULL) {
+            xbuf_append_ptr(stats, &table->missed_stats);
+        }
+        return NULL;
+    }
+
+    struct ind_ovs_flow *flow = container_of(fte, fte, struct ind_ovs_flow);
+
+    if (stats != NULL) {
+        xbuf_append_ptr(stats, &table->matched_stats);
+        xbuf_append_ptr(stats, &flow->stats);
+    }
+
+    return &flow->effects;
 }
 
 

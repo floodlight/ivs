@@ -20,7 +20,6 @@
 #pragma GCC optimize (4)
 #define AIM_CONFIG_INCLUDE_GNU_SOURCE 1
 #include "ovs_driver_int.h"
-#include "actions.h"
 #include "indigo/forwarding.h"
 #include "indigo/port_manager.h"
 #include "indigo/of_state_manager.h"
@@ -50,7 +49,10 @@ struct ind_ovs_upcall_thread {
     int epfd;
 
     /* Cached here so we don't need to reallocate it every time */
-    struct ind_ovs_fwd_result result;
+    struct pipeline_result result;
+
+    /* Packet pipeline */
+    struct pipeline *pipeline;
 
     /* Preallocated messages used by the upcall thread for send and recv. */
     struct nl_msg *msgs[NUM_UPCALL_BUFFERS];
@@ -245,16 +247,21 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key(key, &pkey);
 
-    struct ind_ovs_fwd_result *result = &thread->result;
-    ind_ovs_fwd_result_reset(result);
-    indigo_error_t err = ind_ovs_fwd_process(&pkey, result);
+    struct ind_ovs_cfr cfr;
+    ind_ovs_key_to_cfr(&pkey, &cfr);
+
+    struct pipeline_result *result = &thread->result;
+    pipeline_result_reset(result);
+    indigo_error_t err = pipeline_process(thread->pipeline, &cfr, result);
     if (err < 0) {
         return;
     }
 
+    struct ind_ovs_flow_stats **stats_ptrs = xbuf_data(&result->stats);
+    int num_stats_ptrs = xbuf_length(&result->stats) / sizeof(void *);
     int i;
-    for (i = 0; i < result->num_stats_ptrs; i++) {
-        struct ind_ovs_flow_stats *stats = result->stats_ptrs[i];
+    for (i = 0; i < num_stats_ptrs; i++) {
+        struct ind_ovs_flow_stats *stats = stats_ptrs[i];
         __sync_fetch_and_add(&stats->packets, 1);
         __sync_fetch_and_add(&stats->bytes, nla_len(packet));
     }
@@ -480,7 +487,7 @@ ind_ovs_upcall_init(void)
             abort();
         }
 
-        ind_ovs_fwd_result_init(&thread->result);
+        pipeline_result_init(&thread->result);
 
         for (j = 0; j < NUM_UPCALL_BUFFERS; j++) {
             thread->msgs[j] = nlmsg_alloc();
@@ -493,6 +500,9 @@ ind_ovs_upcall_init(void)
             thread->msgvec[j].msg_hdr.msg_iov = &thread->iovecs[j];
             thread->msgvec[j].msg_hdr.msg_iovlen = 1;
         }
+
+        thread->pipeline =
+            pipeline_create(ind_ovs_version, ind_ovs_fwd_pipeline_lookup);
 
         if (pthread_create(&thread->pthread, NULL,
                         ind_ovs_upcall_thread_main, thread) < 0) {
@@ -524,7 +534,8 @@ ind_ovs_upcall_finish(void)
         struct ind_ovs_upcall_thread *thread = ind_ovs_upcall_threads[i];
         pthread_join(thread->pthread, NULL);
         close(thread->epfd);
-        ind_ovs_fwd_result_cleanup(&thread->result);
+        pipeline_result_cleanup(&thread->result);
+        pipeline_destroy(thread->pipeline);
         for (j = 0; j < NUM_UPCALL_BUFFERS; j++) {
             nlmsg_free(thread->msgs[j]);
         }

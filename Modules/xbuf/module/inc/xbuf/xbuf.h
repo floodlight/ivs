@@ -143,6 +143,15 @@ xbuf_append_zeroes(struct xbuf *xbuf, uint32_t len)
 }
 
 /**
+ * Append a pointer into an xbuf
+ */
+static inline void
+xbuf_append_ptr(struct xbuf *xbuf, void *ptr)
+{
+    xbuf_append(xbuf, &ptr, sizeof(ptr));
+}
+
+/**
  * Append a Netlink-compatible attribute into an xbuf
  */
 static inline void

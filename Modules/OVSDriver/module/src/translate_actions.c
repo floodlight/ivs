@@ -22,7 +22,6 @@
  */
 #pragma GCC optimize (4)
 #include "ovs_driver_int.h"
-#include "actions.h"
 #include "xbuf/xbuf.h"
 #include <byteswap.h>
 #include <linux/if_ether.h>
