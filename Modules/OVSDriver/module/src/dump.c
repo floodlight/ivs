@@ -272,7 +272,7 @@ ind_ovs_dump_flow_attr(const struct nlattr *attr)
 
     leaf(OVS_FLOW_ATTR_STATS, struct ovs_flow_stats,
          "pkts=%"PRIu64" bytes=%"PRIu64, x->n_packets, x->n_bytes);
-    leaf(OVS_FLOW_ATTR_TCP_FLAGS, uint8_t, "%#hhx");
+    leaf(OVS_FLOW_ATTR_TCP_FLAGS, uint8_t, "%#hhx", *x);
     leaf(OVS_FLOW_ATTR_USED, uint64_t, "%"PRIu64, *x);
     leaf(OVS_FLOW_ATTR_CLEAR, void, "");
     default: ind_ovs_dump_unknown_attr(attr);
