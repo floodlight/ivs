@@ -31,13 +31,20 @@ ifndef ROOT
 ROOT := $(dir $(lastword $(MAKEFILE_LIST)))/../..
 endif
 
-ifndef INDIGO
-INDIGO := $(ROOT)/indigo
+ifndef INFRA
+INFRA := $(ROOT)/submodules/infra
 endif
 
-# Necessary for our own settings and the Builder itself
+ifndef INDIGO
+INDIGO := $(ROOT)/submodules/indigo
+endif
+
+ifndef BIGCODE
+BIGCODE := $(ROOT)/submodules/bigcode
+endif
+
 ifndef BUILDER
-BUILDER := $(INDIGO)/Builder/unix
+BUILDER := $(INFRA)/builder/unix
 endif
 
 #
@@ -57,7 +64,7 @@ ALLOW_DECLARATION_AFTER_STATEMENT = 1
 MODULE := IVS
 include $(BUILDER)/standardinit.mk
 
-MODULE_DIRS := $(INDIGO)/Modules $(ROOT)/Modules
+MODULE_DIRS := $(INDIGO)/modules $(INFRA)/modules $(BIGCODE)/modules $(ROOT)/Modules
 
 #
 # We're now ready to specify the "stuff" we want built. 
@@ -80,7 +87,7 @@ include $(BUILDER)/lib.mk
 # All you have to do is point to the Manifest.mk, 
 # specify which Modules you want built, and include dependmodules.mk:
 # 
-MODULEMANIFEST := $(INDIGO)/Modules/Manifest.mk
+MODULEMANIFEST := $(INDIGO)/modules/Manifest.mk $(INFRA)/modules/Manifest.mk
 
 #
 # Set the modules we want to automatically build for this binary

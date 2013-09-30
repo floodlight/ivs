@@ -36,8 +36,6 @@ else:
     log("Install ccache for faster builds\n")
 
 os.environ['ROOT'] = os.path.join(os.getcwd())
-os.environ['INDIGO'] = os.path.join(os.getcwd(), 'indigo')
-os.environ['BUILDER'] = os.path.join(os.getcwd(), 'indigo', 'Builder', 'unix')
 
 try:
     os.mkdir('testlogs')

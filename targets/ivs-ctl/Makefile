@@ -21,12 +21,12 @@ ifndef ROOT
 ROOT := $(dir $(lastword $(MAKEFILE_LIST)))/../..
 endif
 
-ifndef INDIGO
-INDIGO := $(ROOT)/indigo
+ifndef INFRA
+INFRA := $(ROOT)/submodules/infra
 endif
 
 ifndef BUILDER
-BUILDER := $(INDIGO)/Builder/unix
+BUILDER := $(INFRA)/builder/unix
 endif
 
 ifndef BUILD_DIR
