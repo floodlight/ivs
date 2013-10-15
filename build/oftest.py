@@ -325,8 +325,8 @@ if __name__ == "__main__":
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("-T", "--test-spec", help="OFTest test specification", default=None)
     ap.add_argument("-f", "--test-file", help="OFTest test file", default=None)
-    ap.add_argument("--ivs-args", help="Additional arguments passed to IVS.")
-    ap.add_argument("--oft-args", help="Additional arguments passed to oft.")
+    ap.add_argument("--ivs-args", action="append", help="Additional arguments passed to IVS.")
+    ap.add_argument("--oft-args", action="append", help="Additional arguments passed to oft.")
     ap.add_argument("--log-base-dir", help="Set the log base directory.", default=None)
     ap.add_argument("-V", "--openflow-version", help="OpenFlow version (1.0, 1.3)", default="1.0")
 
