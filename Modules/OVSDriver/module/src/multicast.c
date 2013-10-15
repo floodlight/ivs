@@ -21,9 +21,14 @@
 #include "indigo/forwarding.h"
 #include "indigo/port_manager.h"
 #include "indigo/of_state_manager.h"
+#include "indigo/types.h"
 #include <linux/if_ether.h>
+#include <linux/if_packet.h>
+#include <ifaddrs.h>
 #include <stdbool.h>
 #include <sys/epoll.h>
+#include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include "SocketManager/socketmanager.h"
 
@@ -52,6 +57,19 @@ ind_ovs_handle_vport_multicast(struct nlmsghdr *nlh)
                OF_MAC_ADDR_BYTES);
     } else {
         mac_addr = of_mac_addr_all_zeros;
+        struct ifaddrs *ifaddr, *ifa;
+        if (getifaddrs(&ifaddr) != -1) {
+            for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+                if (!strcmp(ifname, ifa->ifa_name)) {
+                    struct sockaddr_ll *sa = (struct sockaddr_ll *)ifa->ifa_addr;
+                    if (sa != NULL && sa->sll_family == AF_PACKET) {
+                        memcpy(mac_addr.addr, &sa->sll_addr, OF_MAC_ADDR_BYTES);
+                        LOG_INFO("Using MAC from interface %s", ifa->ifa_name);
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     if (gnlh->cmd == OVS_VPORT_CMD_NEW) {
