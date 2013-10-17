@@ -334,6 +334,7 @@ void ind_ovs_multicast_init(void);
 
 /* Interface of the group submodule */
 void ind_ovs_group_module_init(void);
+struct ind_ovs_group *ind_ovs_group_lookup(uint32_t id);
 
 /* Log Netlink attributes in human readable form */
 void ind_ovs_dump_nested(const struct nlattr *nla, void (*cb)(const struct nlattr *attr));

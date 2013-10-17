@@ -27,6 +27,7 @@
 #include "xbuf/xbuf.h"
 #include <byteswap.h>
 #include <linux/if_ether.h>
+#include <murmur/murmur.h>
 
 /*
  * Package up the data needed for action translation to reduce the
@@ -401,6 +402,33 @@ ind_ovs_action_set_ipv6_flabel(struct nlattr *attr, struct translate_context *ct
     }
 }
 
+/* Group action */
+
+static void
+ind_ovs_action_group(struct nlattr *attr, struct translate_context *ctx)
+{
+    uint32_t group_id = *XBUF_PAYLOAD(attr, uint32_t);
+    struct ind_ovs_group *group = ind_ovs_group_lookup(group_id);
+    if (group == NULL) {
+        return;
+    }
+
+    if (group->num_buckets == 0) {
+        return;
+    }
+
+    uint32_t hash = murmur_hash(&ctx->current_key, sizeof(ctx->current_key),
+                                ind_ovs_salt);
+
+    struct ind_ovs_group_bucket *bucket = &group->buckets[hash % group->num_buckets];
+    /* TODO update stats */
+
+    ind_ovs_commit_set_field_actions(ctx);
+    ind_ovs_translate_actions(&ctx->current_key, &bucket->actions, ctx->msg);
+
+    /* TODO revert set-field changes */
+}
+
 void
 ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
                           struct xbuf *xbuf, struct nl_msg *msg)
@@ -514,6 +542,9 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
             break;
         case IND_OVS_ACTION_SET_IPV6_FLABEL:
             ind_ovs_action_set_ipv6_flabel(attr, &ctx);
+            break;
+        case IND_OVS_ACTION_GROUP:
+            ind_ovs_action_group(attr, &ctx);
             break;
         default:
             assert(0);
@@ -798,6 +829,12 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
             uint32_t ipv4;
             of_action_bsn_set_tunnel_dst_dst_get(&act.bsn_set_tunnel_dst, &ipv4);
             xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_TUNNEL_DST, &ipv4, sizeof(ipv4));
+            break;
+        }
+        case OF_ACTION_GROUP: {
+            uint32_t group_id;
+            of_action_group_group_id_get(&act.group, &group_id);
+            xbuf_append_attr(xbuf, IND_OVS_ACTION_GROUP, &group_id, sizeof(group_id));
             break;
         }
         default:

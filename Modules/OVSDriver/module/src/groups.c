@@ -27,6 +27,8 @@
 #define TEMPLATE_ENTRY_FIELD hash_entry
 #include <BigHash/bighash_template.h>
 
+static void free_buckets(struct ind_ovs_group_bucket *buckets, uint16_t num_buckets);
+
 static bighash_table_t group_table;
 
 static indigo_error_t
@@ -34,6 +36,7 @@ translate_buckets(of_list_bucket_t *of_buckets,
                   struct ind_ovs_group_bucket **buckets_ptr,
                   uint16_t *num_buckets_ptr)
 {
+    indigo_error_t err;
     uint16_t num_buckets = 0;
 
     struct xbuf buckets_xbuf;
@@ -48,6 +51,18 @@ translate_buckets(of_list_bucket_t *of_buckets,
         bucket->stats.packets = 0;
         bucket->stats.bytes = 0;
         num_buckets++;
+
+        of_list_action_t of_actions;
+        of_bucket_actions_bind(&of_bucket, &of_actions);
+
+        err = ind_ovs_translate_openflow_actions(
+            &of_actions, &bucket->actions, false);
+        if (err < 0) {
+            free_buckets(xbuf_steal(&buckets_xbuf), num_buckets);
+            return err;
+        }
+
+        xbuf_compact(&bucket->actions);
     }
 
     xbuf_compact(&buckets_xbuf);
@@ -67,12 +82,22 @@ free_buckets(struct ind_ovs_group_bucket *buckets, uint16_t num_buckets)
     free(buckets);
 }
 
+struct ind_ovs_group *
+ind_ovs_group_lookup(uint32_t id)
+{
+    return group_table_first(&group_table, &id);
+}
+
 indigo_error_t
 indigo_fwd_group_add(uint32_t id, uint8_t group_type, of_list_bucket_t *of_buckets)
 {
     indigo_error_t err;
     struct ind_ovs_group_bucket *buckets;
     uint16_t num_buckets;
+
+    if (group_type != OF_GROUP_TYPE_SELECT) {
+        return INDIGO_ERROR_NOT_SUPPORTED;
+    }
 
     /* TODO validate */
 
