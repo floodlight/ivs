@@ -17,7 +17,9 @@
  *
  ****************************************************************/
 
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC optimize (4)
+#endif
 #include "flowtable/flowtable.h"
 #include "murmur/murmur.h"
 #include "flowtable_log.h"

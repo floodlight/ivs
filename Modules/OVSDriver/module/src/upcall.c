@@ -17,7 +17,9 @@
  *
  ****************************************************************/
 
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC optimize (4)
+#endif
 #define AIM_CONFIG_INCLUDE_GNU_SOURCE 1
 #include "ovs_driver_int.h"
 #include "indigo/forwarding.h"

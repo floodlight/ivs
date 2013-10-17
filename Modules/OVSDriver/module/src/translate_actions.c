@@ -20,7 +20,9 @@
 /*
  * Translate actions from LOCI into OVS Netlink attributes.
  */
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC optimize (4)
+#endif
 #include "ovs_driver_int.h"
 #include "xbuf/xbuf.h"
 #include <byteswap.h>
@@ -522,7 +524,9 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
 
 
 /* The code below is not in a performance-critical path */
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC optimize ("s")
+#endif
 
 /**
  * Translate LOCI actions into an IVS-internal representation.
