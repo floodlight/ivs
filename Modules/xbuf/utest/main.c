@@ -71,6 +71,19 @@ test_basic(void)
     assert(xbuf_length(&a) == 6);
     assert(a.allocated == 6);
 
+    /* Should be able to allocate uninitialized space */
+    xbuf_reset(&a);
+    {
+        char *data = xbuf_reserve(&a, 8);
+        assert(data == xbuf_data(&a));
+        assert(xbuf_length(&a) == 8);
+    }
+    {
+        char *data = xbuf_reserve(&a, 4);
+        assert(data == (char *)xbuf_data(&a) + 8);
+        assert(xbuf_length(&a) == 12);
+    }
+
     xbuf_cleanup(&a);
 }
 

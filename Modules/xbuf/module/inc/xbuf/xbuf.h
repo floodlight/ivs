@@ -106,6 +106,18 @@ xbuf_reset(struct xbuf *xbuf)
     xbuf->length = 0;
 }
 
+/**
+ * Allocate space in an xbuf
+ */
+static inline void *
+xbuf_reserve(struct xbuf *xbuf, uint32_t len)
+{
+    xbuf_resize_check(xbuf, xbuf->length + len);
+    void *tail = (char *)xbuf->data + xbuf->length;
+    xbuf->length += len;
+    return tail;
+}
+
 /* Internal */
 static inline void
 xbuf_append__(struct xbuf *xbuf, void *data, uint32_t len)
