@@ -247,6 +247,7 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     assert(key && packet);
 
     struct ind_ovs_parsed_key pkey;
+    memset(&pkey, 0, sizeof(pkey));
     ind_ovs_parse_key(key, &pkey);
 
     struct ind_ovs_cfr cfr;
