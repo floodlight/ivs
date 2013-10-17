@@ -98,6 +98,23 @@ xbuf_resize_check(struct xbuf *xbuf, uint32_t new_len)
 void xbuf_compact(struct xbuf *xbuf);
 
 /**
+ * Transfer ownership of an xbuf's backing memory to the caller
+ *
+ * Reinitializes the xbuf to be empty.
+ *
+ * The returned memory should be deallocated with free().
+ */
+static inline void *
+xbuf_steal(struct xbuf *xbuf)
+{
+    void *ptr = xbuf_data(xbuf);
+    xbuf->data = NULL;
+    xbuf->length = 0;
+    xbuf->allocated = 0;
+    return ptr;
+}
+
+/**
  * Set the current length to zero
  */
 static inline void
