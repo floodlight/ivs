@@ -106,6 +106,15 @@ xbuf_reset(struct xbuf *xbuf)
     xbuf->length = 0;
 }
 
+/* Internal */
+static inline void *
+xbuf_reserve__(struct xbuf *xbuf, uint32_t len)
+{
+    void *tail = (char *)xbuf->data + xbuf->length;
+    xbuf->length += len;
+    return tail;
+}
+
 /**
  * Allocate space in an xbuf
  */
@@ -113,17 +122,14 @@ static inline void *
 xbuf_reserve(struct xbuf *xbuf, uint32_t len)
 {
     xbuf_resize_check(xbuf, xbuf->length + len);
-    void *tail = (char *)xbuf->data + xbuf->length;
-    xbuf->length += len;
-    return tail;
+    return xbuf_reserve__(xbuf, len);
 }
 
 /* Internal */
 static inline void
 xbuf_append__(struct xbuf *xbuf, void *data, uint32_t len)
 {
-    memcpy((char *)xbuf->data + xbuf->length, data, len);
-    xbuf->length += len;
+    memcpy(xbuf_reserve__(xbuf, len), data, len);
 }
 
 /**
@@ -140,8 +146,7 @@ xbuf_append(struct xbuf *xbuf, void *data, uint32_t len)
 static inline void
 xbuf_append_zeroes__(struct xbuf *xbuf, uint32_t len)
 {
-    memset((char *)xbuf->data + xbuf->length, 0, len);
-    xbuf->length += len;
+    memset(xbuf_reserve__(xbuf, len), 0, len);
 }
 
 /**
