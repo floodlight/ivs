@@ -37,7 +37,7 @@ ifndef TEST_MODULE
 $(error $$(TEST_MODULE) is not defined. Please define relative to BigCode)
 endif
 
-MODULE_DIRS := $(INDIGO)/Modules $(ROOT)/Modules
+MODULE_DIRS := $(INDIGO)/modules $(INFRA)/modules $(BIGCODE)/modules $(ROOT)/Modules
 
 # At the very least we need the test module
 DEPENDMODULES += $(TEST_MODULE)

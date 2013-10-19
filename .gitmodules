@@ -1,6 +1,12 @@
-[submodule "indigo"]
-	path = indigo
-	url = git://github.com/floodlight/indigo
-[submodule "luajit-2.0"]
-	path = luajit-2.0
+[submodule "submodules/luajit-2.0"]
+	path = submodules/luajit-2.0
 	url = http://luajit.org/git/luajit-2.0.git
+[submodule "submodules/infra"]
+	path = submodules/infra
+	url = git@github.com:floodlight/infra.git
+[submodule "submodules/indigo"]
+	path = submodules/indigo
+	url = git@github.com:floodlight/indigo.git
+[submodule "submodules/bigcode"]
+	path = submodules/bigcode
+	url = git@github.com:floodlight/bigcode.git

@@ -18,7 +18,7 @@
 ################################################################
 
 THIS_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
-LUAJIT := $(THIS_DIR)/../../luajit-2.0
+LUAJIT := $(THIS_DIR)/../../submodules/luajit-2.0
 luajit_INCLUDES := -I $(LUAJIT)/src
 
 LIBRARY_TARGETS += libluajit.a

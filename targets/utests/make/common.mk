@@ -32,8 +32,20 @@ ifndef ROOT
 ROOT := $(dir $(lastword $(MAKEFILE_LIST)))/../../..
 endif
 
+ifndef INFRA
+INFRA := $(ROOT)/submodules/infra
+endif
+
+ifndef BIGCODE
+BIGCODE := $(ROOT)/submodules/bigcode
+endif
+
 ifndef INDIGO
-INDIGO:=$(ROOT)/indigo
+INDIGO := $(ROOT)/submodules/indigo
+endif
+
+ifndef BUILDER
+BUILDER := $(INFRA)/builder/unix
 endif
 
 #
