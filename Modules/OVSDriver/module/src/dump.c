@@ -487,5 +487,8 @@ ind_ovs_dump_cfr(const struct ind_ovs_cfr *cfr)
     output("ipv6_src=%s", src);
     output("ipv6_dst=%s", dst);
 
+    output("in_ports=%08x%08x%08x%08x", cfr->in_ports[0], cfr->in_ports[1],
+                                        cfr->in_ports[2], cfr->in_ports[3]);
+
     indent--;
 }

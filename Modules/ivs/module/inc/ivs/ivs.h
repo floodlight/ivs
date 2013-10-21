@@ -83,8 +83,11 @@ struct ind_ovs_cfr {
     uint16_t tp_dst;            /* TCP/UDP destination port. */
     uint32_t ipv6_src[4];       /* IPv6 source address. */
     uint32_t ipv6_dst[4];       /* IPv6 destination address. */
+    uint32_t in_ports[4];       /* bsn_in_ports extension */
 } __attribute__ ((aligned (8)));
 
-AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == 8*8);
+AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == 10*8);
+
+#define IVS_MAX_BITMAP_IN_PORT 127
 
 #endif
