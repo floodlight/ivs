@@ -72,6 +72,7 @@ ind_ovs_kflow_add(const struct nlattr *key)
     }
 
     struct ind_ovs_parsed_key pkey;
+    memset(&pkey, 0, sizeof(pkey));
     ind_ovs_parse_key((struct nlattr *)key, &pkey);
 
     struct ind_ovs_cfr cfr;

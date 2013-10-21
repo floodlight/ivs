@@ -38,6 +38,7 @@
 #include "ivs/actions.h"
 #include "pipeline/pipeline.h"
 #include "flowtable/flowtable.h"
+#include "BigHash/bighash.h"
 
 #define IND_OVS_MAX_PORTS 1024
 
@@ -244,6 +245,21 @@ struct ind_ovs_table {
     of_table_name_t name;
 };
 
+/* An OpenFlow group bucket */
+struct ind_ovs_group_bucket {
+    struct xbuf actions;
+    struct ind_ovs_flow_stats stats;
+};
+
+/* An OpenFlow group */
+struct ind_ovs_group {
+    bighash_entry_t hash_entry;
+    uint32_t id;
+    uint8_t type;
+    uint16_t num_buckets;
+    struct ind_ovs_group_bucket *buckets;
+};
+
 /* Internal functions */
 
 /* Translate an OVS key into a flat struct */
@@ -315,6 +331,10 @@ void ind_ovs_bh_request_pktin(uint32_t in_port, struct nlattr *packet, struct nl
 
 /* Interface of the multicast submodule */
 void ind_ovs_multicast_init(void);
+
+/* Interface of the group submodule */
+void ind_ovs_group_module_init(void);
+struct ind_ovs_group *ind_ovs_group_lookup(uint32_t id);
 
 /* Log Netlink attributes in human readable form */
 void ind_ovs_dump_nested(const struct nlattr *nla, void (*cb)(const struct nlattr *attr));

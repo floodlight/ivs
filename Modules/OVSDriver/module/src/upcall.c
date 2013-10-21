@@ -17,7 +17,9 @@
  *
  ****************************************************************/
 
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC optimize (4)
+#endif
 #define AIM_CONFIG_INCLUDE_GNU_SOURCE 1
 #include "ovs_driver_int.h"
 #include "indigo/forwarding.h"
@@ -245,6 +247,7 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     assert(key && packet);
 
     struct ind_ovs_parsed_key pkey;
+    memset(&pkey, 0, sizeof(pkey));
     ind_ovs_parse_key(key, &pkey);
 
     struct ind_ovs_cfr cfr;

@@ -22,7 +22,9 @@
  * match structure (struct ind_ovs_cfr), and OVS flow key
  * (struct ind_ovs_parsed_key / nlattrs).
  */
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC optimize (4)
+#endif
 #include "ovs_driver_int.h"
 #include <byteswap.h>
 #include <linux/if_ether.h>
