@@ -65,7 +65,7 @@ indigo_fwd_forwarding_features_get(of_features_reply_t *features)
     OF_CAPABILITIES_FLAG_ARP_MATCH_IP_SET(capabilities, features->version);
     of_features_reply_capabilities_set(features, capabilities);
 
-    if (features->version < OF_VERSION_1_3) {
+    if (features->version == OF_VERSION_1_0) {
         OF_FLAG_ENUM_SET(actions,
             OF_ACTION_TYPE_OUTPUT_BY_VERSION(features->version));
         OF_FLAG_ENUM_SET(actions,
