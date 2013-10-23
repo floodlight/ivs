@@ -41,7 +41,7 @@
 /*
  * Size of the flowtable key in bytes.
  */
-#define FLOWTABLE_KEY_SIZE 64
+#define FLOWTABLE_KEY_SIZE 80
 
 struct flowtable;
 

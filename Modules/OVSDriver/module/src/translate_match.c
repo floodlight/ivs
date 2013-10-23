@@ -204,6 +204,15 @@ ind_ovs_key_to_cfr(const struct ind_ovs_parsed_key *pkey,
 {
     cfr->in_port = pkey->in_port;
 
+    /* Set a bit in the in_ports bitmap */
+    {
+        uint32_t idx = aim_imin(IVS_MAX_BITMAP_IN_PORT, pkey->in_port);
+        uint32_t word = IVS_MAX_BITMAP_IN_PORT/32 - idx/32;
+        uint32_t bit = idx % 32;
+        memset(cfr->in_ports, 0, sizeof(cfr->in_ports));
+        cfr->in_ports[word] = 1 << bit;
+    }
+
     memcpy(cfr->dl_dst, pkey->ethernet.eth_dst, OF_MAC_ADDR_BYTES);
     memcpy(cfr->dl_src, pkey->ethernet.eth_src, OF_MAC_ADDR_BYTES);
 
@@ -280,6 +289,11 @@ ind_ovs_match_to_cfr(const of_match_t *match,
     /* input port */
     fields->in_port = match->fields.in_port;
     masks->in_port = match->masks.in_port;
+
+    masks->in_ports[0] = match->masks.bsn_in_ports_128.hi >> 32;
+    masks->in_ports[1] = match->masks.bsn_in_ports_128.hi;
+    masks->in_ports[2] = match->masks.bsn_in_ports_128.lo >> 32;
+    masks->in_ports[3] = match->masks.bsn_in_ports_128.lo;
 
     /* ether addrs */
     memcpy(fields->dl_dst, &match->fields.eth_dst, OF_MAC_ADDR_BYTES);
