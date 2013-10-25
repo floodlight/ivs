@@ -61,16 +61,6 @@ ifndef SUBMODULE_LUAJIT2
   endif
 endif
 
-ifdef SUBMODULES_LOCAL
-  SUBMODULES_LOCAL_UPDATE := $(shell python $(ROOT)/submodules/init.py --update $(SUBMODULES_LOCAL))
-  ifneq ($(lastword $(SUBMODULES_LOCAL_UPDATE)),submodules:ok.)
-    $(info Local submodule update failed.)
-    $(info Result:)
-    $(info $(SUBMODULES_LOCAL_UPDATE))
-    $(error Abort)
-  endif
-endif
-
 export SUBMODULE_INFRA
 export SUBMODULE_BIGCODE
 export SUBMODULE_INDIGO
