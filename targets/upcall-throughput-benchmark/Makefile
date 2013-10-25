@@ -16,37 +16,12 @@
 # License.
 #
 ################################################################
-
-ifndef ROOT
-ROOT := $(dir $(lastword $(MAKEFILE_LIST)))/../..
-endif
-
-ifndef INFRA
-INFRA := $(ROOT)/submodules/infra
-endif
-
-ifndef BIGCODE
-BIGCODE := $(ROOT)/submodules/bigcode
-endif
-
-ifndef INDIGO
-INDIGO := $(ROOT)/submodules/indigo
-endif
-
-ifndef BUILDER
-BUILDER := $(INFRA)/builder/unix
-endif
-
-ifndef BUILD_DIR
-export BUILD_DIR := ./build
-endif
+include ../../init.mk
 
 ALLOW_DECLARATION_AFTER_STATEMENT = 1
 
 MODULE := upcall_throughput_benchmark
 include $(BUILDER)/standardinit.mk
-
-MODULE_DIRS := $(INDIGO)/modules $(INFRA)/modules $(BIGCODE)/modules $(ROOT)/Modules
 
 LIBRARY := upcall_throughput_benchmark_main
 $(LIBRARY)_SUBDIR := $(dir $(lastword $(MAKEFILE_LIST)))

@@ -16,35 +16,16 @@
 # License.
 #
 ################################################################
-
-ifndef ROOT
-ROOT := $(dir $(lastword $(MAKEFILE_LIST)))/../..
-endif
-
-ifndef INFRA
-INFRA := $(ROOT)/submodules/infra
-endif
-
-ifndef BUILDER
-BUILDER := $(INFRA)/builder/unix
-endif
-
-ifndef BUILD_DIR
-export BUILD_DIR := ./build
-endif
+include ../../init.mk
 
 ALLOW_DECLARATION_AFTER_STATEMENT = 1
 
 MODULE := IVSCtl
 include $(BUILDER)/standardinit.mk
 
-MODULE_DIRS := $(INDIGO)/Modules $(ROOT)/Modules
-
 LIBRARY := IVSCtlMain
 $(LIBRARY)_SUBDIR := $(dir $(lastword $(MAKEFILE_LIST)))
 include $(BUILDER)/lib.mk
-
-MODULEMANIFEST := $(INDIGO)/Modules/Manifest.mk
 
 DEPENDMODULES :=
 include $(BUILDER)/dependmodules.mk
