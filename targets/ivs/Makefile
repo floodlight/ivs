@@ -16,43 +16,7 @@
 # License.
 #
 ################################################################
-
-###############################################################################
-#
-#  Makefile
-#
-#  ivs
-#
-###############################################################################
-
-# Not needed by the build system directly, but necessary for some 
-# of the variables we are going to set
-ifndef ROOT
-ROOT := $(dir $(lastword $(MAKEFILE_LIST)))/../..
-endif
-
-ifndef INFRA
-INFRA := $(ROOT)/submodules/infra
-endif
-
-ifndef INDIGO
-INDIGO := $(ROOT)/submodules/indigo
-endif
-
-ifndef BIGCODE
-BIGCODE := $(ROOT)/submodules/bigcode
-endif
-
-ifndef BUILDER
-BUILDER := $(INFRA)/builder/unix
-endif
-
-#
-# Default to a local build directory for everything
-#
-ifndef BUILD_DIR
-export BUILD_DIR := ./build
-endif
+include ../../init.mk
 
 ALLOW_DECLARATION_AFTER_STATEMENT = 1
 
@@ -64,8 +28,6 @@ ALLOW_DECLARATION_AFTER_STATEMENT = 1
 MODULE := IVS
 include $(BUILDER)/standardinit.mk
 
-MODULE_DIRS := $(INDIGO)/modules $(INFRA)/modules $(BIGCODE)/modules $(ROOT)/Modules
-
 #
 # We're now ready to specify the "stuff" we want built. 
 #
@@ -74,20 +36,6 @@ MODULE_DIRS := $(INDIGO)/modules $(INFRA)/modules $(BIGCODE)/modules $(ROOT)/Mod
 LIBRARY := IVSMain
 $(LIBRARY)_SUBDIR := $(dir $(lastword $(MAKEFILE_LIST)))
 include $(BUILDER)/lib.mk
-
-#
-# Our binary is going to depend upon BigCode modules. 
-#
-# The Manifest.mk for BigCode, which describes the locations
-# of all of the available modules, is in $INDIGO/Modules/Manifest.mk
-# 
-# The settings in the Manifest.mk file will provide the information
-# necessary to build the modules on which this binary will depend. 
-#
-# All you have to do is point to the Manifest.mk, 
-# specify which Modules you want built, and include dependmodules.mk:
-# 
-MODULEMANIFEST := $(INDIGO)/modules/Manifest.mk $(INFRA)/modules/Manifest.mk
 
 #
 # Set the modules we want to automatically build for this binary

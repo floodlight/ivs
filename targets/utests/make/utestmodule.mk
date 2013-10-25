@@ -24,9 +24,9 @@
 ###############################################################################
 UCODE_MAKE := $(dir $(lastword $(MAKEFILE_LIST)))
 
-DEBUG := 1
+include ../../../init.mk
 
-include $(UCODE_MAKE)/common.mk
+DEBUG := 1
 
 .DEFAULT_GOAL := tests
 
@@ -37,7 +37,9 @@ ifndef TEST_MODULE
 $(error $$(TEST_MODULE) is not defined. Please define relative to BigCode)
 endif
 
-MODULE_DIRS := $(INDIGO)/modules $(INFRA)/modules $(BIGCODE)/modules $(ROOT)/Modules
+ifndef MODULE
+$(error Need to define $$MODULE)
+endif
 
 # At the very least we need the test module
 DEPENDMODULES += $(TEST_MODULE)
@@ -53,6 +55,8 @@ include $(BUILDER)/targets.mk
 ifdef VALGRIND
 HARNESS:=valgrind --leak-check=full --show-reachable=yes --suppressions=$(INDIGO)/Tools/valgrind.suppressions
 endif
+
+GLOBAL_CFLAGS += -DOF_WIRE_BUFFER_DEBUG
 
 
 # By Convention

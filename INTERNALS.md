@@ -8,7 +8,7 @@ Here's an (abridged) source code tree:
  - build: Convenience scripts for building and running IVS.
  - debian: Debian packaging.
  - indigo: Submodule linking to floodlight/indigo.
- - Modules
+ - modules
    - flowtable: Hash-based flowtable implementation.
    - OVSDriver: Implementation of Indigo Forwarding/PortManager interfaces
      using the openvswitch kernel module.

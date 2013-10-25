@@ -32,8 +32,8 @@ clean:
 	make -C targets/ivs clean
 	make -C targets/ivs-ctl clean
 	# The build system creates these even during make clean
-	rm -f Modules/OVSDriver/OVSDriver.mk targets/ivs-ctl/IVSCtl.mk targets/ivs/Manifest.mk targets/ivs/IVS.mk targets/ivs/dependmodules.x
-	(cd indigo; rm -f Modules/AIM/AIM.mk Modules/BigData/BigList/BigList.mk Modules/ELS/ELS.mk Modules/FME/FME.mk Modules/IOF/IOF.mk Modules/IVS/IVS.mk Modules/Indigo/OFConnectionManager/OFConnectionManager.mk Modules/Indigo/OFStateManager/OFStateManager.mk Modules/Indigo/SocketManager/SocketManager.mk Modules/Indigo/indigo/indigo.mk Modules/NSS/NSS.mk Modules/PPE/PPE.mk Modules/loci/loci.mk Modules/murmur/murmur.mk Modules/uCli/uCli.mk)
+	rm -f modules/OVSDriver/OVSDriver.mk targets/ivs-ctl/IVSCtl.mk targets/ivs/Manifest.mk targets/ivs/IVS.mk targets/ivs/dependmodules.x
+	(cd indigo; rm -f modules/AIM/AIM.mk modules/BigData/BigList/BigList.mk modules/ELS/ELS.mk modules/FME/FME.mk modules/IOF/IOF.mk modules/IVS/IVS.mk modules/Indigo/OFConnectionManager/OFConnectionManager.mk modules/Indigo/OFStateManager/OFStateManager.mk modules/Indigo/SocketManager/SocketManager.mk modules/Indigo/indigo/indigo.mk modules/NSS/NSS.mk modules/PPE/PPE.mk modules/loci/loci.mk modules/murmur/murmur.mk modules/uCli/uCli.mk)
 
 deb:
 	fakeroot make -f debian/rules binary
