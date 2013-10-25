@@ -51,7 +51,7 @@ if [ ! -e .git/MERGE_MSG ]; then
     git diff-index --check --cached $against -- || exit 1
 
     # Check for tabs
-    srcdirs="Modules targets"
+    srcdirs="modules targets"
     if find $srcdirs -type f -name '*.[ch]' -a \! -name 'openvswitch.h' -a \! -name 'tunnel.h' | xargs grep -n -P '\t'; then
         echo "Tabs found"
         exit 1

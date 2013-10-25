@@ -77,7 +77,7 @@ export SUBMODULE_INDIGO
 export SUBMODULE_LUAJIT2
 export BUILDER := $(SUBMODULE_INFRA)/builder/unix
 
-MODULE_DIRS := $(ROOT)/Modules \
+MODULE_DIRS := $(ROOT)/modules \
                $(SUBMODULE_INFRA)/modules \
                $(SUBMODULE_BIGCODE)/modules \
                $(SUBMODULE_INDIGO)/modules
