@@ -483,7 +483,7 @@ ind_fwd_pkt_in(of_port_no_t in_port,
     }
 
     if (port != NULL && OF_PORT_CONFIG_FLAG_NO_PACKET_IN_TEST(
-                            port->config, ctrlr_of_version)) {
+                            port->config, ind_ovs_version)) {
         LOG_TRACE("Packet-in not enabled from this port");
         return INDIGO_ERROR_NONE;
     }
@@ -495,7 +495,7 @@ ind_fwd_pkt_in(of_port_no_t in_port,
 
     if (ind_ovs_pktin_suppression_cfg.enabled && reason == OF_PACKET_IN_REASON_NO_MATCH) {
         LOG_TRACE("installing pktin suppression flow");
-        of_flow_add_t *flow_mod = of_flow_add_new(ctrlr_of_version);
+        of_flow_add_t *flow_mod = of_flow_add_new(ind_ovs_version);
         of_flow_add_hard_timeout_set(flow_mod, ind_ovs_pktin_suppression_cfg.hard_timeout);
         of_flow_add_idle_timeout_set(flow_mod, ind_ovs_pktin_suppression_cfg.idle_timeout);
         of_flow_add_cookie_set(flow_mod, ind_ovs_pktin_suppression_cfg.cookie);
@@ -518,7 +518,7 @@ ind_fwd_pkt_in(of_port_no_t in_port,
     of_packet_in_reason_set(of_packet_in, reason);
     of_packet_in_buffer_id_set(of_packet_in, OF_BUFFER_ID_NO_BUFFER);
 
-    if (ctrlr_of_version < OF_VERSION_1_2) {
+    if (of_packet_in->version < OF_VERSION_1_2) {
         of_packet_in_in_port_set(of_packet_in, in_port);
     } else {
         if (LOXI_FAILURE(of_packet_in_match_set(of_packet_in, match))) {
@@ -528,7 +528,7 @@ ind_fwd_pkt_in(of_port_no_t in_port,
         }
     }
 
-    if (ctrlr_of_version >= OF_VERSION_1_3) {
+    if (of_packet_in->version >= OF_VERSION_1_3) {
         of_packet_in_cookie_set(of_packet_in, 0xffffffffffffffff);
     }
 
