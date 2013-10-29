@@ -475,8 +475,15 @@ ind_fwd_pkt_in(of_port_no_t in_port,
     LOG_TRACE("Sending packet-in");
 
     struct ind_ovs_port *port = ind_ovs_port_lookup(in_port);
+    of_version_t ctrlr_of_version;
+
+    if (indigo_cxn_get_async_version(&ctrlr_of_version) != INDIGO_ERROR_NONE) {
+        LOG_TRACE("No active controller connection");
+        return INDIGO_ERROR_NONE;
+    }
+
     if (port != NULL && OF_PORT_CONFIG_FLAG_NO_PACKET_IN_TEST(
-                            port->config, ind_ovs_version)) {
+                            port->config, ctrlr_of_version)) {
         LOG_TRACE("Packet-in not enabled from this port");
         return INDIGO_ERROR_NONE;
     }
@@ -488,7 +495,7 @@ ind_fwd_pkt_in(of_port_no_t in_port,
 
     if (ind_ovs_pktin_suppression_cfg.enabled && reason == OF_PACKET_IN_REASON_NO_MATCH) {
         LOG_TRACE("installing pktin suppression flow");
-        of_flow_add_t *flow_mod = of_flow_add_new(ind_ovs_version);
+        of_flow_add_t *flow_mod = of_flow_add_new(ctrlr_of_version);
         of_flow_add_hard_timeout_set(flow_mod, ind_ovs_pktin_suppression_cfg.hard_timeout);
         of_flow_add_idle_timeout_set(flow_mod, ind_ovs_pktin_suppression_cfg.idle_timeout);
         of_flow_add_cookie_set(flow_mod, ind_ovs_pktin_suppression_cfg.cookie);
@@ -503,7 +510,7 @@ ind_fwd_pkt_in(of_port_no_t in_port,
     of_octets_t of_octets = { .data = data, .bytes = len };
 
     of_packet_in_t *of_packet_in;
-    if ((of_packet_in = of_packet_in_new(ind_ovs_version)) == NULL) {
+    if ((of_packet_in = of_packet_in_new(ctrlr_of_version)) == NULL) {
         return INDIGO_ERROR_RESOURCE;
     }
 
@@ -511,7 +518,7 @@ ind_fwd_pkt_in(of_port_no_t in_port,
     of_packet_in_reason_set(of_packet_in, reason);
     of_packet_in_buffer_id_set(of_packet_in, OF_BUFFER_ID_NO_BUFFER);
 
-    if (ind_ovs_version < OF_VERSION_1_2) {
+    if (ctrlr_of_version < OF_VERSION_1_2) {
         of_packet_in_in_port_set(of_packet_in, in_port);
     } else {
         if (LOXI_FAILURE(of_packet_in_match_set(of_packet_in, match))) {
@@ -521,7 +528,7 @@ ind_fwd_pkt_in(of_port_no_t in_port,
         }
     }
 
-    if (ind_ovs_version >= OF_VERSION_1_3) {
+    if (ctrlr_of_version >= OF_VERSION_1_3) {
         of_packet_in_cookie_set(of_packet_in, 0xffffffffffffffff);
     }
 
