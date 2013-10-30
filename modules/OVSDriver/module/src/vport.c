@@ -548,9 +548,14 @@ port_status_notify(of_port_no_t of_port_num, unsigned reason)
     indigo_error_t   result = INDIGO_ERROR_NONE;
     of_port_desc_t   *of_port_desc   = 0;
     of_port_status_t *of_port_status = 0;
+    of_version_t ctrlr_of_version;
 
-    /* Don't know the cxn this is going to, so use configured version */
-    if ((of_port_desc = of_port_desc_new(ind_ovs_version)) == 0) {
+    if (indigo_cxn_get_async_version(&ctrlr_of_version) != INDIGO_ERROR_NONE) {
+        LOG_TRACE("No active controller connection");
+        return INDIGO_ERROR_NONE;
+    }
+
+    if ((of_port_desc = of_port_desc_new(ctrlr_of_version)) == 0) {
         LOG_ERROR("of_port_desc_new() failed");
         result = INDIGO_ERROR_UNKNOWN;
         goto done;
@@ -558,7 +563,7 @@ port_status_notify(of_port_no_t of_port_num, unsigned reason)
 
     port_desc_set(of_port_desc, of_port_num);
 
-    if ((of_port_status = of_port_status_new(ind_ovs_version)) == 0) {
+    if ((of_port_status = of_port_status_new(ctrlr_of_version)) == 0) {
         LOG_ERROR("of_port_status_new() failed");
         result = INDIGO_ERROR_UNKNOWN;
         goto done;
