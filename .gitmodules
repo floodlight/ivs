@@ -1,6 +1,6 @@
 [submodule "submodules/luajit-2.0"]
 	path = submodules/luajit-2.0
-	url = http://luajit.org/git/luajit-2.0.git
+	url = git@github.com:floodlight/luajit-2.0.git
 [submodule "submodules/infra"]
 	path = submodules/infra
 	url = git@github.com:floodlight/infra.git
