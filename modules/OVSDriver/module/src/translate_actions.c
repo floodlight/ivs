@@ -736,6 +736,42 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_UDP_DST, &port, sizeof(port));
                     break;
                 }
+                case OF_OXM_BSN_LAG_ID: {
+                    uint32_t val;
+                    of_oxm_bsn_lag_id_value_get(&oxm.bsn_lag_id, &val);
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_LAG_ID, &val, sizeof(val));
+                    break;
+                }
+                case OF_OXM_BSN_VRF: {
+                    uint32_t val;
+                    of_oxm_bsn_vrf_value_get(&oxm.bsn_vrf, &val);
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_VRF, &val, sizeof(val));
+                    break;
+                }
+                case OF_OXM_BSN_L3_INTERFACE_CLASS_ID: {
+                    uint32_t val;
+                    of_oxm_bsn_l3_interface_class_id_value_get(&oxm.bsn_l3_interface_class_id, &val);
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_L3_INTERFACE_CLASS_ID, &val, sizeof(val));
+                    break;
+                }
+                case OF_OXM_BSN_L3_SRC_CLASS_ID: {
+                    uint32_t val;
+                    of_oxm_bsn_l3_src_class_id_value_get(&oxm.bsn_l3_src_class_id, &val);
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_L3_SRC_CLASS_ID, &val, sizeof(val));
+                    break;
+                }
+                case OF_OXM_BSN_L3_DST_CLASS_ID: {
+                    uint32_t val;
+                    of_oxm_bsn_l3_dst_class_id_value_get(&oxm.bsn_l3_dst_class_id, &val);
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_L3_DST_CLASS_ID, &val, sizeof(val));
+                    break;
+                }
+                case OF_OXM_BSN_GLOBAL_VRF_ALLOWED: {
+                    uint8_t val;
+                    of_oxm_bsn_global_vrf_allowed_value_get(&oxm.bsn_global_vrf_allowed, &val);
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_GLOBAL_VRF_ALLOWED, &val, sizeof(val));
+                    break;
+                }
                 default:
                     LOG_ERROR("unsupported set-field oxm %s", of_object_id_str[oxm.header.object_id]);
                     return INDIGO_ERROR_COMPAT;

@@ -62,10 +62,10 @@ struct ind_ovs_flow_stats {
  * Canonical Flow Representation
  * Compressed version of the OpenFlow match fields for use in matching.
  * Does not contain the non-OpenFlow fields of the flow key.
- * Only contains OF 1.0 fields for now.
  * Wildcarded fields must be zeroed in the flow entry's CFR.
  * sizeof(struct ind_ovs_cfr) must be a multiple of 8.
- * All fields are in network byte order except in_port.
+ * All fields are in network byte order except in_port, lag_id, the
+ * class_ids, and global_vrf_allowed.
  */
 
 struct ind_ovs_cfr {
@@ -84,9 +84,15 @@ struct ind_ovs_cfr {
     uint32_t ipv6_src[4];       /* IPv6 source address. */
     uint32_t ipv6_dst[4];       /* IPv6 destination address. */
     uint32_t in_ports[4];       /* bsn_in_ports extension */
+    uint32_t lag_id;            /* bsn_lag_id extension */
+    uint32_t vrf;               /* bsn_vrf extension */
+    uint32_t l3_interface_class_id;  /* bsn_l3_interface_class_id extension */
+    uint32_t l3_src_class_id;   /* bsn_l3_src_class_id extension */
+    uint32_t l3_dst_class_id;   /* bsn_l3_dst_class_id extension */
+    uint32_t global_vrf_allowed:1;  /* bsn_global_vrf_allowed extension */
 } __attribute__ ((aligned (8)));
 
-AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == 10*8);
+AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == 13*8);
 
 #define IVS_MAX_BITMAP_IN_PORT 127
 

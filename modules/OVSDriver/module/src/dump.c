@@ -490,5 +490,12 @@ ind_ovs_dump_cfr(const struct ind_ovs_cfr *cfr)
     output("in_ports=%08x%08x%08x%08x", cfr->in_ports[0], cfr->in_ports[1],
                                         cfr->in_ports[2], cfr->in_ports[3]);
 
+    output("lag_id=%u", cfr->lag_id);
+    output("vrf=%u", cfr->vrf);
+    output("l3_interface_class_id=%u", cfr->l3_interface_class_id);
+    output("l3_src_class_id=%u", cfr->l3_src_class_id);
+    output("l3_dst_class_id=%u", cfr->l3_dst_class_id);
+    output("global_vrf_allowed=%u", cfr->global_vrf_allowed);
+
     indent--;
 }
