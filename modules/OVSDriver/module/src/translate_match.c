@@ -411,6 +411,20 @@ ind_ovs_match_to_cfr(const of_match_t *match,
         }
     }
 
+    /* Metadata */
+    fields->lag_id = match->fields.bsn_lag_id;
+    masks->lag_id = match->masks.bsn_lag_id;
+    fields->vrf = match->fields.bsn_vrf;
+    masks->vrf = match->masks.bsn_vrf;
+    fields->l3_interface_class_id = match->fields.bsn_l3_interface_class_id;
+    masks->l3_interface_class_id = match->masks.bsn_l3_interface_class_id;
+    fields->l3_src_class_id = match->fields.bsn_l3_src_class_id;
+    masks->l3_src_class_id = match->masks.bsn_l3_src_class_id;
+    fields->l3_dst_class_id = match->fields.bsn_l3_dst_class_id;
+    masks->l3_dst_class_id = match->masks.bsn_l3_dst_class_id;
+    fields->global_vrf_allowed = match->fields.bsn_global_vrf_allowed & 1;
+    masks->global_vrf_allowed = match->masks.bsn_global_vrf_allowed & 1;
+
     /* normalize the flow entry */
     int i;
     char *f = (char *)fields;

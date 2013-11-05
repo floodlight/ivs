@@ -137,6 +137,26 @@ ind_ovs_fwd_update_cfr(struct ind_ovs_cfr *cfr, struct xbuf *actions)
             memcpy(&cfr->ipv6_src, xbuf_payload(attr), sizeof(cfr->ipv6_src));
             break;
         /* Not implemented: IND_OVS_ACTION_SET_IPV6_FLABEL */
+        case IND_OVS_ACTION_SET_LAG_ID:
+            memcpy(&cfr->lag_id, xbuf_payload(attr), sizeof(cfr->lag_id));
+            break;
+        case IND_OVS_ACTION_SET_VRF:
+            memcpy(&cfr->vrf, xbuf_payload(attr), sizeof(cfr->vrf));
+            break;
+        case IND_OVS_ACTION_SET_L3_INTERFACE_CLASS_ID:
+            memcpy(&cfr->l3_interface_class_id, xbuf_payload(attr), sizeof(cfr->l3_interface_class_id));
+            break;
+        case IND_OVS_ACTION_SET_L3_SRC_CLASS_ID:
+            memcpy(&cfr->l3_src_class_id, xbuf_payload(attr), sizeof(cfr->l3_src_class_id));
+            break;
+        case IND_OVS_ACTION_SET_L3_DST_CLASS_ID:
+            memcpy(&cfr->l3_dst_class_id, xbuf_payload(attr), sizeof(cfr->l3_dst_class_id));
+            break;
+        case IND_OVS_ACTION_SET_GLOBAL_VRF_ALLOWED: {
+            uint8_t flag = *XBUF_PAYLOAD(attr, uint8_t);
+            cfr->global_vrf_allowed = flag & 1;
+            break;
+        }
         default:
             break;
         }
