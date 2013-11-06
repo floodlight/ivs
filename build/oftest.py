@@ -303,7 +303,7 @@ class AutotestIVS(object):
         if self.abat:
             self.abat.addTestcase(testName, testLogDir)
 
-        networkConfig = VethNetworkConfig(4)
+        networkConfig = VethNetworkConfig(8)
         ivs = IVS(networkConfig, testLogDir, self.config.openflow_version, self.config.ivs_args)
 
         ivs.start()
