@@ -18,8 +18,4 @@
 #
 ################################################################
 
-ROOT=$(dirname $(readlink -f $0))/..
-TOOLCHAIN=${TOOLCHAIN:=gcc-local}
-sudo "$ROOT/build/veth_setup.sh"
-export INDIGO_BENCHMARK=1 # disable ratelimiters
-sudo -E ${TOOL:-} "$ROOT/targets/ivs/build/$TOOLCHAIN/bin/ivs" -i veth0 -i veth2 -i veth4 -i veth6 -c 127.0.0.1 -l 127.0.0.1:6634 "$@"
+TOOL="valgrind ${VALGRIND_OPTIONS:-}" $(dirname $(readlink -f $0))/ivs.sh
