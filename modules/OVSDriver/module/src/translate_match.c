@@ -288,6 +288,14 @@ ind_ovs_key_to_cfr(const struct ind_ovs_parsed_key *pkey,
         cfr->tp_src = 0;
         cfr->tp_dst = 0;
     }
+
+    cfr->lag_id = 0;
+    cfr->vrf = 0;
+    cfr->l3_interface_class_id = 0;
+    cfr->l3_src_class_id = 0;
+    cfr->l3_dst_class_id = 0;
+    cfr->global_vrf_allowed = 0;
+    cfr->pad = 0;
 }
 
 void
@@ -424,6 +432,8 @@ ind_ovs_match_to_cfr(const of_match_t *match,
     masks->l3_dst_class_id = match->masks.bsn_l3_dst_class_id;
     fields->global_vrf_allowed = match->fields.bsn_global_vrf_allowed & 1;
     masks->global_vrf_allowed = match->masks.bsn_global_vrf_allowed & 1;
+    fields->pad = 0;
+    masks->pad = 0;
 
     /* normalize the flow entry */
     int i;
