@@ -90,6 +90,7 @@ struct ind_ovs_cfr {
     uint32_t l3_src_class_id;   /* bsn_l3_src_class_id extension */
     uint32_t l3_dst_class_id;   /* bsn_l3_dst_class_id extension */
     uint32_t global_vrf_allowed:1;  /* bsn_global_vrf_allowed extension */
+    uint32_t pad:31;
 } __attribute__ ((aligned (8)));
 
 AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == 13*8);
