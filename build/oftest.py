@@ -289,7 +289,9 @@ class AutotestIVS(object):
                 print test
 
     def runTest(self, test):
-        if self.config.openflow_version == "1.3":
+        if self.config.test_prefix:
+            testName = "%s.%s" % (self.config.test_prefix, test)
+        elif self.config.openflow_version == "1.3":
             testName = "of13.%s" % test
         else:
             testName = test
@@ -337,6 +339,7 @@ if __name__ == "__main__":
     ap.add_argument("--log-base-dir", help="Set the log base directory.", default=None)
     ap.add_argument("-V", "--openflow-version", help="OpenFlow version (1.0, 1.3)", default="1.0")
     ap.add_argument("--test-dir", help="Directory containing tests")
+    ap.add_argument("--test-prefix", help="Prefix to use when reporting results")
 
     config = ap.parse_args()
 
