@@ -1,12 +1,12 @@
 [submodule "submodules/luajit-2.0"]
 	path = submodules/luajit-2.0
-	url = git@github.com:floodlight/luajit-2.0.git
+	url = git://github.com/floodlight/luajit-2.0.git
 [submodule "submodules/infra"]
 	path = submodules/infra
-	url = git@github.com:floodlight/infra.git
+	url = git://github.com/floodlight/infra.git
 [submodule "submodules/indigo"]
 	path = submodules/indigo
-	url = git@github.com:floodlight/indigo.git
+	url = git://github.com/floodlight/indigo.git
 [submodule "submodules/bigcode"]
 	path = submodules/bigcode
-	url = git@github.com:floodlight/bigcode.git
+	url = git://github.com/floodlight/bigcode.git
