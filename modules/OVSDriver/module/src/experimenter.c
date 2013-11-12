@@ -106,7 +106,9 @@ ind_ovs_handle_bsn_get_interfaces_request(
 
     freeifaddrs(ifaddr);
 
-    return indigo_cxn_send_controller_message(cxn_id, reply);
+    indigo_cxn_send_controller_message(cxn_id, reply);
+
+    return INDIGO_ERROR_NONE;
 }
 
 indigo_error_t
@@ -138,7 +140,9 @@ ind_ovs_handle_bsn_set_pktin_suppression_request(of_experimenter_t *experimenter
 
     of_bsn_set_pktin_suppression_reply_status_set(reply, 0);
 
-    return indigo_cxn_send_controller_message(cxn_id, reply);
+    indigo_cxn_send_controller_message(cxn_id, reply);
+
+    return INDIGO_ERROR_NONE;
 }
 
 indigo_error_t
