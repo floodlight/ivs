@@ -198,6 +198,10 @@ struct ind_ovs_flow {
     /* Updated periodically from the kernel flows */
     struct ind_ovs_flow_stats stats;
 
+    /* Packet stats from the last hit bit check */
+    /* See indigo_fwd_table_stats_get */
+    uint64_t last_hit_check_packets;
+
     indigo_cookie_t  flow_id;
     struct list_links flow_id_links; /* (global) ind_ovs_flow_id_buckets */
 

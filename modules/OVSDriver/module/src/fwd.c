@@ -234,6 +234,7 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
     flow->flow_id = flow_id;
     flow->stats.packets = 0;
     flow->stats.bytes = 0;
+    flow->last_hit_check_packets = 0;
 
     of_match_t of_match;
     memset(&of_match, 0, sizeof(of_match));
@@ -399,6 +400,29 @@ indigo_fwd_flow_stats_get(indigo_cookie_t flow_id,
     flow_stats->duration_ns = 0;
     flow_stats->packets = flow->stats.packets;
     flow_stats->bytes = flow->stats.bytes;
+
+    return INDIGO_ERROR_NONE;
+}
+
+
+/** \brief Get flow hit status */
+
+indigo_error_t
+indigo_fwd_flow_hit_status_get(indigo_cookie_t flow_id, bool *hit)
+{
+    struct ind_ovs_flow *flow;
+
+    if ((flow = ind_ovs_flow_lookup(flow_id)) == 0) {
+       LOG_ERROR("Flow not found");
+       return INDIGO_ERROR_NOT_FOUND;
+    }
+
+    if (flow->stats.packets != flow->last_hit_check_packets) {
+        flow->last_hit_check_packets = flow->stats.packets;
+        *hit = true;
+    } else {
+        *hit = false;
+    }
 
     return INDIGO_ERROR_NONE;
 }
