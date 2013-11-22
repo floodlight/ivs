@@ -51,6 +51,7 @@ struct ind_ovs_flow_effects {
     uint32_t meter_id;
     uint8_t next_table_id;
     unsigned clear_actions : 1;
+    unsigned disable_src_mac_check : 1;
 };
 
 struct ind_ovs_flow_stats {

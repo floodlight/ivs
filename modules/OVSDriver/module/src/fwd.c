@@ -132,6 +132,7 @@ init_effects(struct ind_ovs_flow_effects *effects,
     xbuf_init(&effects->write_actions);
 
     effects->clear_actions = 0;
+    effects->disable_src_mac_check = 0;
     effects->meter_id = -1;
     effects->next_table_id = -1;
 
@@ -184,6 +185,9 @@ init_effects(struct ind_ovs_flow_effects *effects,
                 break;
             case OF_INSTRUCTION_METER:
                 of_instruction_meter_meter_id_get(&inst.meter, &effects->meter_id);
+                break;
+            case OF_INSTRUCTION_BSN_DISABLE_SRC_MAC_CHECK:
+                effects->disable_src_mac_check = 1;
                 break;
             default:
                 return INDIGO_ERROR_COMPAT;
