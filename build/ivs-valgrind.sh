@@ -18,4 +18,4 @@
 #
 ################################################################
 
-TOOL="valgrind ${VALGRIND_OPTIONS:-}" $(dirname $(readlink -f $0))/ivs.sh
+TOOL="valgrind ${VALGRIND_OPTIONS:-}" $(dirname $(readlink -f $0))/ivs.sh "$@"
