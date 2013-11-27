@@ -18,4 +18,4 @@
 #
 ################################################################
 
-TOOL="gdb --args" $(dirname $(readlink -f $0))/ivs.sh
+TOOL="gdb --args" $(dirname $(readlink -f $0))/ivs.sh "$@"
