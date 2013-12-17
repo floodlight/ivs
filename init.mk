@@ -70,6 +70,15 @@ ifndef SUBMODULE_SWITCHLIGHT_COMMON
   endif
 endif
 
+ifndef SUBMODULE_LOXIGEN_ARTIFACTS
+  ifdef SUBMODULES
+    SUBMODULE_LOXIGEN_ARTIFACTS := $(SUBMODULES)/loxigen-artifacts
+  else
+    SUBMODULE_LOXIGEN_ARTIFACTS := $(ROOT)/submodules/loxigen-artifacts
+    SUBMODULES_LOCAL += loxigen-artifacts
+  endif
+endif
+
 export SUBMODULE_INFRA
 export SUBMODULE_BIGCODE
 export SUBMODULE_INDIGO
