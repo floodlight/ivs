@@ -351,7 +351,11 @@ port_stats_iterator(struct nl_msg *msg, void *arg)
         return NL_STOP;
     }
 
-    of_port_stats_entry_port_no_set(entry, port_no);
+    if (port_no == OVSP_LOCAL) {
+        of_port_stats_entry_port_no_set(entry, OF_PORT_DEST_LOCAL);
+    } else {
+        of_port_stats_entry_port_no_set(entry, port_no);
+    }
 
     struct rtnl_link *link;
     if ((vport_type == OVS_VPORT_TYPE_NETDEV
