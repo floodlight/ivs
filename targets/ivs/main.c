@@ -44,6 +44,7 @@
 #include <lacpa/lacpa.h>
 #include <lldpa/lldpa.h>
 #include <arpa/arpa.h>
+#include <router_ip_table/router_ip_table.h>
 
 #define AIM_LOG_MODULE_NAME ivs
 #include <AIM/aim_log.h>
@@ -407,6 +408,11 @@ aim_main(int argc, char* argv[])
         return 1;
     }
 
+    if (router_ip_table_init() < 0) {
+        AIM_LOG_FATAL("Failed to initialize Router IP table module");
+        return 1;
+    }
+
     if (enable_tunnel) {
         if (ind_ovs_tunnel_init() < 0) {
             AIM_LOG_FATAL("Failed to initialize tunneling");
@@ -576,6 +582,7 @@ aim_main(int argc, char* argv[])
 
     AIM_LOG_MSG("Stopping %s", program_version);
 
+    router_ip_table_finish();
     arpa_finish();
     lldpa_system_finish();
     ind_core_finish();
