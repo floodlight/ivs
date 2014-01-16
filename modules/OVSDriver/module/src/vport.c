@@ -46,6 +46,10 @@ static void port_desc_set_local(of_port_desc_t *of_port_desc);
 struct ind_ovs_port *
 ind_ovs_port_lookup(of_port_no_t port_no)
 {
+    if (port_no == OF_PORT_DEST_USE_TABLE) {
+        return ind_ovs_ports[OVSP_LOCAL];
+    }
+
     if (port_no >= IND_OVS_MAX_PORTS) {
         return NULL;
     }
