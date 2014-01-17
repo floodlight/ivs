@@ -194,6 +194,10 @@ ind_ovs_init(const char *datapath_name, uint32_t max_flows)
         return ret;
     }
 
+    /* Pretend we received a port created notification for the internal port */
+    of_mac_addr_t local_mac = { { 0, 0, 0, 0, 0, 0 } };
+    ind_ovs_port_added(OVSP_LOCAL, "local", local_mac);
+
     if ((ret = ind_soc_timer_event_register(
         (ind_soc_timer_callback_f)ind_ovs_kflow_expire, NULL, 2345)) != 0) {
         LOG_ERROR("failed to create timer");
