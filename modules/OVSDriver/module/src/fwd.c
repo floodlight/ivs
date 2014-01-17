@@ -616,7 +616,7 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
         /* Send the packet to in_port's upcall thread */
         struct ind_ovs_port *in_port = ind_ovs_port_lookup(of_port_num);
         if (in_port == NULL) {
-            LOG_ERROR("controller specified an invalid packet-out in_port: 0x%x", in_port);
+            LOG_ERROR("controller specified an invalid packet-out in_port: 0x%x", of_port_num);
             return INDIGO_ERROR_PARAM;
         }
         netlink_pid = nl_socket_get_local_port(in_port->notify_socket);
