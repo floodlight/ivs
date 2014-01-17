@@ -559,6 +559,34 @@ ind_fwd_pkt_in(of_port_no_t in_port,
     return indigo_core_packet_in(of_packet_in);
 }
 
+/* Check for a single output to OFPP_TABLE */
+
+static bool
+check_for_table_action(of_list_action_t *actions)
+{
+    of_action_t action;
+
+    if (of_list_action_first(actions, &action) < 0) {
+        return false;
+    }
+
+    if (action.header.object_id != OF_ACTION_OUTPUT) {
+        return false;
+    }
+
+    of_port_no_t port_no;
+    of_action_output_port_get(&action.output, &port_no);
+    if (port_no != OF_PORT_DEST_USE_TABLE) {
+        return false;
+    }
+
+    if (of_list_action_next(actions, &action) == 0) {
+        return false;
+    }
+
+    return true;
+}
+
 /** \brief Handle packet out request from Core */
 
 indigo_error_t
@@ -571,6 +599,22 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
     of_packet_out_in_port_get(of_packet_out, &of_port_num);
     of_packet_out_data_get(of_packet_out, of_octets);
     of_packet_out_actions_bind(of_packet_out, of_list_action);
+
+    bool use_table = check_for_table_action(of_list_action);
+
+    int netlink_pid;
+    if (use_table) {
+        /* Send the packet to in_port's upcall thread */
+        struct ind_ovs_port *in_port = ind_ovs_port_lookup(of_port_num);
+        if (in_port == NULL) {
+            LOG_ERROR("controller specified an invalid packet-out in_port: 0x%x", in_port);
+            return INDIGO_ERROR_PARAM;
+        }
+        netlink_pid = nl_socket_get_local_port(in_port->notify_socket);
+    } else {
+        /* Send the packet back to ourselves with the full key */
+        netlink_pid = nl_socket_get_local_port(ind_ovs_socket);
+    }
 
     /* Create the OVS_PACKET_CMD_EXECUTE message which will be used twice: once
      * to ask the kernel to parse the packet, and then again with the real actions. */
@@ -591,10 +635,14 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
 
     nla_put(msg, OVS_PACKET_ATTR_PACKET, of_octets->bytes, of_octets->data);
 
-    /* This action sends the packet back to us with the full key */
     struct nlattr *actions = nla_nest_start(msg, OVS_PACKET_ATTR_ACTIONS);
     struct nlattr *action_attr = nla_nest_start(msg, OVS_ACTION_ATTR_USERSPACE);
-    nla_put_u32(msg, OVS_USERSPACE_ATTR_PID, nl_socket_get_local_port(ind_ovs_socket));
+    nla_put_u32(msg, OVS_USERSPACE_ATTR_PID, netlink_pid);
+    if (use_table) {
+        /* Ask the upcall thread to process this even though it's won't be a
+         * miss */
+        nla_put_u64(msg, OVS_USERSPACE_ATTR_USERDATA, 1);
+    }
     nla_nest_end(msg, action_attr);
     nla_nest_end(msg, actions);
 
@@ -604,6 +652,12 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
         LOG_ERROR("nl_send failed: %s", nl_geterror(err));
         ind_ovs_nlmsg_freelist_free(msg);
         return INDIGO_ERROR_UNKNOWN;
+    }
+
+    if (use_table) {
+        /* An upcall thread will forward the packet */
+        ind_ovs_nlmsg_freelist_free(msg);
+        return INDIGO_ERROR_NONE;
     }
 
     /* Receive the OVS_PACKET_CMD_ACTION we just caused */
