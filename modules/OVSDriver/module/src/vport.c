@@ -45,7 +45,7 @@ static void port_desc_set(of_port_desc_t *of_port_desc, of_port_no_t of_port_num
 struct ind_ovs_port *
 ind_ovs_port_lookup(of_port_no_t port_no)
 {
-    if (port_no == OF_PORT_DEST_USE_TABLE) {
+    if (port_no == OF_PORT_DEST_LOCAL) {
         return ind_ovs_ports[OVSP_LOCAL];
     }
 
