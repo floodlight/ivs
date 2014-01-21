@@ -28,7 +28,6 @@
 #include "indigo/error.h"
 #include <xbuf/xbuf.h>
 
-struct pipeline;
 struct pipeline_result;
 struct ind_ovs_cfr;
 
@@ -60,8 +59,8 @@ struct pipeline_result {
     struct xbuf stats;
 };
 
-struct pipeline *pipeline_create(int openflow_version, pipeline_lookup_f lookup);
-void pipeline_destroy(struct pipeline *pipeline);
+void pipeline_init(int openflow_version, pipeline_lookup_f lookup);
+void pipeline_finish(void);
 
 /*
  * Send a packet through the pipeline.
@@ -69,8 +68,7 @@ void pipeline_destroy(struct pipeline *pipeline);
  * 'result' should be initialized with pipeline_result_init.
  */
 indigo_error_t
-pipeline_process(struct pipeline *pipeline,
-                 struct ind_ovs_cfr *cfr,
+pipeline_process(struct ind_ovs_cfr *cfr,
                  struct pipeline_result *result);
 
 /* Operations on a struct pipeline_result */

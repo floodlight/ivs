@@ -25,43 +25,34 @@
 #include <ivs/actions.h>
 #include <loci/loci.h>
 
-struct pipeline {
-    int openflow_version;
-    pipeline_lookup_f lookup;
-};
+static int pipeline_openflow_version;
+static pipeline_lookup_f pipeline_lookup;
 
 void ind_ovs_fwd_update_cfr(struct ind_ovs_cfr *cfr, struct xbuf *actions);
 
-struct pipeline *
-pipeline_create(int openflow_version, pipeline_lookup_f lookup)
+void
+pipeline_init(int openflow_version, pipeline_lookup_f lookup)
 {
-    struct pipeline *pipeline = malloc(sizeof(*pipeline));
-    if (pipeline == NULL) {
-        AIM_DIE("failed to allocate pipeline");
-    }
-    pipeline->openflow_version = openflow_version;
-    pipeline->lookup = lookup;
-    return pipeline;
+    pipeline_openflow_version = openflow_version;
+    pipeline_lookup = lookup;
 }
 
 void
-pipeline_destroy(struct pipeline *pipeline)
+pipeline_finish(void)
 {
-    free(pipeline);
 }
 
 indigo_error_t
-pipeline_process(struct pipeline *pipeline,
-                 struct ind_ovs_cfr *cfr,
+pipeline_process(struct ind_ovs_cfr *cfr,
                  struct pipeline_result *result)
 {
     uint8_t table_id = 0;
 
     while (table_id != (uint8_t)-1) {
         struct ind_ovs_flow_effects *effects =
-            pipeline->lookup(table_id, cfr, &result->stats);
+            pipeline_lookup(table_id, cfr, &result->stats);
         if (effects == NULL) {
-            if (pipeline->openflow_version < OF_VERSION_1_3) {
+            if (pipeline_openflow_version < OF_VERSION_1_3) {
                 uint8_t reason = OF_PACKET_IN_REASON_NO_MATCH;
                 xbuf_append_attr(&result->actions, IND_OVS_ACTION_CONTROLLER, &reason, sizeof(reason));
             }
