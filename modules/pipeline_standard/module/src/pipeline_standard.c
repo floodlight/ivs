@@ -24,33 +24,36 @@
 #include <ivs/ivs.h>
 #include <ivs/actions.h>
 #include <loci/loci.h>
+#include <OVSDriver/ovsdriver.h>
 
-#define AIM_LOG_MODULE_NAME pipeline
+#define AIM_LOG_MODULE_NAME pipeline_standard
 #include <AIM/aim_log.h>
 
-static void pipeline_openflow_update_cfr(struct ind_ovs_cfr *cfr, struct xbuf *actions);
+AIM_LOG_STRUCT_DEFINE(AIM_LOG_OPTIONS_DEFAULT, AIM_LOG_BITS_DEFAULT, NULL, 0);
 
-static int pipeline_openflow_version = -1;
+static void pipeline_standard_update_cfr(struct ind_ovs_cfr *cfr, struct xbuf *actions);
+
+static int openflow_version = -1;
 
 static void
-pipeline_openflow_init(const char *name)
+pipeline_standard_init(const char *name)
 {
     if (!strcmp(name, "standard-1.0")) {
-        pipeline_openflow_version = OF_VERSION_1_0;
+        openflow_version = OF_VERSION_1_0;
     } else if (!strcmp(name, "standard-1.3")) {
-        pipeline_openflow_version = OF_VERSION_1_3;
+        openflow_version = OF_VERSION_1_3;
     } else {
         AIM_DIE("unexpected pipeline name '%s'", name);
     }
 }
 
 static void
-pipeline_openflow_finish(void)
+pipeline_standard_finish(void)
 {
 }
 
 indigo_error_t
-pipeline_openflow_process(struct ind_ovs_cfr *cfr,
+pipeline_standard_process(struct ind_ovs_cfr *cfr,
                           struct pipeline_result *result)
 {
     uint8_t table_id = 0;
@@ -59,7 +62,7 @@ pipeline_openflow_process(struct ind_ovs_cfr *cfr,
         struct ind_ovs_flow_effects *effects =
             ind_ovs_fwd_pipeline_lookup(table_id, cfr, &result->stats);
         if (effects == NULL) {
-            if (pipeline_openflow_version < OF_VERSION_1_3) {
+            if (openflow_version < OF_VERSION_1_3) {
                 uint8_t reason = OF_PACKET_IN_REASON_NO_MATCH;
                 xbuf_append_attr(&result->actions, IND_OVS_ACTION_CONTROLLER, &reason, sizeof(reason));
             }
@@ -72,31 +75,31 @@ pipeline_openflow_process(struct ind_ovs_cfr *cfr,
         table_id = effects->next_table_id;
 
         if (table_id != (uint8_t)-1) {
-            pipeline_openflow_update_cfr(cfr, &effects->apply_actions);
+            pipeline_standard_update_cfr(cfr, &effects->apply_actions);
         }
     }
 
     return INDIGO_ERROR_NONE;
 }
 
-static struct pipeline_ops pipeline_openflow_ops = {
-    .init = pipeline_openflow_init,
-    .finish = pipeline_openflow_finish,
-    .process = pipeline_openflow_process,
+static struct pipeline_ops pipeline_standard_ops = {
+    .init = pipeline_standard_init,
+    .finish = pipeline_standard_finish,
+    .process = pipeline_standard_process,
 };
 
 void
-__pipeline_openflow_module_init__(void)
+__pipeline_standard_module_init__(void)
 {
-    pipeline_register("standard-1.0", &pipeline_openflow_ops);
-    pipeline_register("standard-1.3", &pipeline_openflow_ops);
+    pipeline_register("standard-1.0", &pipeline_standard_ops);
+    pipeline_register("standard-1.3", &pipeline_standard_ops);
 }
 
 /*
  * Scan actions list for field modifications and update the CFR accordingly
  */
 static void
-pipeline_openflow_update_cfr(struct ind_ovs_cfr *cfr, struct xbuf *actions)
+pipeline_standard_update_cfr(struct ind_ovs_cfr *cfr, struct xbuf *actions)
 {
     struct nlattr *attr;
     XBUF_FOREACH(xbuf_data(actions), xbuf_length(actions), attr) {

@@ -20,4 +20,3 @@
 THIS_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 pipeline_INCLUDES := -I $(THIS_DIR)inc
 pipeline_INTERNAL_INCLUDES := -I $(THIS_DIR)src
-pipeline_DEPENDMODULE_ENTRIES := init:pipeline_openflow
