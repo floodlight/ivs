@@ -24,17 +24,16 @@
 #include <ivs/ivs.h>
 #include <ivs/actions.h>
 #include <loci/loci.h>
-
-static int pipeline_openflow_version;
-static pipeline_lookup_f pipeline_lookup;
+#include <OVSDriver/ovsdriver.h>
 
 void ind_ovs_fwd_update_cfr(struct ind_ovs_cfr *cfr, struct xbuf *actions);
 
+static int pipeline_openflow_version;
+
 void
-pipeline_init(int openflow_version, pipeline_lookup_f lookup)
+pipeline_init(int openflow_version)
 {
     pipeline_openflow_version = openflow_version;
-    pipeline_lookup = lookup;
 }
 
 void
@@ -50,7 +49,7 @@ pipeline_process(struct ind_ovs_cfr *cfr,
 
     while (table_id != (uint8_t)-1) {
         struct ind_ovs_flow_effects *effects =
-            pipeline_lookup(table_id, cfr, &result->stats);
+            ind_ovs_fwd_pipeline_lookup(table_id, cfr, &result->stats);
         if (effects == NULL) {
             if (pipeline_openflow_version < OF_VERSION_1_3) {
                 uint8_t reason = OF_PACKET_IN_REASON_NO_MATCH;

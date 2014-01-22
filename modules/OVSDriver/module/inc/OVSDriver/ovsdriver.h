@@ -20,9 +20,18 @@
 #ifndef __OVSDRIVER_H__
 #define __OVSDRIVER_H__
 
+struct xbuf;
+struct ind_ovs_cfr;
+
 indigo_error_t ind_ovs_init(const char *datapath_name);
 void ind_ovs_finish(void);
 
 indigo_error_t ind_ovs_tunnel_init(void);
+
+/*
+ * Exported from OVSDriver for use by the pipeline
+ */
+struct ind_ovs_flow_effects *ind_ovs_fwd_pipeline_lookup(int table_id, struct ind_ovs_cfr *cfr, struct xbuf *stats);
+
 
 #endif

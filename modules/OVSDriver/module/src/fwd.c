@@ -797,7 +797,7 @@ ind_ovs_fwd_init(void)
         }
     }
 
-    pipeline_init(ind_ovs_version, ind_ovs_fwd_pipeline_lookup);
+    pipeline_init(ind_ovs_version);
 
     aim_ratelimiter_init(&ind_ovs_pktin_limiter, PKTIN_INTERVAL,
                          PKTIN_BURST_SIZE, NULL);

@@ -32,13 +32,6 @@ struct pipeline_result;
 struct ind_ovs_cfr;
 
 /*
- * Function provided to the pipeline to lookup in flowtables.
- */
-typedef struct ind_ovs_flow_effects *(* pipeline_lookup_f)(
-        int table_id, struct ind_ovs_cfr *cfr,
-        struct xbuf *stats);
-
-/*
  * Result of the forwarding pipeline (ind_ovs_pipeline_process)
  *
  * See pipeline_result_{init,reset,cleanup}.
@@ -59,7 +52,7 @@ struct pipeline_result {
     struct xbuf stats;
 };
 
-void pipeline_init(int openflow_version, pipeline_lookup_f lookup);
+void pipeline_init(int openflow_version);
 void pipeline_finish(void);
 
 /*
