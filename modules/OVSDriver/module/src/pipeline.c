@@ -23,18 +23,19 @@
 void
 indigo_fwd_pipeline_get(of_desc_str_t pipeline)
 {
-    strcpy(pipeline, "unknown");
+    const char *name = pipeline_get();
+    memset(pipeline, 0, sizeof(of_desc_str_t));
+    strncpy(pipeline, name, sizeof(of_desc_str_t));
 }
 
 indigo_error_t
 indigo_fwd_pipeline_set(of_desc_str_t pipeline)
 {
-    return INDIGO_ERROR_NOT_SUPPORTED;
+    return pipeline_set(pipeline);
 }
 
 void
 indigo_fwd_pipeline_stats_get(of_desc_str_t **pipelines, int *num_pipelines)
 {
-    *num_pipelines = 0;
-    *pipelines = NULL;
+    pipeline_list(pipelines, num_pipelines);
 }

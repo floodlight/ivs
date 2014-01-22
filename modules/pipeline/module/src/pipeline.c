@@ -85,10 +85,31 @@ pipeline_set(const char *name)
         return INDIGO_ERROR_NONE;
     }
 
-    AIM_LOG_INFO("Initializing pipeline %s", name);
     new_pipeline->ops->init(name);
     current_pipeline = new_pipeline;
     return INDIGO_ERROR_NONE;
+}
+
+const char *
+pipeline_get(void)
+{
+    AIM_TRUE_OR_DIE(current_pipeline != NULL);
+    return current_pipeline->name;
+}
+
+void
+pipeline_list(of_desc_str_t **ret_pipelines, int *num_pipelines)
+{
+    *ret_pipelines = aim_zmalloc(sizeof(of_desc_str_t) * MAX_PIPELINES);
+
+    int i, j = 0;
+    for (i = 0; i < MAX_PIPELINES; i++) {
+        if (pipelines[i].name != 0) {
+            strncpy((*ret_pipelines)[j++], pipelines[i].name, sizeof(of_desc_str_t));
+        }
+    }
+
+    *num_pipelines = j;
 }
 
 indigo_error_t

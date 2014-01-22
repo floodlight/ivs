@@ -25,7 +25,7 @@
 #define PIPELINE_H
 
 #include <stdbool.h>
-#include "indigo/error.h"
+#include <indigo/indigo.h>
 #include <xbuf/xbuf.h>
 
 struct pipeline_result;
@@ -80,6 +80,16 @@ void pipeline_register(const char *name, const struct pipeline_ops *ops);
  * is initialized.
  */
 indigo_error_t pipeline_set(const char *name);
+
+/*
+ * Get the name of the current pipeline
+ */
+const char *pipeline_get(void);
+
+/*
+ * Get a list of supported pipelines
+ */
+void pipeline_list(of_desc_str_t **ret_pipelines, int *num_pipelines);
 
 /*
  * Send a packet through the pipeline.
