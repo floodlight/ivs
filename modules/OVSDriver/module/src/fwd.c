@@ -797,7 +797,13 @@ ind_ovs_fwd_init(void)
         }
     }
 
-    pipeline_init(ind_ovs_version);
+    if (ind_ovs_version == OF_VERSION_1_0) {
+        AIM_TRUE_OR_DIE(pipeline_set("standard-1.0") == 0);
+    } else if (ind_ovs_version == OF_VERSION_1_3) {
+        AIM_TRUE_OR_DIE(pipeline_set("standard-1.3") == 0);
+    } else {
+        AIM_DIE("unexpected OpenFlow version");
+    }
 
     aim_ratelimiter_init(&ind_ovs_pktin_limiter, PKTIN_INTERVAL,
                          PKTIN_BURST_SIZE, NULL);
@@ -824,8 +830,6 @@ ind_ovs_fwd_finish(void)
 
     /* Hold this forever. */
     ind_ovs_fwd_write_lock();
-
-    pipeline_finish();
 
     for (i = 0; i < IND_OVS_NUM_TABLES; i++) {
         struct ind_ovs_table *table = &ind_ovs_tables[i];

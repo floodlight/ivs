@@ -52,8 +52,34 @@ struct pipeline_result {
     struct xbuf stats;
 };
 
-void pipeline_init(int openflow_version);
-void pipeline_finish(void);
+struct pipeline_ops {
+    void (*init)(const char *name);
+    void (*finish)(void);
+    indigo_error_t (*process)(struct ind_ovs_cfr *cfr, struct pipeline_result *result);
+};
+
+/*
+ * Register a pipeline implementation
+ *
+ * 'name' must be unique.
+ */
+void pipeline_register(const char *name, const struct pipeline_ops *ops);
+
+/*
+ * Choose a pipeline implementation
+ *
+ * Returns an error and has no effect if 'name' is not a valid pipeline name.
+ *
+ * Cleans up the old pipeline and initializes the new one. This happens even if
+ * 'name' matches the current pipeline.
+ *
+ * Initially no pipeline is current. Attempting to process packets will cause
+ * an abort until this function is used to choose a pipeline.
+ *
+ * If name is NULL then the current pipeline is cleaned up and no new pipeline
+ * is initialized.
+ */
+indigo_error_t pipeline_set(const char *name);
 
 /*
  * Send a packet through the pipeline.
