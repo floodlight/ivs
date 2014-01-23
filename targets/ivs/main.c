@@ -45,6 +45,7 @@
 #include <lldpa/lldpa.h>
 #include <arpa/arpa.h>
 #include <router_ip_table/router_ip_table.h>
+#include <icmpa/icmpa.h>
 #include <pipeline/pipeline.h>
 
 #define AIM_LOG_MODULE_NAME ivs
@@ -393,6 +394,11 @@ aim_main(int argc, char* argv[])
         return 1;
     }
 
+    if (icmpa_init() < 0) {
+        AIM_LOG_FATAL("Failed to initialize ICMP Agent module");
+        return 1;
+    }
+
     if (enable_tunnel) {
         if (ind_ovs_tunnel_init() < 0) {
             AIM_LOG_FATAL("Failed to initialize tunneling");
@@ -581,6 +587,7 @@ aim_main(int argc, char* argv[])
     router_ip_table_finish();
     arpa_finish();
     lldpa_system_finish();
+    icmpa_finish();
     ind_core_finish();
     ind_ovs_finish();
     ind_cxn_finish();
