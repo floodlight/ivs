@@ -48,7 +48,7 @@ pipeline_register(const char *name, const struct pipeline_ops *ops)
     for (i = 0; i < MAX_PIPELINES; i++) {
         struct pipeline *p = &pipelines[i];
         if (p->name == NULL) {
-            p->name = name;
+            p->name = aim_strdup(name);
             p->ops = ops;
             return;
         }
