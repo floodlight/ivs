@@ -797,6 +797,14 @@ ind_ovs_fwd_init(void)
         }
     }
 
+    if (ind_ovs_version == OF_VERSION_1_0) {
+        AIM_TRUE_OR_DIE(pipeline_set("standard-1.0") == 0);
+    } else if (ind_ovs_version == OF_VERSION_1_3) {
+        AIM_TRUE_OR_DIE(pipeline_set("standard-1.3") == 0);
+    } else {
+        AIM_DIE("unexpected OpenFlow version");
+    }
+
     aim_ratelimiter_init(&ind_ovs_pktin_limiter, PKTIN_INTERVAL,
                          PKTIN_BURST_SIZE, NULL);
 

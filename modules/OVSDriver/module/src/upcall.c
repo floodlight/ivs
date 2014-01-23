@@ -53,9 +53,6 @@ struct ind_ovs_upcall_thread {
     /* Cached here so we don't need to reallocate it every time */
     struct pipeline_result result;
 
-    /* Packet pipeline */
-    struct pipeline *pipeline;
-
     /* Preallocated messages used by the upcall thread for send and recv. */
     struct nl_msg *msgs[NUM_UPCALL_BUFFERS];
 
@@ -255,7 +252,7 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
 
     struct pipeline_result *result = &thread->result;
     pipeline_result_reset(result);
-    indigo_error_t err = pipeline_process(thread->pipeline, &cfr, result);
+    indigo_error_t err = pipeline_process(&cfr, result);
     if (err < 0) {
         return;
     }
@@ -504,9 +501,6 @@ ind_ovs_upcall_init(void)
             thread->msgvec[j].msg_hdr.msg_iovlen = 1;
         }
 
-        thread->pipeline =
-            pipeline_create(ind_ovs_version, ind_ovs_fwd_pipeline_lookup);
-
         if (pthread_create(&thread->pthread, NULL,
                         ind_ovs_upcall_thread_main, thread) < 0) {
             LOG_ERROR("failed to start upcall thread");
@@ -538,7 +532,6 @@ ind_ovs_upcall_finish(void)
         pthread_join(thread->pthread, NULL);
         close(thread->epfd);
         pipeline_result_cleanup(&thread->result);
-        pipeline_destroy(thread->pipeline);
         for (j = 0; j < NUM_UPCALL_BUFFERS; j++) {
             nlmsg_free(thread->msgs[j]);
         }

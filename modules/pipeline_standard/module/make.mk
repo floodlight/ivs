@@ -1,6 +1,6 @@
 ################################################################
 #
-#        Copyright 2013, Big Switch Networks, Inc.
+#        Copyright 2014, Big Switch Networks, Inc.
 #
 # Licensed under the Eclipse Public License, Version 1.0 (the
 # "License"); you may not use this file except in compliance
@@ -17,6 +17,7 @@
 #
 ################################################################
 
-UMODULE := pipeline
-UMODULE_SUBDIR := $(dir $(lastword $(MAKEFILE_LIST)))
-include $(BUILDER)/utest.mk
+THIS_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+pipeline_standard_INCLUDES := -I $(THIS_DIR)inc
+pipeline_standard_INTERNAL_INCLUDES := -I $(THIS_DIR)src
+pipeline_standard_DEPENDMODULE_ENTRIES := init:pipeline_standard
