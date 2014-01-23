@@ -224,7 +224,7 @@ ind_ovs_handle_one_upcall(struct ind_ovs_upcall_thread *thread,
         abort();
     }
 
-    if (gnlh->cmd == OVS_PACKET_CMD_MISS || attrs[OVS_PACKET_ATTR_USERDATA]) {
+    if (gnlh->cmd == OVS_PACKET_CMD_MISS || !attrs[OVS_PACKET_ATTR_USERDATA]) {
         ind_ovs_handle_packet_miss(thread, port, msg, attrs);
     } else {
         ind_ovs_handle_packet_action(thread, port, msg, attrs);

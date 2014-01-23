@@ -647,11 +647,6 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
     struct nlattr *actions = nla_nest_start(msg, OVS_PACKET_ATTR_ACTIONS);
     struct nlattr *action_attr = nla_nest_start(msg, OVS_ACTION_ATTR_USERSPACE);
     nla_put_u32(msg, OVS_USERSPACE_ATTR_PID, netlink_pid);
-    if (use_table) {
-        /* Ask the upcall thread to process this even though it's won't be a
-         * miss */
-        nla_put_u64(msg, OVS_USERSPACE_ATTR_USERDATA, 1);
-    }
     nla_nest_end(msg, action_attr);
     nla_nest_end(msg, actions);
 
