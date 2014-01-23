@@ -51,6 +51,8 @@ pipeline_register(const char *name, const struct pipeline_ops *ops)
             p->name = aim_strdup(name);
             p->ops = ops;
             return;
+        } else if (!strcmp(p->name, name)) {
+            AIM_DIE("attempted to register duplicate pipeline '%s'", name);
         }
     }
 
