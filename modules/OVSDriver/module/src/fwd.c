@@ -636,6 +636,8 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
     struct nlattr *key = nla_nest_start(msg, OVS_PACKET_ATTR_KEY);
     if (of_port_num < IND_OVS_MAX_PORTS) {
         nla_put_u32(msg, OVS_KEY_ATTR_IN_PORT, of_port_num);
+    } else if (of_port_num == OF_PORT_DEST_LOCAL) {
+        nla_put_u32(msg, OVS_KEY_ATTR_IN_PORT, OVSP_LOCAL);
     } else {
         /* Can't have an empty key. */
         nla_put_u32(msg, OVS_KEY_ATTR_PRIORITY, 0);
