@@ -47,6 +47,7 @@ int ovs_datapath_family, ovs_packet_family, ovs_vport_family, ovs_flow_family;
 bool ind_ovs_benchmark_mode = false;
 uint32_t ind_ovs_salt;
 int ind_ovs_version = OF_VERSION_1_0;
+uint32_t ind_ovs_max_flows;
 
 static int
 ind_ovs_create_datapath(const char *name)
@@ -145,7 +146,7 @@ indigo_fwd_expiration_enable_get(int *is_enabled)
 }
 
 indigo_error_t
-ind_ovs_init(const char *datapath_name)
+ind_ovs_init(const char *datapath_name, uint32_t max_flows)
 {
     int ret;
 
@@ -154,6 +155,8 @@ ind_ovs_init(const char *datapath_name)
         LOG_WARN("Benchmark mode enabled.");
         ind_ovs_benchmark_mode = true;
     }
+
+    ind_ovs_max_flows = max_flows;
 
     ind_ovs_salt = get_entropy();
 

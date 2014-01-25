@@ -39,6 +39,8 @@ static pthread_rwlock_t ind_ovs_fwd_rwlock;
 
 static aim_ratelimiter_t ind_ovs_pktin_limiter;
 
+static uint32_t ind_ovs_num_flows;
+
 /**
  * Stats for packet in
  */
@@ -231,6 +233,11 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
     indigo_error_t result = INDIGO_ERROR_NONE;
     struct ind_ovs_flow *flow = NULL;
 
+    if (ind_ovs_num_flows >= ind_ovs_max_flows) {
+        LOG_ERROR("Flowtable size exceeded");
+        return INDIGO_ERROR_RESOURCE;
+    }
+
     LOG_TRACE("Flow create called");
     flow = malloc(sizeof(*flow));
     if (flow == NULL) {
@@ -298,6 +305,7 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
     ind_ovs_kflow_invalidate_all();
 
     ++table->num_flows;
+    ++ind_ovs_num_flows;
 
  done:
     if (INDIGO_FAILURE(result)) {
@@ -386,6 +394,7 @@ indigo_fwd_flow_delete(indigo_cookie_t flow_id,
     INDIGO_MEM_FREE(flow);
 
     --table->num_flows;
+    --ind_ovs_num_flows;
 
     return INDIGO_ERROR_NONE;
 }
@@ -790,7 +799,7 @@ ind_ovs_fwd_init(void)
         struct ind_ovs_table *table = &ind_ovs_tables[i];
         memset(table, 0, sizeof(*table));
         snprintf(table->name, sizeof(table->name), "Table %d", i);
-        table->max_flows = 16384; /* XXX */
+        table->max_flows = ind_ovs_max_flows;
         table->ft = flowtable_create();
         if (table->ft == NULL) {
             abort();

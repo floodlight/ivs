@@ -422,4 +422,9 @@ struct ind_ovs_table ind_ovs_tables[IND_OVS_NUM_TABLES];
  */
 extern struct ind_ovs_pktin_suppression_cfg ind_ovs_pktin_suppression_cfg;
 
+/*
+ * Maximum number of flows allowed across all flowtables.
+ */
+extern uint32_t ind_ovs_max_flows;
+
 #endif
