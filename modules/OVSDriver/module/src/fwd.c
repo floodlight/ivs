@@ -616,7 +616,7 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
         /* Send the packet to in_port's upcall thread */
         struct ind_ovs_port *in_port = ind_ovs_port_lookup(of_port_num);
         if (in_port == NULL) {
-            LOG_ERROR("controller specified an invalid packet-out in_port: 0x%x", in_port);
+            LOG_ERROR("controller specified an invalid packet-out in_port: 0x%x", of_port_num);
             return INDIGO_ERROR_PARAM;
         }
         netlink_pid = nl_socket_get_local_port(in_port->notify_socket);
@@ -636,6 +636,8 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
     struct nlattr *key = nla_nest_start(msg, OVS_PACKET_ATTR_KEY);
     if (of_port_num < IND_OVS_MAX_PORTS) {
         nla_put_u32(msg, OVS_KEY_ATTR_IN_PORT, of_port_num);
+    } else if (of_port_num == OF_PORT_DEST_LOCAL) {
+        nla_put_u32(msg, OVS_KEY_ATTR_IN_PORT, OVSP_LOCAL);
     } else {
         /* Can't have an empty key. */
         nla_put_u32(msg, OVS_KEY_ATTR_PRIORITY, 0);
@@ -647,11 +649,6 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
     struct nlattr *actions = nla_nest_start(msg, OVS_PACKET_ATTR_ACTIONS);
     struct nlattr *action_attr = nla_nest_start(msg, OVS_ACTION_ATTR_USERSPACE);
     nla_put_u32(msg, OVS_USERSPACE_ATTR_PID, netlink_pid);
-    if (use_table) {
-        /* Ask the upcall thread to process this even though it's won't be a
-         * miss */
-        nla_put_u64(msg, OVS_USERSPACE_ATTR_USERDATA, 1);
-    }
     nla_nest_end(msg, action_attr);
     nla_nest_end(msg, actions);
 

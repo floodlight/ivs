@@ -39,14 +39,13 @@ static struct nl_cache_mngr *route_cache_mngr;
 static struct nl_cache *link_cache;
 static struct nl_cb *netlink_callbacks;
 
-static indigo_error_t port_status_notify(of_port_no_t of_port_num, unsigned reason);
+static indigo_error_t port_status_notify(uint32_t port_no, unsigned reason);
 static void port_desc_set(of_port_desc_t *of_port_desc, of_port_no_t of_port_num);
-static void port_desc_set_local(of_port_desc_t *of_port_desc);
 
 struct ind_ovs_port *
 ind_ovs_port_lookup(of_port_no_t port_no)
 {
-    if (port_no == OF_PORT_DEST_USE_TABLE) {
+    if (port_no == OF_PORT_DEST_LOCAL) {
         return ind_ovs_ports[OVSP_LOCAL];
     }
 
@@ -102,10 +101,6 @@ indigo_error_t indigo_port_features_get(
             of_list_port_desc_append(of_list_port_desc, of_port_desc);
         }
     }
-
-    port_desc_set_local(of_port_desc);
-    /* TODO error handling */
-    of_list_port_desc_append(of_list_port_desc, of_port_desc);
 
     if (LOXI_FAILURE(of_features_reply_ports_set(features,
                                                  of_list_port_desc
@@ -498,9 +493,6 @@ indigo_error_t indigo_port_desc_stats_get(
             of_list_port_desc_append(of_list_port_desc, of_port_desc);
         }
     }
-    port_desc_set_local(of_port_desc);
-    /* TODO error handling */
-    of_list_port_desc_append(of_list_port_desc, of_port_desc);
 
     if (LOXI_FAILURE(of_port_desc_stats_reply_entries_set(port_desc_stats_reply,
             of_list_port_desc))){
@@ -554,7 +546,7 @@ indigo_port_queue_stats_get(
 }
 
 static indigo_error_t
-port_status_notify(of_port_no_t of_port_num, unsigned reason)
+port_status_notify(uint32_t port_no, unsigned reason)
 {
     indigo_error_t   result = INDIGO_ERROR_NONE;
     of_port_desc_t   *of_port_desc   = 0;
@@ -572,7 +564,7 @@ port_status_notify(of_port_no_t of_port_num, unsigned reason)
         goto done;
     }
 
-    port_desc_set(of_port_desc, of_port_num);
+    port_desc_set(of_port_desc, port_no);
 
     if ((of_port_status = of_port_status_new(ctrlr_of_version)) == 0) {
         LOG_ERROR("of_port_status_new() failed");
@@ -597,12 +589,17 @@ port_status_notify(of_port_no_t of_port_num, unsigned reason)
 }
 
 static void
-port_desc_set(of_port_desc_t *of_port_desc, of_port_no_t of_port_num)
+port_desc_set(of_port_desc_t *of_port_desc, uint32_t port_no)
 {
-    struct ind_ovs_port *port = ind_ovs_ports[of_port_num];
+    struct ind_ovs_port *port = ind_ovs_ports[port_no];
     assert(port != NULL);
 
-    of_port_desc_port_no_set(of_port_desc, of_port_num);
+    if (port_no == OVSP_LOCAL) {
+        of_port_desc_port_no_set(of_port_desc, OF_PORT_DEST_LOCAL);
+    } else {
+        of_port_desc_port_no_set(of_port_desc, port_no);
+    }
+
     of_port_desc_hw_addr_set(of_port_desc, port->mac_addr);
     of_port_desc_name_set(of_port_desc, port->ifname);
     of_port_desc_config_set(of_port_desc, port->config);
@@ -614,35 +611,23 @@ port_desc_set(of_port_desc_t *of_port_desc, of_port_no_t of_port_num)
     of_port_desc_state_set(of_port_desc, state);
 
     uint32_t curr, advertised, supported, peer;
-    ind_ovs_get_interface_features(port->ifname, &curr, &advertised,
-        &supported, &peer, of_port_desc->version);
+
+    if (port_no == OVSP_LOCAL) {
+        /* Internal ports do not support ethtool */
+        curr = OF_PORT_FEATURE_FLAG_10GB_FD |
+               OF_PORT_FEATURE_FLAG_COPPER_BY_VERSION(of_port_desc->version);
+        advertised = 0;
+        supported = 0;
+        peer = 0;
+    } else {
+        ind_ovs_get_interface_features(port->ifname, &curr, &advertised,
+            &supported, &peer, of_port_desc->version);
+    }
 
     of_port_desc_curr_set(of_port_desc, curr);
     of_port_desc_advertised_set(of_port_desc, advertised);
     of_port_desc_supported_set(of_port_desc, supported);
     of_port_desc_peer_set(of_port_desc, peer);
-}
-
-static void
-port_desc_set_local(of_port_desc_t *of_port_desc)
-{
-    of_port_desc_port_no_set(of_port_desc, OF_PORT_DEST_LOCAL);
-    {
-        of_mac_addr_t of_mac_addr;
-        /** \todo Get proper MAC address */
-        memset(&of_mac_addr, 0, sizeof(of_mac_addr));
-        of_port_desc_hw_addr_set(of_port_desc, of_mac_addr);
-    }
-    of_port_name_t name = "local";
-    of_port_desc_name_set(of_port_desc, name);
-    of_port_desc_config_set(of_port_desc, 0);
-    of_port_desc_state_set(of_port_desc, 0);
-
-    of_port_desc_curr_set(of_port_desc, OF_PORT_FEATURE_FLAG_10GB_FD |
-        OF_PORT_FEATURE_FLAG_COPPER_BY_VERSION(of_port_desc->version));
-    of_port_desc_advertised_set(of_port_desc, 0);
-    of_port_desc_supported_set(of_port_desc, 0);
-    of_port_desc_peer_set(of_port_desc, 0);
 }
 
 /*

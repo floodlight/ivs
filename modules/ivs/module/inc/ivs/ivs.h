@@ -71,14 +71,16 @@ struct ind_ovs_flow_stats {
  */
 
 struct ind_ovs_cfr {
+    uint32_t in_port;           /* Input switch port. */
     uint8_t dl_dst[6];          /* Ethernet destination address. */
     uint8_t dl_src[6];          /* Ethernet source address. */
-    uint16_t in_port;           /* Input switch port. */
     uint16_t dl_type;           /* Ethernet frame type. */
     uint16_t dl_vlan;           /* VLAN id and priority, same as wire format
                                    plus CFI bit set if tag present. */
     uint8_t nw_tos;             /* IPv4 DSCP. */
     uint8_t nw_proto;           /* IP protocol. */
+    uint16_t global_vrf_allowed:1;  /* bsn_global_vrf_allowed extension */
+    uint32_t pad:15;
     uint32_t nw_src;            /* IP source address. */
     uint32_t nw_dst;            /* IP destination address. */
     uint16_t tp_src;            /* TCP/UDP source port. */
@@ -91,8 +93,6 @@ struct ind_ovs_cfr {
     uint32_t l3_interface_class_id;  /* bsn_l3_interface_class_id extension */
     uint32_t l3_src_class_id;   /* bsn_l3_src_class_id extension */
     uint32_t l3_dst_class_id;   /* bsn_l3_dst_class_id extension */
-    uint32_t global_vrf_allowed:1;  /* bsn_global_vrf_allowed extension */
-    uint32_t pad:31;
 } __attribute__ ((aligned (8)));
 
 AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == 13*8);

@@ -215,11 +215,16 @@ void
 ind_ovs_key_to_cfr(const struct ind_ovs_parsed_key *pkey,
                    struct ind_ovs_cfr *cfr)
 {
-    cfr->in_port = pkey->in_port;
+    if (pkey->in_port == OVSP_LOCAL) {
+        cfr->in_port = OF_PORT_DEST_LOCAL;
+    } else {
+        cfr->in_port = pkey->in_port;
+    }
 
     /* Set a bit in the in_ports bitmap */
     {
-        uint32_t idx = aim_imin(IVS_MAX_BITMAP_IN_PORT, pkey->in_port);
+        uint32_t idx = IVS_MAX_BITMAP_IN_PORT < cfr->in_port ?
+            IVS_MAX_BITMAP_IN_PORT : cfr->in_port;
         uint32_t word = IVS_MAX_BITMAP_IN_PORT/32 - idx/32;
         uint32_t bit = idx % 32;
         memset(cfr->in_ports, 0, sizeof(cfr->in_ports));
