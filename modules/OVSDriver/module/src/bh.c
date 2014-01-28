@@ -163,10 +163,7 @@ ind_ovs_bh_run()
             struct ind_ovs_parsed_key pkey;
             ind_ovs_parse_key(key, &pkey);
 
-            of_match_t match;
-            ind_ovs_key_to_match(&pkey, &match);
-
-            ind_fwd_pkt_in(req->in_port, nla_data(packet), nla_len(packet), req->reason, &match);
+            ind_fwd_pkt_in(req->in_port, nla_data(packet), nla_len(packet), req->reason, &pkey);
         } else {
             abort();
         }

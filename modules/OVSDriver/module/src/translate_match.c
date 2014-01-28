@@ -85,12 +85,13 @@ ind_ovs_parse_key(struct nlattr *key, struct ind_ovs_parsed_key *pkey)
 /* Should only be used when creating the match for a packet-in */
 void
 ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey,
+                     of_version_t version,
                      of_match_t *match)
 {
     memset(match, 0, sizeof(*match));
 
     /* We only populate the masks for this OF version */
-    match->version = ind_ovs_version;
+    match->version = version;
 
     of_match_fields_t *fields = &match->fields;
 
@@ -117,11 +118,11 @@ ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey,
     if (ATTR_BITMAP_TEST(pkey->populated, OVS_KEY_ATTR_VLAN)) {
         fields->vlan_vid = VLAN_VID(ntohs(pkey->vlan));
         fields->vlan_pcp = VLAN_PCP(ntohs(pkey->vlan));
-        if (ind_ovs_version == OF_VERSION_1_3) {
+        if (version == OF_VERSION_1_3) {
             fields->vlan_vid |= VLAN_CFI_BIT;
         }
     } else {
-        if (ind_ovs_version == OF_VERSION_1_0) {
+        if (version == OF_VERSION_1_0) {
             fields->vlan_vid = -1;
         } else {
             fields->vlan_vid = 0;
@@ -156,7 +157,7 @@ ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey,
         memcpy(&fields->arp_tha, pkey->arp.arp_tha, OF_MAC_ADDR_BYTES);
 
         /* Special case ARP for OF 1.0 */
-        if (ind_ovs_version == OF_VERSION_1_0) {
+        if (version == OF_VERSION_1_0) {
             fields->ipv4_src = ntohl(pkey->arp.arp_sip);
             fields->ipv4_dst = ntohl(pkey->arp.arp_tip);
             fields->ip_proto = ntohs(pkey->arp.arp_op) & 0xFF;
@@ -178,7 +179,7 @@ ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey,
         fields->udp_src = ntohs(pkey->udp.udp_src);
 
         /* Special case UDP for OF 1.0 */
-        if (ind_ovs_version == OF_VERSION_1_0) {
+        if (version == OF_VERSION_1_0) {
             fields->tcp_dst = ntohs(pkey->udp.udp_dst);
             fields->tcp_src = ntohs(pkey->udp.udp_src);
             OF_MATCH_MASK_TCP_DST_EXACT_SET(match);
@@ -191,7 +192,7 @@ ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey,
         fields->icmpv4_code = pkey->icmp.icmp_code;
 
         /* Special case ICMP for OF 1.0 */
-        if (ind_ovs_version == OF_VERSION_1_0) {
+        if (version == OF_VERSION_1_0) {
             fields->tcp_dst = pkey->icmp.icmp_code;
             fields->tcp_src = pkey->icmp.icmp_type;
             OF_MATCH_MASK_TCP_DST_EXACT_SET(match);
