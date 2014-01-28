@@ -117,7 +117,8 @@ struct ind_ovs_port {
     uint32_t dp_port_no; /* Kernel datapath port number */
     int ifflags; /* Linux interface flags */
     of_mac_addr_t mac_addr;
-    uint32_t config; /* OpenFlow config */
+    unsigned no_packet_in : 1;
+    unsigned no_flood : 1;
     uint32_t num_kflows; /* Number of kflows with this in_port */
     struct nl_sock *notify_socket; /* Netlink socket for upcalls */
     aim_ratelimiter_t upcall_log_limiter;

@@ -506,8 +506,7 @@ ind_fwd_pkt_in(of_port_no_t in_port,
         return INDIGO_ERROR_NONE;
     }
 
-    if (port != NULL && OF_PORT_CONFIG_FLAG_NO_PACKET_IN_TEST(
-                            port->config, ind_ovs_version)) {
+    if (port != NULL && port->no_packet_in) {
         LOG_TRACE("Packet-in not enabled from this port");
         return INDIGO_ERROR_NONE;
     }
