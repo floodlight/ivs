@@ -521,7 +521,7 @@ ind_fwd_pkt_in(of_port_no_t in_port,
 
     if (ind_ovs_pktin_suppression_cfg.enabled && reason == OF_PACKET_IN_REASON_NO_MATCH) {
         LOG_TRACE("installing pktin suppression flow");
-        of_flow_add_t *flow_mod = of_flow_add_new(ind_ovs_version);
+        of_flow_add_t *flow_mod = of_flow_add_new(match.version);
         of_flow_add_hard_timeout_set(flow_mod, ind_ovs_pktin_suppression_cfg.hard_timeout);
         of_flow_add_idle_timeout_set(flow_mod, ind_ovs_pktin_suppression_cfg.idle_timeout);
         of_flow_add_cookie_set(flow_mod, ind_ovs_pktin_suppression_cfg.cookie);
