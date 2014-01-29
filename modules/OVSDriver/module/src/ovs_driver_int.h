@@ -409,11 +409,6 @@ extern bool ind_ovs_benchmark_mode;
 extern uint32_t ind_ovs_salt;
 
 /*
- * Configured OpenFlow version.
- */
-extern int ind_ovs_version;
-
-/*
  * OpenFlow tables. Protected by ind_ovs_fwd_{read,write}_{lock,unlock}.
  */
 struct ind_ovs_table ind_ovs_tables[IND_OVS_NUM_TABLES];

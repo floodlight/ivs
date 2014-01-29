@@ -72,8 +72,6 @@ static ind_soc_config_t soc_cfg;
 static ind_cxn_config_t cxn_cfg;
 static ind_core_config_t core_cfg;
 
-extern int ind_ovs_version;
-
 static int sighup_eventfd;
 static int sigterm_eventfd;
 
@@ -84,16 +82,6 @@ static enum loglevel {
     LOGLEVEL_VERBOSE,
     LOGLEVEL_TRACE
 } loglevel = LOGLEVEL_DEFAULT;
-
-static struct of_version {
-    const char *name;
-    int wire_version;
-} of_versions[] = {
-    { "1.0", 1 },
-    { "1.1", 2 },
-    { "1.2", 3 },
-    { "1.3", 4 },
-};
 
 static biglist_t *controllers = NULL;
 static biglist_t *listeners = NULL;
@@ -152,19 +140,6 @@ parse_controller(const char *str,
     }
 
     return 0;
-}
-
-static int
-parse_of_version(const char *name)
-{
-    int i;
-    for (i = 0; i < 4; i++) {
-        if (!strcmp(of_versions[i].name, name)) {
-            return of_versions[i].wire_version;
-        }
-    }
-    AIM_LOG_ERROR("Invalid OpenFlow version \"%s\"", name);
-    return -1;
 }
 
 static void
@@ -375,13 +350,6 @@ aim_main(int argc, char* argv[])
 
     AIM_LOG_MSG("Starting %s (%s)", program_version, AIM_STRINGIFY(BUILD_ID));
 
-    if (openflow_version != NULL) {
-        ind_ovs_version = parse_of_version(openflow_version);
-        if (ind_ovs_version == -1) {
-            return 1;
-        }
-    }
-
     /* Initialize all modules */
 
     if (ind_soc_init(&soc_cfg) < 0) {
@@ -431,12 +399,20 @@ aim_main(int argc, char* argv[])
         }
     }
 
-    if (pipeline) {
-        indigo_error_t rv = pipeline_set(pipeline);
-        if (rv < 0) {
-            AIM_LOG_FATAL("Failed to set pipeline: %s", indigo_strerror(rv));
-            return 1;
+    if (pipeline == NULL) {
+        if (openflow_version == NULL || !strcmp(openflow_version, "1.0")) {
+            AIM_TRUE_OR_DIE(pipeline_set("standard-1.0") == 0);
+        } else if (!strcmp(openflow_version, "1.3")) {
+            AIM_TRUE_OR_DIE(pipeline_set("standard-1.3") == 0);
+        } else {
+            AIM_DIE("unexpected OpenFlow version");
         }
+    }
+
+    indigo_error_t rv = pipeline_set(pipeline);
+    if (rv < 0) {
+        AIM_LOG_FATAL("Failed to set pipeline: %s", indigo_strerror(rv));
+        return 1;
     }
 
 #if 0
