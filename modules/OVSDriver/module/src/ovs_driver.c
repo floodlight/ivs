@@ -46,7 +46,6 @@ struct nl_sock *ind_ovs_socket;
 int ovs_datapath_family, ovs_packet_family, ovs_vport_family, ovs_flow_family;
 bool ind_ovs_benchmark_mode = false;
 uint32_t ind_ovs_salt;
-int ind_ovs_version = OF_VERSION_1_0;
 uint32_t ind_ovs_max_flows;
 
 static int

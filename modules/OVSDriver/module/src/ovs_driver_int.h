@@ -117,7 +117,8 @@ struct ind_ovs_port {
     uint32_t dp_port_no; /* Kernel datapath port number */
     int ifflags; /* Linux interface flags */
     of_mac_addr_t mac_addr;
-    uint32_t config; /* OpenFlow config */
+    unsigned no_packet_in : 1;
+    unsigned no_flood : 1;
     uint32_t num_kflows; /* Number of kflows with this in_port */
     struct nl_sock *notify_socket; /* Netlink socket for upcalls */
     aim_ratelimiter_t upcall_log_limiter;
@@ -276,7 +277,7 @@ indigo_error_t ind_ovs_translate_openflow_actions(of_list_action_t *actions, str
 void ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey, struct xbuf *actions, struct nl_msg *msg);
 
 /* Translate an OVS key into an OpenFlow match object */
-void ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey, of_match_t *match);
+void ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey, of_version_t version, of_match_t *match);
 
 /* Translate an OVS key into a CFR */
 void ind_ovs_key_to_cfr(const struct ind_ovs_parsed_key *pkey, struct ind_ovs_cfr *cfr);
@@ -287,7 +288,7 @@ void ind_ovs_match_to_cfr(const of_match_t *match, struct ind_ovs_cfr *cfr, stru
 /* Internal interfaces to the forwarding module */
 indigo_error_t ind_ovs_fwd_init(void);
 void ind_ovs_fwd_finish(void);
-indigo_error_t ind_fwd_pkt_in(of_port_no_t of_port_num, uint8_t *data, unsigned int len, unsigned reason, of_match_t *match);
+indigo_error_t ind_fwd_pkt_in(of_port_no_t of_port_num, uint8_t *data, unsigned int len, unsigned reason, struct ind_ovs_parsed_key *pkey);
 struct ind_ovs_flow_effects *ind_ovs_fwd_pipeline_lookup(int table_id, struct ind_ovs_cfr *cfr, struct xbuf *stats);
 
 /*
@@ -406,11 +407,6 @@ extern bool ind_ovs_benchmark_mode;
  * collisions.
  */
 extern uint32_t ind_ovs_salt;
-
-/*
- * Configured OpenFlow version.
- */
-extern int ind_ovs_version;
 
 /*
  * OpenFlow tables. Protected by ind_ovs_fwd_{read,write}_{lock,unlock}.

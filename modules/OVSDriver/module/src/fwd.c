@@ -494,7 +494,7 @@ indigo_fwd_table_stats_get(of_table_stats_request_t *table_stats_request,
 indigo_error_t
 ind_fwd_pkt_in(of_port_no_t in_port,
                uint8_t *data, unsigned int len, unsigned reason,
-               of_match_t *match)
+               struct ind_ovs_parsed_key *pkey)
 {
     LOG_TRACE("Sending packet-in");
 
@@ -506,8 +506,7 @@ ind_fwd_pkt_in(of_port_no_t in_port,
         return INDIGO_ERROR_NONE;
     }
 
-    if (port != NULL && OF_PORT_CONFIG_FLAG_NO_PACKET_IN_TEST(
-                            port->config, ind_ovs_version)) {
+    if (port != NULL && port->no_packet_in) {
         LOG_TRACE("Packet-in not enabled from this port");
         return INDIGO_ERROR_NONE;
     }
@@ -517,15 +516,18 @@ ind_fwd_pkt_in(of_port_no_t in_port,
         return INDIGO_ERROR_NONE;
     }
 
+    of_match_t match;
+    ind_ovs_key_to_match(pkey, ctrlr_of_version, &match);
+
     if (ind_ovs_pktin_suppression_cfg.enabled && reason == OF_PACKET_IN_REASON_NO_MATCH) {
         LOG_TRACE("installing pktin suppression flow");
-        of_flow_add_t *flow_mod = of_flow_add_new(ind_ovs_version);
+        of_flow_add_t *flow_mod = of_flow_add_new(match.version);
         of_flow_add_hard_timeout_set(flow_mod, ind_ovs_pktin_suppression_cfg.hard_timeout);
         of_flow_add_idle_timeout_set(flow_mod, ind_ovs_pktin_suppression_cfg.idle_timeout);
         of_flow_add_cookie_set(flow_mod, ind_ovs_pktin_suppression_cfg.cookie);
         of_flow_add_priority_set(flow_mod, ind_ovs_pktin_suppression_cfg.priority);
         of_flow_add_buffer_id_set(flow_mod, -1);
-        if (of_flow_add_match_set(flow_mod, match)) {
+        if (of_flow_add_match_set(flow_mod, &match)) {
             abort();
         }
         indigo_core_receive_controller_message(INDIGO_CXN_ID_UNSPECIFIED, flow_mod);
@@ -545,7 +547,7 @@ ind_fwd_pkt_in(of_port_no_t in_port,
     if (of_packet_in->version < OF_VERSION_1_2) {
         of_packet_in_in_port_set(of_packet_in, in_port);
     } else {
-        if (LOXI_FAILURE(of_packet_in_match_set(of_packet_in, match))) {
+        if (LOXI_FAILURE(of_packet_in_match_set(of_packet_in, &match))) {
             LOG_ERROR("Failed to write match to packet-in message");
             of_packet_in_delete(of_packet_in);
             return INDIGO_ERROR_UNKNOWN;
@@ -801,14 +803,6 @@ ind_ovs_fwd_init(void)
         if (table->ft == NULL) {
             abort();
         }
-    }
-
-    if (ind_ovs_version == OF_VERSION_1_0) {
-        AIM_TRUE_OR_DIE(pipeline_set("standard-1.0") == 0);
-    } else if (ind_ovs_version == OF_VERSION_1_3) {
-        AIM_TRUE_OR_DIE(pipeline_set("standard-1.3") == 0);
-    } else {
-        AIM_DIE("unexpected OpenFlow version");
     }
 
     aim_ratelimiter_init(&ind_ovs_pktin_limiter, PKTIN_INTERVAL,

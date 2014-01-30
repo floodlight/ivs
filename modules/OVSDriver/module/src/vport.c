@@ -315,7 +315,14 @@ indigo_port_modify(of_port_mod_t *port_mod)
         return INDIGO_ERROR_NOT_FOUND;
     }
 
-    port->config = (port->config & ~mask) | (config & mask);
+    if (OF_PORT_CONFIG_FLAG_NO_PACKET_IN_TEST(mask, port_mod->version)) {
+        port->no_packet_in = OF_PORT_CONFIG_FLAG_NO_PACKET_IN_TEST(config, port_mod->version);
+    }
+
+    if (OF_PORT_CONFIG_FLAG_NO_FLOOD_TEST(mask, port_mod->version)) {
+        port->no_flood = OF_PORT_CONFIG_FLAG_NO_FLOOD_TEST(config, port_mod->version);
+    }
+
     /* TODO change other configuration? */
     ind_ovs_kflow_invalidate_all();
 
@@ -602,7 +609,15 @@ port_desc_set(of_port_desc_t *of_port_desc, uint32_t port_no)
 
     of_port_desc_hw_addr_set(of_port_desc, port->mac_addr);
     of_port_desc_name_set(of_port_desc, port->ifname);
-    of_port_desc_config_set(of_port_desc, port->config);
+
+    uint32_t config = 0;
+    if (port->no_packet_in) {
+        OF_PORT_CONFIG_FLAG_NO_PACKET_IN_SET(config, of_port_desc->version);
+    }
+    if (port->no_flood) {
+        OF_PORT_CONFIG_FLAG_NO_FLOOD_SET(config, of_port_desc->version);
+    }
+    of_port_desc_config_set(of_port_desc, config);
 
     uint32_t state = 0;
     if (!(port->ifflags & IFF_UP)) {

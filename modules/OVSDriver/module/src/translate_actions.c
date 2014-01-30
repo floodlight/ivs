@@ -133,8 +133,7 @@ ind_ovs_action_flood(struct nlattr *attr, struct translate_context *ctx)
     int i;
     for (i = 0; i < IND_OVS_MAX_PORTS; i++) {
         struct ind_ovs_port *port = ind_ovs_ports[i];
-        if (port != NULL && i != ingress_port_no &&
-                !(port->config & OF_PORT_CONFIG_FLAG_NO_FLOOD)) {
+        if (port != NULL && i != ingress_port_no && !port->no_flood) {
             nla_put_u32(ctx->msg, OVS_ACTION_ATTR_OUTPUT, i);
         }
     }
