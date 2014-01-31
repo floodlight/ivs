@@ -42,7 +42,7 @@ include $(BUILDER)/lib.mk
 #
 DEPENDMODULES := SocketManager OFConnectionManager OFStateManager OVSDriver \
                  Configuration loci indigo BigList BigHash ivs_common pipeline pipeline_standard flowtable xbuf \
-                 lldpa lacpa arpa router_ip_table PPE IOF \
+                 lldpa lacpa arpa router_ip_table icmpa PPE IOF \
                  AIM murmur cjson OS
 
 ifdef USE_LUAJIT
