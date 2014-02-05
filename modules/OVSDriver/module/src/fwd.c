@@ -136,6 +136,7 @@ init_effects(struct ind_ovs_flow_effects *effects,
     effects->clear_actions = 0;
     effects->disable_src_mac_check = 0;
     effects->arp_offload = 0;
+    effects->dhcp_offload = 0;
     effects->meter_id = -1;
     effects->next_table_id = -1;
 
@@ -194,6 +195,9 @@ init_effects(struct ind_ovs_flow_effects *effects,
                 break;
             case OF_INSTRUCTION_BSN_ARP_OFFLOAD:
                 effects->arp_offload = 1;
+                break;
+            case OF_INSTRUCTION_BSN_DHCP_OFFLOAD:
+                effects->dhcp_offload = 1;
                 break;
             default:
                 return INDIGO_ERROR_COMPAT;
