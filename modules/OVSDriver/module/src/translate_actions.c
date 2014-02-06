@@ -101,6 +101,19 @@ OVS_TUNNEL_KEY_FIELDS
     ctx->modified_attrs = 0;
 }
 
+/* Send the packet back to an upcall thread with the given reason as userdata */
+static void
+pktin(uint8_t reason, struct translate_context *ctx)
+{
+    uint32_t ingress_port_no = ctx->current_key.in_port;
+    ind_ovs_commit_set_field_actions(ctx);
+    struct nlattr *action_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_USERSPACE);
+    struct nl_sock *sk = ind_ovs_ports[ingress_port_no]->notify_socket;
+    nla_put_u32(ctx->msg, OVS_USERSPACE_ATTR_PID, nl_socket_get_local_port(sk));
+    nla_put_u64(ctx->msg, OVS_USERSPACE_ATTR_USERDATA, reason);
+    nla_nest_end(ctx->msg, action_attr);
+}
+
 /*
  * Output actions
  */
@@ -115,14 +128,8 @@ ind_ovs_action_output(struct nlattr *attr, struct translate_context *ctx)
 static void
 ind_ovs_action_controller(struct nlattr *attr, struct translate_context *ctx)
 {
-    uint32_t ingress_port_no = ctx->current_key.in_port;
     uint8_t reason = *XBUF_PAYLOAD(attr, uint8_t);
-    ind_ovs_commit_set_field_actions(ctx);
-    struct nlattr *action_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_USERSPACE);
-    struct nl_sock *sk = ind_ovs_ports[ingress_port_no]->notify_socket;
-    nla_put_u32(ctx->msg, OVS_USERSPACE_ATTR_PID, nl_socket_get_local_port(sk));
-    nla_put_u64(ctx->msg, OVS_USERSPACE_ATTR_USERDATA, reason);
-    nla_nest_end(ctx->msg, action_attr);
+    pktin(reason, ctx);
 }
 
 static void
