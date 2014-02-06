@@ -552,6 +552,24 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
         case IND_OVS_ACTION_GROUP:
             ind_ovs_action_group(attr, &ctx);
             break;
+        case IND_OVS_ACTION_CHECK_NW_TTL:
+            /* Special cased because it can drop the packet */
+            if (ATTR_BITMAP_TEST(ctx.current_key.populated, OVS_KEY_ATTR_IPV4)) {
+                ATTR_BITMAP_SET(ctx.modified_attrs, OVS_KEY_ATTR_IPV4);
+                if (ctx.current_key.ipv4.ipv4_ttl == 0
+                        || ctx.current_key.ipv4.ipv4_ttl == 1) {
+                    pktin(OF_PACKET_IN_REASON_INVALID_TTL, &ctx);
+                    return;
+                }
+            } else if (ATTR_BITMAP_TEST(ctx.current_key.populated, OVS_KEY_ATTR_IPV6)) {
+                ATTR_BITMAP_SET(ctx.modified_attrs, OVS_KEY_ATTR_IPV6);
+                if (ctx.current_key.ipv6.ipv6_hlimit == 0
+                        || ctx.current_key.ipv6.ipv6_hlimit == 1) {
+                    pktin(OF_PACKET_IN_REASON_INVALID_TTL, &ctx);
+                    return;
+                }
+            }
+            break;
         default:
             assert(0);
             break;
