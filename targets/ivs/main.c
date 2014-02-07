@@ -245,7 +245,6 @@ parse_options(int argc, char **argv)
 
         case OPT_PIPELINE:
             pipeline = optarg ? optarg : "experimental";
-            AIM_LOG_MSG("Setting forwarding pipeline to '%s'", pipeline);
             break;
 
         case 'h':
@@ -408,14 +407,15 @@ aim_main(int argc, char* argv[])
 
     if (pipeline == NULL) {
         if (openflow_version == NULL || !strcmp(openflow_version, "1.0")) {
-            AIM_TRUE_OR_DIE(pipeline_set("standard-1.0") == 0);
+            pipeline = "standard-1.0";
         } else if (!strcmp(openflow_version, "1.3")) {
-            AIM_TRUE_OR_DIE(pipeline_set("standard-1.3") == 0);
+            pipeline = "standard-1.3";
         } else {
             AIM_DIE("unexpected OpenFlow version");
         }
     }
 
+    AIM_LOG_INFO("Initializing forwarding pipeline '%s'", pipeline);
     indigo_error_t rv = pipeline_set(pipeline);
     if (rv < 0) {
         AIM_LOG_FATAL("Failed to set pipeline: %s", indigo_strerror(rv));
