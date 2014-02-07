@@ -28,12 +28,4 @@ void ind_ovs_finish(void);
 
 indigo_error_t ind_ovs_tunnel_init(void);
 
-/*
- * Exported from OVSDriver for use by the pipeline
- */
-struct ind_ovs_flow_effects *ind_ovs_fwd_pipeline_lookup(int table_id, struct ind_ovs_cfr *cfr, struct xbuf *stats);
-indigo_error_t ind_ovs_group_select(uint32_t id, uint32_t hash, struct xbuf **actions);
-indigo_error_t ind_ovs_group_indirect(uint32_t id, struct xbuf **actions);
-
-
 #endif
