@@ -95,10 +95,6 @@ indigo_fwd_group_add(uint32_t id, uint8_t group_type, of_list_bucket_t *of_bucke
     struct ind_ovs_group_bucket *buckets;
     uint16_t num_buckets;
 
-    if (group_type != OF_GROUP_TYPE_SELECT) {
-        return INDIGO_ERROR_NOT_SUPPORTED;
-    }
-
     /* TODO validate */
 
     err = translate_buckets(of_buckets, &buckets, &num_buckets);
