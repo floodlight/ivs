@@ -24,6 +24,12 @@
 #ifndef IVS_H
 #define IVS_H
 
+#include "openvswitch.h"
+#include <stdint.h>
+#include <xbuf/xbuf.h>
+#include <indigo/error.h>
+#include <loci/loci.h>
+
 #define VLAN_CFI_BIT (1<<12)
 #define VLAN_TCI(vid, pcp) ( (((pcp) & 0x7) << 13) | ((vid) & 0xfff) )
 #define VLAN_VID(tci) ((tci) & 0xfff)
@@ -39,6 +45,14 @@
 #define ARRAY_SIZE(a)  (sizeof(a) / sizeof((a)[0]))
 
 #define ALIGN8(x) (((x) + 7) & ~7)
+
+/* Manage a uint64_t bitmap of OVS key attributes. */
+#define ATTR_BITMAP_TEST(bitmap, attr) ((bitmap & (1 << (attr))) != 0)
+#define ATTR_BITMAP_SET(bitmap, attr) (bitmap |= (1 << (attr)))
+#define ATTR_BITMAP_CLEAR(bitmap, attr) (bitmap &= ~(1 << (attr)))
+
+/* Use instead of assert for cases we should eventually handle. */
+#define NYI(x) assert(!(x))
 
 /*
  * Derived from a flow's actions/instructions.
@@ -98,6 +112,66 @@ struct ind_ovs_cfr {
 
 AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == 13*8);
 
+/*
+ * X-macro representation of the OVS key (nlattr type, key field, type).
+ */
+#define OVS_KEY_FIELDS \
+    field(OVS_KEY_ATTR_PRIORITY,  priority,  uint32_t) \
+    field(OVS_KEY_ATTR_IN_PORT,   in_port,   uint32_t) \
+    field(OVS_KEY_ATTR_ETHERNET,  ethernet,  struct ovs_key_ethernet) \
+    field(OVS_KEY_ATTR_VLAN,      vlan,      uint16_t) \
+    field(OVS_KEY_ATTR_ETHERTYPE, ethertype, uint16_t) \
+    field(OVS_KEY_ATTR_IPV4,      ipv4,      struct ovs_key_ipv4) \
+    field(OVS_KEY_ATTR_IPV6,      ipv6,      struct ovs_key_ipv6) \
+    field(OVS_KEY_ATTR_TCP,       tcp,       struct ovs_key_tcp) \
+    field(OVS_KEY_ATTR_UDP,       udp,       struct ovs_key_udp) \
+    field(OVS_KEY_ATTR_ICMP,      icmp,      struct ovs_key_icmp) \
+    field(OVS_KEY_ATTR_ICMPV6,    icmpv6,    struct ovs_key_icmpv6) \
+    field(OVS_KEY_ATTR_ARP,       arp,       struct ovs_key_arp) \
+    field(OVS_KEY_ATTR_ND,        nd,        struct ovs_key_nd)
+
+#define OVS_TUNNEL_KEY_FIELDS \
+    field(OVS_TUNNEL_KEY_ATTR_ID,       id,       uint64_t) \
+    field(OVS_TUNNEL_KEY_ATTR_IPV4_SRC, ipv4_src, uint32_t) \
+    field(OVS_TUNNEL_KEY_ATTR_IPV4_DST, ipv4_dst, uint32_t) \
+    field(OVS_TUNNEL_KEY_ATTR_TOS,      tos,      uint8_t) \
+    field(OVS_TUNNEL_KEY_ATTR_TTL,      ttl,      uint8_t)
+
+/*
+ * Efficient representation of the OVS flow key.
+ *
+ * This is used only as a temporary object which is easier to work with
+ * than the OVS_ATTR_KEY_* netlink attributes. It contains a subset of the
+ * information in the real key which is why we must store that instead.
+ */
+struct ind_ovs_parsed_key {
+    uint64_t populated; /* bitmap of OVS_KEY_ATTR_* */
+    uint32_t priority;
+    uint32_t in_port;
+    struct ovs_key_ethernet ethernet;
+    uint16_t vlan; /* VLAN TCI */
+    uint16_t ethertype;
+    union { /* Network protocols */
+        struct ovs_key_ipv4 ipv4;
+        struct ovs_key_ipv6 ipv6;
+    };
+    union { /* Transport protocols */
+        struct ovs_key_tcp tcp;
+        struct ovs_key_udp udp;
+        struct ovs_key_icmp icmp;
+        struct ovs_key_icmpv6 icmpv6;
+        struct ovs_key_arp arp;
+        struct ovs_key_nd nd;
+    };
+    struct {
+        uint64_t id;
+        uint32_t ipv4_src;
+        uint32_t ipv4_dst;
+        uint8_t tos;
+        uint8_t ttl;
+    } tunnel;
+};
+
 #define IVS_MAX_BITMAP_IN_PORT 127
 
 /*
@@ -106,5 +180,11 @@ AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == 13*8);
 struct ind_ovs_flow_effects *ind_ovs_fwd_pipeline_lookup(int table_id, struct ind_ovs_cfr *cfr, struct xbuf *stats);
 indigo_error_t ind_ovs_group_select(uint32_t id, uint32_t hash, struct xbuf **actions);
 indigo_error_t ind_ovs_group_indirect(uint32_t id, struct xbuf **actions);
+
+/* Translate an OVS key into a CFR */
+void ind_ovs_key_to_cfr(const struct ind_ovs_parsed_key *pkey, struct ind_ovs_cfr *cfr);
+
+/* Translate an OpenFlow match into a CFR and mask */
+void ind_ovs_match_to_cfr(const of_match_t *match, struct ind_ovs_cfr *cfr, struct ind_ovs_cfr *mask);
 
 #endif
