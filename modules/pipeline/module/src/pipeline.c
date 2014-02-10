@@ -115,11 +115,11 @@ pipeline_list(of_desc_str_t **ret_pipelines, int *num_pipelines)
 }
 
 indigo_error_t
-pipeline_process(struct ind_ovs_cfr *cfr,
+pipeline_process(struct ind_ovs_parsed_key *key,
                  struct pipeline_result *result)
 {
     AIM_TRUE_OR_DIE(current_pipeline != NULL);
-    return current_pipeline->ops->process(cfr, result);
+    return current_pipeline->ops->process(key, result);
 }
 
 void

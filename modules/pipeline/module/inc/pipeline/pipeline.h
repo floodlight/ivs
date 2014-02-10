@@ -29,7 +29,7 @@
 #include <xbuf/xbuf.h>
 
 struct pipeline_result;
-struct ind_ovs_cfr;
+struct ind_ovs_parsed_key;
 
 /*
  * Result of the forwarding pipeline (ind_ovs_pipeline_process)
@@ -55,7 +55,7 @@ struct pipeline_result {
 struct pipeline_ops {
     void (*init)(const char *name);
     void (*finish)(void);
-    indigo_error_t (*process)(struct ind_ovs_cfr *cfr, struct pipeline_result *result);
+    indigo_error_t (*process)(struct ind_ovs_parsed_key *key, struct pipeline_result *result);
 };
 
 /*
@@ -97,7 +97,7 @@ void pipeline_list(of_desc_str_t **ret_pipelines, int *num_pipelines);
  * 'result' should be initialized with pipeline_result_init.
  */
 indigo_error_t
-pipeline_process(struct ind_ovs_cfr *cfr,
+pipeline_process(struct ind_ovs_parsed_key *key,
                  struct pipeline_result *result);
 
 /* Operations on a struct pipeline_result */

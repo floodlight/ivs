@@ -53,14 +53,17 @@ pipeline_standard_finish(void)
 }
 
 indigo_error_t
-pipeline_standard_process(struct ind_ovs_cfr *cfr,
+pipeline_standard_process(struct ind_ovs_parsed_key *key,
                           struct pipeline_result *result)
 {
+    struct ind_ovs_cfr cfr;
+    ind_ovs_key_to_cfr(key, &cfr);
+
     uint8_t table_id = 0;
 
     while (table_id != (uint8_t)-1) {
         struct ind_ovs_flow_effects *effects =
-            ind_ovs_fwd_pipeline_lookup(table_id, cfr, &result->stats);
+            ind_ovs_fwd_pipeline_lookup(table_id, &cfr, &result->stats);
         if (effects == NULL) {
             if (openflow_version < OF_VERSION_1_3) {
                 uint8_t reason = OF_PACKET_IN_REASON_NO_MATCH;
@@ -75,7 +78,7 @@ pipeline_standard_process(struct ind_ovs_cfr *cfr,
         table_id = effects->next_table_id;
 
         if (table_id != (uint8_t)-1) {
-            pipeline_standard_update_cfr(cfr, &effects->apply_actions);
+            pipeline_standard_update_cfr(&cfr, &effects->apply_actions);
         }
     }
 

@@ -74,13 +74,10 @@ ind_ovs_kflow_add(const struct nlattr *key)
     memset(&pkey, 0, sizeof(pkey));
     ind_ovs_parse_key((struct nlattr *)key, &pkey);
 
-    struct ind_ovs_cfr cfr;
-    ind_ovs_key_to_cfr(&pkey, &cfr);
-
     struct pipeline_result *result = &ind_ovs_kflow_pipeline_result;
     pipeline_result_reset(result);
 
-    indigo_error_t err = pipeline_process(&cfr, result);
+    indigo_error_t err = pipeline_process(&pkey, result);
     if (err < 0) {
         /* Flow was deleted after the BH request was queued. */
         return err;
@@ -225,13 +222,10 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key(kflow->key, &pkey);
 
-    struct ind_ovs_cfr cfr;
-    ind_ovs_key_to_cfr(&pkey, &cfr);
-
     struct pipeline_result *result = &ind_ovs_kflow_pipeline_result;
     pipeline_result_reset(result);
 
-    indigo_error_t err = pipeline_process(&cfr, result);
+    indigo_error_t err = pipeline_process(&pkey, result);
     if (err < 0) {
         ind_ovs_kflow_delete(kflow);
         return;
