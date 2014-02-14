@@ -47,6 +47,7 @@
 #include <router_ip_table/router_ip_table.h>
 #include <icmpa/icmpa.h>
 #include <pipeline/pipeline.h>
+#include <dhcpra/dhcpra.h>
 
 #define AIM_LOG_MODULE_NAME ivs
 #include <AIM/aim_log.h>
@@ -395,6 +396,11 @@ aim_main(int argc, char* argv[])
 
     if (icmpa_init() < 0) {
         AIM_LOG_FATAL("Failed to initialize ICMP Agent module");
+        return 1;
+    }
+
+    if (dhcpra_system_init() < 0) {
+        AIM_LOG_FATAL("Failed to initialize DHCP relay table and agent module");
         return 1;
     }
 
