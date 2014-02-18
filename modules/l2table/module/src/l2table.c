@@ -29,6 +29,7 @@
 #include <l2table/l2table.h>
 #include <stdbool.h>
 #include <murmur/murmur.h>
+#include <AIM/aim_memory.h>
 
 /*
  * Highest 4 key bits are reserved for flags
@@ -61,21 +62,13 @@ static void l2table_decode_key__(uint64_t key, uint8_t mac[L2TABLE_MAC_LEN], uin
 struct l2table *
 l2table_create(uint32_t salt)
 {
-    struct l2table *t = malloc(sizeof(*t));
-    if (t == NULL) {
-        return NULL;
-    }
-
+    struct l2table *t = aim_malloc(sizeof(*t));
     t->size = 1;
     t->num_occupied = 0;
     t->num_deleted = 0;
     t->salt = salt;
 
-    t->entries = malloc(t->size * sizeof(*t->entries));
-    if (t->entries == NULL) {
-        free(t);
-        return NULL;
-    }
+    t->entries = aim_malloc(t->size * sizeof(*t->entries));
 
     int i;
     for (i = 0; i < t->size; i++) {
@@ -88,8 +81,8 @@ l2table_create(uint32_t salt)
 void
 l2table_destroy(struct l2table *t)
 {
-    free(t->entries);
-    free(t);
+    aim_free(t->entries);
+    aim_free(t);
 }
 
 static uint32_t
@@ -265,11 +258,7 @@ l2table_resize__(struct l2table *t)
     int old_size = t->size;
     int new_size = t->size * 2;
     struct l2table_entry *old_entries = t->entries;
-    struct l2table_entry *new_entries = malloc(new_size * sizeof(*new_entries));
-
-    if (new_entries == NULL) {
-        return AIM_ERROR_INTERNAL;
-    }
+    struct l2table_entry *new_entries = aim_malloc(new_size * sizeof(*new_entries));
 
     for (i = 0; i < new_size; i++) {
         new_entries[i].key = KEY_FREE;
@@ -292,7 +281,7 @@ l2table_resize__(struct l2table *t)
         }
     }
 
-    free(old_entries);
+    aim_free(old_entries);
 
     return AIM_ERROR_NONE;
 }

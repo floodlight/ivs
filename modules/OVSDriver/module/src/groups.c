@@ -79,7 +79,7 @@ free_buckets(struct ind_ovs_group_bucket *buckets, uint16_t num_buckets)
     for (i = 0; i < num_buckets; i++) {
         xbuf_cleanup(&buckets[i].actions);
     }
-    free(buckets);
+    aim_free(buckets);
 }
 
 struct ind_ovs_group *
@@ -102,8 +102,7 @@ indigo_fwd_group_add(uint32_t id, uint8_t group_type, of_list_bucket_t *of_bucke
         return err;
     }
 
-    struct ind_ovs_group *group = malloc(sizeof(*group));
-    AIM_TRUE_OR_DIE(group != NULL);
+    struct ind_ovs_group *group = aim_malloc(sizeof(*group));
 
     group->id = id;
     group->type = group_type;
@@ -161,7 +160,7 @@ indigo_fwd_group_delete(uint32_t id)
     ind_ovs_fwd_write_unlock();
 
     free_buckets(group->buckets, group->num_buckets);
-    free(group);
+    aim_free(group);
 
     ind_ovs_kflow_invalidate_all();
 }

@@ -86,10 +86,7 @@ ind_ovs_kflow_add(const struct nlattr *key)
         return err;
     }
 
-    struct ind_ovs_kflow *kflow = malloc(sizeof(*kflow) + key->nla_len);
-    if (kflow == NULL) {
-        return INDIGO_ERROR_RESOURCE;
-    }
+    struct ind_ovs_kflow *kflow = aim_malloc(sizeof(*kflow) + key->nla_len);
 
     struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_NEW);
     nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(key), nla_data(key));
@@ -99,13 +96,13 @@ ind_ovs_kflow_add(const struct nlattr *key)
     ind_ovs_nla_nest_end(msg, actions);
 
     /* Copy actions before ind_ovs_transact() frees msg */
-    kflow->actions = malloc(nla_len(actions));
+    kflow->actions = aim_malloc(nla_len(actions));
     memcpy(kflow->actions, nla_data(actions), nla_len(actions));
     kflow->actions_len = nla_len(actions);
 
     if (ind_ovs_transact(msg) < 0) {
-        free(kflow->actions);
-        free(kflow);
+        aim_free(kflow->actions);
+        aim_free(kflow);
         return INDIGO_ERROR_UNKNOWN;
     }
 
@@ -180,7 +177,7 @@ ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow)
         }
     }
 
-    free(reply);
+    aim_free(reply);
 }
 
 /*
@@ -210,9 +207,9 @@ ind_ovs_kflow_delete(struct ind_ovs_kflow *kflow)
 
     list_remove(&kflow->global_links);
     list_remove(&kflow->bucket_links);
-    free(kflow->actions);
-    free(kflow->stats_ptrs);
-    free(kflow);
+    aim_free(kflow->actions);
+    aim_free(kflow->stats_ptrs);
+    aim_free(kflow);
 }
 
 /*
@@ -246,7 +243,7 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
         ind_ovs_kflow_sync_stats(kflow);
         if (num_stats_ptrs != kflow->num_stats_ptrs) {
             kflow->num_stats_ptrs = num_stats_ptrs;
-            kflow->stats_ptrs = realloc(kflow->stats_ptrs, stats_ptrs_len);
+            kflow->stats_ptrs = aim_realloc(kflow->stats_ptrs, stats_ptrs_len);
         }
         memcpy(kflow->stats_ptrs, stats_ptrs, stats_ptrs_len);
     }
@@ -265,7 +262,7 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
             LOG_ERROR("Failed to modify kernel flow");
             return;
         }
-        kflow->actions = realloc(kflow->actions, nla_len(actions));
+        kflow->actions = aim_realloc(kflow->actions, nla_len(actions));
         memcpy(kflow->actions, nla_data(actions), nla_len(actions));
         kflow->actions_len = nla_len(actions);
     } else {

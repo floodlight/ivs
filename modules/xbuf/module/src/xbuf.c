@@ -18,6 +18,7 @@
  ****************************************************************/
 
 #include <xbuf/xbuf.h>
+#include <AIM/aim_memory.h>
 
 #define XBUF_INITIAL_LEN 64
 
@@ -33,7 +34,7 @@ xbuf_init(struct xbuf *xbuf)
 void
 xbuf_cleanup(struct xbuf *xbuf)
 {
-    free(xbuf->data);
+    aim_free(xbuf->data);
     xbuf->data = NULL;
     xbuf->length = 0;
     xbuf->allocated = 0;
@@ -56,7 +57,7 @@ void
 xbuf_resize(struct xbuf *xbuf, uint32_t new_len)
 {
     xbuf->allocated = next_pow2(new_len);
-    xbuf->data = realloc(xbuf->data, xbuf->allocated);
+    xbuf->data = aim_realloc(xbuf->data, xbuf->allocated);
     AIM_TRUE_OR_DIE(xbuf->data != NULL, "failed to allocate xbuf");
 }
 
@@ -64,6 +65,6 @@ void
 xbuf_compact(struct xbuf *xbuf)
 {
     xbuf->allocated = xbuf->length;
-    xbuf->data = realloc(xbuf->data, xbuf->allocated);
+    xbuf->data = aim_realloc(xbuf->data, xbuf->allocated);
     AIM_TRUE_OR_DIE(xbuf->allocated == 0 || xbuf->data != NULL, "failed to allocate xbuf");
 }
