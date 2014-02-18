@@ -247,12 +247,7 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
     }
 
     LOG_TRACE("Flow create called");
-    flow = malloc(sizeof(*flow));
-    if (flow == NULL) {
-        LOG_ERROR("INDIGO_MEM_ALLOC() failed");
-        result = INDIGO_ERROR_UNKNOWN;
-        goto done;
-    }
+    flow = aim_malloc(sizeof(*flow));
 
     flow->flow_id = flow_id;
     flow->stats.packets = 0;
@@ -318,7 +313,7 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
  done:
     if (INDIGO_FAILURE(result)) {
         cleanup_effects(&flow->effects);
-        free(flow);
+        aim_free(flow);
     } else {
         *table_id = flow->table_id;
     }
@@ -399,7 +394,7 @@ indigo_fwd_flow_delete(indigo_cookie_t flow_id,
 
     list_remove(&flow->flow_id_links);
 
-    INDIGO_MEM_FREE(flow);
+    aim_free(flow);
 
     --table->num_flows;
     --ind_ovs_num_flows;
@@ -851,7 +846,7 @@ ind_ovs_fwd_finish(void)
         LIST_FOREACH_SAFE(bucket, cur, next) {
             struct ind_ovs_flow *flow = container_of(cur, flow_id_links, struct ind_ovs_flow);
             cleanup_effects(&flow->effects);
-            free(flow);
+            aim_free(flow);
         }
     }
 }

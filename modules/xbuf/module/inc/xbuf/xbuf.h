@@ -102,7 +102,7 @@ void xbuf_compact(struct xbuf *xbuf);
  *
  * Reinitializes the xbuf to be empty.
  *
- * The returned memory should be deallocated with free().
+ * The returned memory should be deallocated with aim_free().
  */
 static inline void *
 xbuf_steal(struct xbuf *xbuf)

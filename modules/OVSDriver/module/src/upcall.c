@@ -475,11 +475,7 @@ ind_ovs_upcall_init(void)
 
     int i, j;
     for (i = 0; i < ind_ovs_num_upcall_threads; i++) {
-        struct ind_ovs_upcall_thread *thread = calloc(1, sizeof(*thread));
-        if (thread == NULL) {
-            LOG_ERROR("Failed to create upcall thread");
-            abort();
-        }
+        struct ind_ovs_upcall_thread *thread = aim_zmalloc(sizeof(*thread));
 
         thread->epfd = epoll_create(1);
         if (thread->epfd < 0) {
@@ -535,7 +531,7 @@ ind_ovs_upcall_finish(void)
         for (j = 0; j < NUM_UPCALL_BUFFERS; j++) {
             nlmsg_free(thread->msgs[j]);
         }
-        free(thread);
+        aim_free(thread);
         ind_ovs_upcall_threads[i] = NULL;
     }
 }

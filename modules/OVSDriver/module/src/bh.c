@@ -68,11 +68,7 @@ void
 ind_ovs_bh_request_kflow(struct nlattr *key)
 {
     int key_size = nla_total_size(nla_len(key));
-    struct ind_ovs_bh_request *req = malloc(sizeof(*req) + key_size);
-    if (req == NULL) {
-        LOG_ERROR("failed to allocate bottom-half request");
-        return;
-    }
+    struct ind_ovs_bh_request *req = aim_malloc(sizeof(*req) + key_size);
 
     req->type = IND_OVS_BH_REQUEST_KFLOW;
     req->len = key_size;
@@ -86,11 +82,7 @@ ind_ovs_bh_request_pktin(uint32_t in_port, struct nlattr *packet, struct nlattr 
 {
     int packet_size = nla_total_size(nla_len(packet));
     int key_size = nla_total_size(nla_len(key));
-    struct ind_ovs_bh_request *req = malloc(sizeof(*req) + packet_size + key_size);
-    if (req == NULL) {
-        LOG_ERROR("failed to allocate bottom-half request");
-        return;
-    }
+    struct ind_ovs_bh_request *req = aim_malloc(sizeof(*req) + packet_size + key_size);
 
     req->type = IND_OVS_BH_REQUEST_PKTIN;
     req->len = packet_size + key_size;
@@ -109,7 +101,7 @@ ind_ovs_bh_enqueue(struct ind_ovs_bh_request *req)
     if (ind_ovs_bh_queue_len > IND_OVS_BH_MAX_QUEUE_LEN) {
         pthread_mutex_unlock(&ind_ovs_bh_lock);
         LOG_VERBOSE("dropping bottom-half request: queue too long");
-        free(req);
+        aim_free(req);
         return;
     }
     list_push(&ind_ovs_bh_requests, &req->links);
@@ -167,7 +159,7 @@ ind_ovs_bh_run()
         } else {
             abort();
         }
-        free(req);
+        aim_free(req);
     }
 }
 

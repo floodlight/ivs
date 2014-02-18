@@ -20,6 +20,7 @@
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC optimize (4)
 #endif
+#include <AIM/aim_memory.h>
 #include "flowtable/flowtable.h"
 #include "murmur/murmur.h"
 #include "flowtable_log.h"
@@ -76,21 +77,11 @@ extern uint32_t ind_ovs_salt;
 struct flowtable *
 flowtable_create()
 {
-    struct flowtable *ft = malloc(sizeof(*ft));
-    if (ft == NULL) {
-        AIM_LOG_ERROR("Failed to allocate flowtable");
-        return NULL;
-    }
+    struct flowtable *ft = aim_malloc(sizeof(*ft));
 
     ft->fts_list_size = FLOWTABLE_BUCKETS;
     ft->fts_list_cnt  = 0;
-    ft->fts_list = calloc(ft->fts_list_size, sizeof(ft->fts_list));
-
-    if(ft->fts_list == NULL) {
-        free(ft);
-        AIM_LOG_ERROR("Failed to allocate specific flowtable list");
-        return NULL;
-    }
+    ft->fts_list = aim_zmalloc(ft->fts_list_size * sizeof(ft->fts_list));
 
     int i;
     for (i = 0; i < FLOWTABLE_BUCKETS; i++) {
@@ -112,12 +103,12 @@ flowtable_destroy(struct flowtable *ft)
             struct flowtable_specific *cur_fts =
                 container_of(cur, links, struct flowtable_specific);
 
-            free(cur_fts);
+            aim_free(cur_fts);
         }
     }
 
-    free(ft->fts_list);
-    free(ft);
+    aim_free(ft->fts_list);
+    aim_free(ft);
     return;
 }
 
@@ -156,7 +147,7 @@ flowtable_insert(struct flowtable *ft, struct flowtable_entry *fte)
     }
 
     /* If not present, then create a specific flowtable */
-    struct flowtable_specific *new_fts = calloc(1, sizeof(*new_fts));
+    struct flowtable_specific *new_fts = aim_zmalloc(sizeof(*new_fts));
     if(new_fts == NULL) {
         AIM_LOG_ERROR("Failed to allocate specific flowtable");
         return;
@@ -202,7 +193,7 @@ flowtable_remove(struct flowtable *ft, struct flowtable_entry *fte)
         if(!cur_fts->flow_cnt) {
             list_remove(&cur_fts->links);
             flowtable_specific_list_del(ft, cur_fts);
-            free(cur_fts);
+            aim_free(cur_fts);
         }
     }
 
@@ -341,7 +332,7 @@ flowtable_specific_list_add(struct flowtable *ft, struct flowtable_specific *fts
     /* If list is full, allocate twice the size of current list */
     if(ft->fts_list_cnt >= ft->fts_list_size) {
         struct flowtable_specific **new_fts_list =
-            realloc(ft->fts_list, 2*ft->fts_list_size*(sizeof(ft->fts_list[0])));
+            aim_realloc(ft->fts_list, 2*ft->fts_list_size*(sizeof(ft->fts_list[0])));
 
         if(new_fts_list == NULL) {
             AIM_LOG_ERROR("Failed to allocate more specific flowtable list");

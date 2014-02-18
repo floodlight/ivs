@@ -154,7 +154,7 @@ indigo_port_interface_list(indigo_port_info_t** list)
     for (i = IND_OVS_MAX_PORTS-1; i >= 0; i--) { 
         struct ind_ovs_port *port = ind_ovs_ports[i];
         if(port != NULL) { 
-            indigo_port_info_t* pi = calloc(1, sizeof(*pi)); 
+            indigo_port_info_t* pi = aim_zmalloc(sizeof(*pi));
             strncpy(pi->port_name, port->ifname, sizeof(port->ifname)); 
             pi->of_port = i; 
             pi->next = head; 
@@ -171,7 +171,7 @@ indigo_port_interface_list_destroy(indigo_port_info_t* list)
 {
     while(list) { 
         indigo_port_info_t* next = list->next; 
-        free(list); 
+        aim_free(list);
         list = next; 
     }
 }
@@ -186,11 +186,7 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname, of_mac_addr_t mac_addr)
         return;
     }
 
-    struct ind_ovs_port *port = calloc(1, sizeof(*port));
-    if (port == NULL) {
-        LOG_ERROR("failed to allocate port");
-        return;
-    }
+    struct ind_ovs_port *port = aim_zmalloc(sizeof(*port));
 
     strncpy(port->ifname, ifname, sizeof(port->ifname));
     port->dp_port_no = port_no;
@@ -252,7 +248,7 @@ cleanup_port:
     if (port->notify_socket) {
         nl_socket_free(port->notify_socket);
     }
-    free(port);
+    aim_free(port);
 }
 
 /*
@@ -293,7 +289,7 @@ ind_ovs_port_deleted(uint32_t port_no)
     nl_socket_free(port->notify_socket);
     pthread_mutex_destroy(&port->quiesce_lock);
     pthread_cond_destroy(&port->quiesce_cvar);
-    free(port);
+    aim_free(port);
     ind_ovs_ports[port_no] = NULL;
     ind_ovs_fwd_write_unlock();
 
