@@ -350,7 +350,7 @@ aim_main(int argc, char* argv[])
         aim_log_pvs_set_all(aim_pvs_syslog_open("ivs", LOG_NDELAY, LOG_DAEMON));
     }
 
-    AIM_LOG_MSG("Starting %s (%s)", program_version, AIM_STRINGIFY(BUILD_ID));
+    AIM_LOG_MSG("Starting %s (%s) pid %d", program_version, AIM_STRINGIFY(BUILD_ID), getpid());
 
     /* Initialize all modules */
 
@@ -562,6 +562,8 @@ aim_main(int argc, char* argv[])
     snprintf(dp_desc, sizeof(dp_desc), "%s.%s pid %d",
              hostname, domainname, getpid());
     ind_core_dp_desc_set(dp_desc);
+
+    AIM_LOG_INFO("Datapath description: %s", dp_desc);
 
     of_serial_num_t serial_num = "";
     ind_core_serial_num_set(serial_num);
