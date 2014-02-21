@@ -68,7 +68,7 @@ l2table_create(uint32_t salt)
     t->num_deleted = 0;
     t->salt = salt;
 
-    t->entries = aim_malloc(t->size * sizeof(*t->entries));
+    t->entries = aim_malloc(sizeof(*t->entries));
 
     int i;
     for (i = 0; i < t->size; i++) {

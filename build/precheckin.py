@@ -37,6 +37,9 @@ else:
 
 os.environ['ROOT'] = os.path.join(os.getcwd())
 
+if os.environ.get('CC'):
+    os.environ['GCC'] = os.environ['CC']
+
 try:
     os.mkdir('testlogs')
 except:
