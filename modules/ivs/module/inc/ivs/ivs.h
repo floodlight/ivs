@@ -69,6 +69,8 @@ struct ind_ovs_flow_effects {
     unsigned arp_offload : 1;
     unsigned dhcp_offload : 1;
     unsigned disable_split_horizon_check : 1;
+    unsigned permit : 1;
+    unsigned deny : 1;
 };
 
 struct ind_ovs_flow_stats {
