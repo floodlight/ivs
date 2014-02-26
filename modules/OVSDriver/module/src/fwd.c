@@ -138,6 +138,8 @@ init_effects(struct ind_ovs_flow_effects *effects,
     effects->arp_offload = 0;
     effects->dhcp_offload = 0;
     effects->disable_split_horizon_check = 0;
+    effects->permit = 0;
+    effects->deny = 0;
     effects->meter_id = -1;
     effects->next_table_id = -1;
 
@@ -202,6 +204,12 @@ init_effects(struct ind_ovs_flow_effects *effects,
                 break;
             case OF_INSTRUCTION_BSN_DISABLE_SPLIT_HORIZON_CHECK:
                 effects->disable_split_horizon_check = 1;
+                break;
+            case OF_INSTRUCTION_BSN_PERMIT:
+                effects->permit = 1;
+                break;
+            case OF_INSTRUCTION_BSN_DENY:
+                effects->deny = 1;
                 break;
             default:
                 return INDIGO_ERROR_COMPAT;
