@@ -111,6 +111,7 @@ struct ind_ovs_port {
     of_mac_addr_t mac_addr;
     unsigned no_packet_in : 1;
     unsigned no_flood : 1;
+    unsigned admin_down : 1;
     uint32_t num_kflows; /* Number of kflows with this in_port */
     struct nl_sock *notify_socket; /* Netlink socket for upcalls */
     aim_ratelimiter_t upcall_log_limiter;
