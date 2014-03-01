@@ -616,7 +616,7 @@ port_desc_set(of_port_desc_t *of_port_desc, uint32_t port_no)
     of_port_desc_config_set(of_port_desc, config);
 
     uint32_t state = 0;
-    if (!(port->ifflags & IFF_UP)) {
+    if (!(port->ifflags & IFF_RUNNING)) {
         state |= OF_PORT_STATE_FLAG_LINK_DOWN;
     }
     of_port_desc_state_set(of_port_desc, state);
@@ -671,9 +671,9 @@ link_change_cb(struct nl_cache *cache,
     }
 
     /* Log at INFO only if the interface transitioned between up/down */
-    if ((ifflags & IFF_UP) && !(port->ifflags & IFF_UP)) {
+    if ((ifflags & IFF_RUNNING) && !(port->ifflags & IFF_RUNNING)) {
         LOG_INFO("Interface %s state changed to up", ifname);
-    } else if (!(ifflags & IFF_UP) && (port->ifflags & IFF_UP)) {
+    } else if (!(ifflags & IFF_RUNNING) && (port->ifflags & IFF_RUNNING)) {
         LOG_INFO("Interface %s state changed to down", ifname);
     }
 
