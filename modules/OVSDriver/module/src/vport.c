@@ -319,6 +319,16 @@ indigo_port_modify(of_port_mod_t *port_mod)
         port->no_flood = OF_PORT_CONFIG_FLAG_NO_FLOOD_TEST(config, port_mod->version);
     }
 
+    if (OF_PORT_CONFIG_FLAG_PORT_DOWN_TEST(mask, port_mod->version)) {
+        port->admin_down = OF_PORT_CONFIG_FLAG_PORT_DOWN_TEST(config, port_mod->version);
+        if (port->admin_down) {
+            port->ifflags &= ~IFF_UP;
+        } else {
+            port->ifflags |= IFF_UP;
+        }
+        (void) ind_ovs_set_interface_flags(port->ifname, port->ifflags);
+    }
+
     /* TODO change other configuration? */
     ind_ovs_kflow_invalidate_all();
 
@@ -613,10 +623,13 @@ port_desc_set(of_port_desc_t *of_port_desc, uint32_t port_no)
     if (port->no_flood) {
         OF_PORT_CONFIG_FLAG_NO_FLOOD_SET(config, of_port_desc->version);
     }
+    if (port->admin_down) {
+        OF_PORT_CONFIG_FLAG_PORT_DOWN_SET(config, of_port_desc->version);
+    }
     of_port_desc_config_set(of_port_desc, config);
 
     uint32_t state = 0;
-    if (!(port->ifflags & IFF_UP)) {
+    if (!(port->ifflags & IFF_RUNNING)) {
         state |= OF_PORT_STATE_FLAG_LINK_DOWN;
     }
     of_port_desc_state_set(of_port_desc, state);
@@ -671,15 +684,16 @@ link_change_cb(struct nl_cache *cache,
     }
 
     /* Log at INFO only if the interface transitioned between up/down */
-    if ((ifflags & IFF_UP) && !(port->ifflags & IFF_UP)) {
+    if ((ifflags & IFF_RUNNING) && !(port->ifflags & IFF_RUNNING)) {
         LOG_INFO("Interface %s state changed to up", ifname);
-    } else if (!(ifflags & IFF_UP) && (port->ifflags & IFF_UP)) {
+    } else if (!(ifflags & IFF_RUNNING) && (port->ifflags & IFF_RUNNING)) {
         LOG_INFO("Interface %s state changed to down", ifname);
     }
 
     LOG_VERBOSE("Sending port status change notification for interface %s", ifname);
 
     port->ifflags = ifflags;
+    port->admin_down = !(ifflags & IFF_UP);
     port_status_notify(port->dp_port_no, OF_PORT_CHANGE_REASON_MODIFY);
 }
 
