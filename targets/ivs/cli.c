@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <uCli/ucli.h>
@@ -35,6 +36,7 @@ struct client {
     int fd;
     char read_buffer[READ_BUFFER_SIZE];
     int read_buffer_offset;
+    bool read_finished;
     aim_pvs_t *write_pvs;
     char *write_buffer;
     int write_buffer_offset;
@@ -141,8 +143,15 @@ client_callback(
         client->read_buffer_offset += c;
 
         if (c == 0) {
-            AIM_LOG_TRACE("Disconnecting CLI client due to EOF");
-            destroy_client(client);
+            /* Peer has shutdown their write side */
+            if (client->write_buffer_len == 0 &&
+                    aim_pvs_buffer_size(client->write_pvs) == 0) {
+                destroy_client(client);
+            } else {
+                /* We'll destroy the client once we've finished writing to it */
+                ind_soc_data_in_pause(client->fd);
+                client->read_finished = true;
+            }
             return;
         }
 
@@ -201,6 +210,9 @@ client_callback(
             client->write_buffer = NULL;
             if (aim_pvs_buffer_size(client->write_pvs) == 0) {
                 ind_soc_data_out_clear(client->fd);
+                if (client->read_finished) {
+                    destroy_client(client);
+                }
             }
         }
     }
