@@ -192,10 +192,11 @@ client_callback(
             client->write_pvs = aim_pvs_buffer_create();
         }
 
-        int c = write(client->fd,
-                      client->write_buffer+client->write_buffer_offset,
-                      client->write_buffer_len-client->write_buffer_offset);
-        if (c < 0) {
+        int c = send(client->fd,
+                     client->write_buffer+client->write_buffer_offset,
+                     client->write_buffer_len-client->write_buffer_offset,
+                     MSG_NOSIGNAL);
+        if (c <= 0) {
             AIM_LOG_ERROR("write failed: %s", strerror(errno));
             destroy_client(client);
             return;
