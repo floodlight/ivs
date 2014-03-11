@@ -43,7 +43,7 @@ include $(BUILDER)/lib.mk
 DEPENDMODULES := SocketManager OFConnectionManager OFStateManager OVSDriver \
                  Configuration loci indigo BigList BigHash ivs_common pipeline pipeline_standard flowtable xbuf \
                  lldpa lacpa arpa router_ip_table icmpa dhcpra PPE IOF \
-                 AIM murmur cjson OS
+                 AIM murmur cjson OS uCli
 
 ifdef USE_LUAJIT
 DEPENDMODULES += luajit
@@ -82,8 +82,8 @@ include $(BUILDER)/bin.mk
 include $(BUILDER)/targets.mk
 
 
-# Disable uCLI
-GLOBAL_CFLAGS += $(foreach mod,$(DEPENDMODULES_UPPER),-D$(mod)_CONFIG_INCLUDE_UCLI=0)
+# Enable uCLI
+GLOBAL_CFLAGS += $(foreach mod,$(DEPENDMODULES_UPPER),-D$(mod)_CONFIG_INCLUDE_UCLI=1)
 
 
 # These indicate Linux specific implementations to be used for
