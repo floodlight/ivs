@@ -178,6 +178,7 @@ client_callback(
             client->write_buffer = aim_pvs_buffer_get(client->write_pvs);
             client->write_buffer_len = aim_pvs_buffer_size(client->write_pvs);
             client->write_buffer_offset = 0;
+            /* aim_pvs_buffer_reset has a bug, workaround it */
             aim_pvs_destroy(client->write_pvs);
             client->write_pvs = aim_pvs_buffer_create();
         }
