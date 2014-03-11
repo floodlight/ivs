@@ -29,6 +29,7 @@
 #include <AIM/aim_log.h>
 
 #define READ_BUFFER_SIZE 1024
+#define LISTEN_BACKLOG 5
 
 struct client {
     int fd;
@@ -70,7 +71,7 @@ ivs_cli_init(const char *path)
         abort();
     }
 
-    if (listen(listen_socket, 5) < 0) {
+    if (listen(listen_socket, LISTEN_BACKLOG) < 0) {
         perror("listen (CLI)");
         abort();
     }
