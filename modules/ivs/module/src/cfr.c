@@ -115,6 +115,8 @@ ind_ovs_key_to_cfr(const struct ind_ovs_parsed_key *pkey,
     cfr->l3_dst_class_id = 0;
     cfr->global_vrf_allowed = 0;
     cfr->pad = 0;
+    cfr->egr_port_group_id = 0;
+    cfr->pad2 = 0;
 }
 
 void
@@ -253,6 +255,10 @@ ind_ovs_match_to_cfr(const of_match_t *match,
     masks->global_vrf_allowed = match->masks.bsn_global_vrf_allowed & 1;
     fields->pad = 0;
     masks->pad = 0;
+    fields->egr_port_group_id = match->fields.bsn_egr_port_group_id;
+    masks->egr_port_group_id = match->masks.bsn_egr_port_group_id;
+    fields->pad2 = 0;
+    masks->pad2 = 0;
 
     /* normalize the flow entry */
     int i;
