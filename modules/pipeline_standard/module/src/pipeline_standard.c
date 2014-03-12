@@ -174,6 +174,9 @@ pipeline_standard_update_cfr(struct ind_ovs_cfr *cfr, struct xbuf *actions)
             cfr->global_vrf_allowed = flag & 1;
             break;
         }
+        case IND_OVS_ACTION_SET_EGR_PORT_GROUP_ID:
+            memcpy(&cfr->egr_port_group_id, xbuf_payload(attr), sizeof(cfr->egr_port_group_id));
+            break;
         default:
             break;
         }
