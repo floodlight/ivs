@@ -85,7 +85,7 @@ struct ind_ovs_flow_stats {
  * Wildcarded fields must be zeroed in the flow entry's CFR.
  * sizeof(struct ind_ovs_cfr) must be a multiple of 8.
  * All fields are in network byte order except in_port, lag_id, the
- * class_ids, and global_vrf_allowed.
+ * class_ids, egr_port_group_id, and global_vrf_allowed.
  */
 
 struct ind_ovs_cfr {
@@ -111,9 +111,11 @@ struct ind_ovs_cfr {
     uint32_t l3_interface_class_id;  /* bsn_l3_interface_class_id extension */
     uint32_t l3_src_class_id;   /* bsn_l3_src_class_id extension */
     uint32_t l3_dst_class_id;   /* bsn_l3_dst_class_id extension */
+    uint32_t egr_port_group_id; /* bsn_egr_port_group_id extension */
+    uint32_t pad2;
 } __attribute__ ((aligned (8)));
 
-AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == 13*8);
+AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == 14*8);
 
 /*
  * X-macro representation of the OVS key (nlattr type, key field, type).

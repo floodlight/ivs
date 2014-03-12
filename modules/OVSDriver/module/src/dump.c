@@ -496,6 +496,7 @@ ind_ovs_dump_cfr(const struct ind_ovs_cfr *cfr)
     output("l3_src_class_id=%u", cfr->l3_src_class_id);
     output("l3_dst_class_id=%u", cfr->l3_dst_class_id);
     output("global_vrf_allowed=%u", cfr->global_vrf_allowed);
+    output("egr_port_group_id=%u", cfr->egr_port_group_id);
 
     indent--;
 }
