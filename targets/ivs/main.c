@@ -502,8 +502,8 @@ aim_main(int argc, char* argv[])
                 .reset_echo_count = 3,
             };
 
-            indigo_cxn_id_t cxn_id;
-            if (indigo_cxn_connection_add(&proto, &config, &cxn_id) < 0) {
+            indigo_controller_id_t id;
+            if (indigo_controller_add(&proto, &config, &id) < 0) {
                 AIM_LOG_FATAL("Failed to add controller %s", str);
                 return 1;
             }
@@ -532,8 +532,8 @@ aim_main(int argc, char* argv[])
                 .reset_echo_count = 0,
             };
 
-            indigo_cxn_id_t cxn_id;
-            if (indigo_cxn_connection_add(&proto, &config, &cxn_id) < 0) {
+            indigo_controller_id_t id;
+            if (indigo_controller_add(&proto, &config, &id) < 0) {
                 AIM_LOG_FATAL("Failed to add listener %s", str);
                 return 1;
             }
