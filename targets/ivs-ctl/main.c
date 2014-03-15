@@ -33,6 +33,9 @@
 #include <netlink/genl/genl.h>
 #include <netlink/genl/ctrl.h>
 #include <getopt.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include "openvswitch.h"
 
 static int transact(struct nl_sock *sk, struct nl_msg *msg);
@@ -50,6 +53,7 @@ static void help(void)
     fprintf(stderr, "  add-port INTERFACE: add a port to the datapath\n");
     fprintf(stderr, "  add-internal-port INTERFACE: add an internal port to the datapath\n");
     fprintf(stderr, "  del-port INTERFACE: delete a port from the datapath\n");
+    fprintf(stderr, "  cli ...: run an internal CLI command\n");
 }
 
 static void
@@ -303,6 +307,51 @@ del_dp(const char *datapath)
     }
 }
 
+static void
+cli(int argc, char **argv)
+{
+    const char *path = "/var/run/ivs-cli.sock";
+
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd < 0) {
+        perror("socket");
+        exit(1);
+    }
+
+    struct sockaddr_un saddr;
+    memset(&saddr, 0, sizeof(&saddr));
+    saddr.sun_family = AF_UNIX;
+    strcpy(saddr.sun_path, path);
+
+    if (connect(fd, (struct sockaddr *)&saddr, sizeof(saddr)) < 0) {
+        perror("connect");
+        exit(1);
+    }
+
+    FILE *f = fdopen(fd, "r+");
+    if (f == NULL) {
+        perror("fdopen");
+        exit(1);
+    }
+
+    int i;
+    for (i = 0; i < argc; i++) {
+        fprintf(f, "%s ", argv[i]);
+    }
+    fprintf(f, "\n");
+
+    fflush(f);
+    shutdown(fd, SHUT_WR);
+
+    char buf[1024];
+    int c;
+    while ((c = fread(buf, 1, sizeof(buf), f)) > 0) {
+        fwrite(buf, c, 1, stdout);
+    }
+
+    fclose(f);
+}
+
 static struct nl_sock *
 create_genl_socket(void)
 {
@@ -378,6 +427,8 @@ main(int argc, char *argv[])
             return 1;
         }
         del_dp(datapath_name);
+    } else if (!strcmp(cmd, "cli")) {
+        cli(argc-1, argv+1);
     } else {
         fprintf(stderr, "Unknown command '%s' (try help)\n", cmd);
         return 1;
