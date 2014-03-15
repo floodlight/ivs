@@ -796,6 +796,12 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_GLOBAL_VRF_ALLOWED, &val, sizeof(val));
                     break;
                 }
+                case OF_OXM_BSN_EGR_PORT_GROUP_ID: {
+                    uint32_t val;
+                    of_oxm_bsn_egr_port_group_id_value_get(&oxm.bsn_egr_port_group_id, &val);
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_EGR_PORT_GROUP_ID, &val, sizeof(val));
+                    break;
+                }
                 default:
                     LOG_ERROR("unsupported set-field oxm %s", of_object_id_str[oxm.header.object_id]);
                     return INDIGO_ERROR_COMPAT;
