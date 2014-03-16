@@ -201,7 +201,11 @@ ind_ovs_handle_one_upcall(struct ind_ovs_upcall_thread *thread,
     struct nlmsghdr *nlh = nlmsg_hdr(msg);
 
     if (nlh->nlmsg_type == NLMSG_ERROR) {
-        abort();
+        struct nlmsgerr *err = NLMSG_DATA(nlh);
+        LOG_ERROR("Received error on upcall socket: %s", strerror(-err->error));
+        LOG_VERBOSE("Original message:");
+        ind_ovs_dump_msg(&err->msg);
+        return;
     } else if (nlh->nlmsg_type == ovs_datapath_family) {
         /* Spurious message used to wake up an upcall thread. */
         /* See ind_ovs_upcall_quiesce. */
