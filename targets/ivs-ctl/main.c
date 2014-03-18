@@ -35,7 +35,7 @@
 #include <getopt.h>
 #include <unistd.h>
 #include <sys/socket.h>
-#include <sys/un.h>
+#include <linux/un.h>
 #include "openvswitch.h"
 
 static int transact(struct nl_sock *sk, struct nl_msg *msg);
@@ -310,7 +310,8 @@ del_dp(const char *datapath)
 static void
 cli(int argc, char **argv)
 {
-    const char *path = "/var/run/ivs-cli.sock";
+    char path[UNIX_PATH_MAX];
+    snprintf(path, sizeof(path), "/var/run/ivs-ucli.%s.sock", datapath_name);
 
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd < 0) {
