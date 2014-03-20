@@ -71,6 +71,7 @@ struct ind_ovs_flow_effects {
     unsigned disable_split_horizon_check : 1;
     unsigned permit : 1;
     unsigned deny : 1;
+    unsigned packet_of_death : 1;
 };
 
 struct ind_ovs_flow_stats {
