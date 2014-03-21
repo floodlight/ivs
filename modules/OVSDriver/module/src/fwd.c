@@ -570,7 +570,7 @@ ind_fwd_pkt_in(of_port_no_t in_port,
     }
 
     if (of_packet_in->version >= OF_VERSION_1_3) {
-        of_packet_in_cookie_set(of_packet_in, 0xffffffffffffffff);
+        of_packet_in_cookie_set(of_packet_in, UINT64_C(0xffffffffffffffff));
     }
 
     if (LOXI_FAILURE(of_packet_in_data_set(of_packet_in, &of_octets))) {
