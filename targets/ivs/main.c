@@ -501,7 +501,7 @@ aim_main(int argc, char* argv[])
                 .cxn_priority = 0,
                 .local = 0,
                 .listen = 0,
-                .periodic_echo_ms = 10000,
+                .periodic_echo_ms = 2000,
                 .reset_echo_count = 3,
             };
 
