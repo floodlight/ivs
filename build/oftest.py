@@ -75,6 +75,9 @@ import select
 import platform
 import logging
 
+# Prevent ratelimiters from causing test failures
+os.environ['INDIGO_BENCHMARK'] = '1'
+
 ###############################################################################
 #
 # Helpers
