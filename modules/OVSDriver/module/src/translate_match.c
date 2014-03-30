@@ -71,6 +71,7 @@ ind_ovs_parse_key__(struct nlattr *key, struct ind_ovs_parsed_key *pkey)
 void
 ind_ovs_parse_key(struct nlattr *key, struct ind_ovs_parsed_key *pkey)
 {
+    memset(pkey, 0, sizeof(*pkey));
     pkey->populated = 0;
     pkey->in_port = -1;
     pkey->tunnel.id = 0;
