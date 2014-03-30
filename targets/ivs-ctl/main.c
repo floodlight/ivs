@@ -320,7 +320,7 @@ cli(int argc, char **argv)
     }
 
     struct sockaddr_un saddr;
-    memset(&saddr, 0, sizeof(&saddr));
+    memset(&saddr, 0, sizeof(saddr));
     saddr.sun_family = AF_UNIX;
     strcpy(saddr.sun_path, path);
 
