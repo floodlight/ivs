@@ -25,7 +25,9 @@
  * reused by insertions.
  */
 
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC optimize (4)
+#endif
 #include <l2table/l2table.h>
 #include <stdbool.h>
 #include <murmur/murmur.h>
