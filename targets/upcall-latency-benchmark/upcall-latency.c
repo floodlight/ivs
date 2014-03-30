@@ -207,6 +207,20 @@ measure_latency(uint32_t ip_src, uint16_t udp_dst)
     }
 }
 
+static int
+compare_uint32(const void *_a, const void *_b)
+{
+    uint32_t a = *(const uint32_t *)_a;
+    uint32_t b = *(const uint32_t *)_b;
+    if (a < b) {
+        return -1;
+    } else if (a > b) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 int
 main(int argc, char **argv)
 {
@@ -277,19 +291,7 @@ main(int argc, char **argv)
             measure_latency(ip_src, i);
         }
 
-        int sort_uint32(const void *_a, const void *_b) {
-            uint32_t a = *(const uint32_t *)_a;
-            uint32_t b = *(const uint32_t *)_b;
-            if (a < b) {
-                return -1;
-            } else if (a > b) {
-                return 1;
-            } else {
-                return 0;
-            }
-        }
-
-        qsort(latencies, total_recvd, sizeof(latencies[0]), sort_uint32);
+        qsort(latencies, total_recvd, sizeof(latencies[0]), compare_uint32);
         uint32_t median_latency = latencies[total_recvd/2];
 
 #if 1

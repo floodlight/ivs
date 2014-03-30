@@ -47,7 +47,7 @@ except:
 
 # TODO add more default toolchains
 BUILDS = []
-def build(path, toolchains=['gcc-local']):
+def build(path, toolchains=['gcc-local', 'clang']):
     BUILDS.append({ 'path' : path, 'toolchains' : toolchains })
 
 TESTS = []
