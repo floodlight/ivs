@@ -39,6 +39,7 @@ include $(BUILDER)/targets.mk
 
 GLOBAL_CFLAGS += -g
 GLOBAL_CFLAGS += -O3
+GLOBAL_CFLAGS += -fno-omit-frame-pointer
 GLOBAL_LINK_LIBS += -lrt
 
 ifdef USE_CALLGRIND

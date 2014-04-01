@@ -1,3 +1,4 @@
+#!/bin/bash -eu
 ################################################################
 #
 #        Copyright 2013, Big Switch Networks, Inc.
@@ -16,32 +17,7 @@
 # License.
 #
 ################################################################
-include ../../init.mk
 
-ALLOW_DECLARATION_AFTER_STATEMENT = 1
-
-MODULE := l2table_benchmark
-include $(BUILDER)/standardinit.mk
-
-LIBRARY := l2table_benchmark_main
-$(LIBRARY)_SUBDIR := $(dir $(lastword $(MAKEFILE_LIST)))
-include $(BUILDER)/lib.mk
-
-DEPENDMODULES := l2table AIM murmur
-include $(BUILDER)/dependmodules.mk
-
-BINARY := l2table-benchmark
-
-$(BINARY)_LIBRARIES := $(LIBRARY_TARGETS)
-include $(BUILDER)/bin.mk
-
-include $(BUILDER)/targets.mk
-
-GLOBAL_CFLAGS += -g
-GLOBAL_CFLAGS += -O3
-GLOBAL_CFLAGS += -fno-omit-frame-pointer
-GLOBAL_LINK_LIBS += -lrt
-
-ifdef USE_CALLGRIND
-GLOBAL_CFLAGS += -DUSE_CALLGRIND
-endif
+export VALGRIND_OPTIONS="--tool=callgrind --cache-sim=yes --branch-sim=yes --dump-instr=yes --callgrind-out-file=profile.kcg"
+trap "{ sudo chmod a+r profile.kcg; echo Output left in profile.kcg; }" EXIT
+$(dirname $(readlink -f $0))/ivs-valgrind.sh "$@"
