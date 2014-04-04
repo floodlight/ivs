@@ -636,17 +636,8 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
             break;
         }
         case OF_ACTION_SET_FIELD: {
-            /* HACK loci does not yet support the OXM field in the set-field action */
             of_oxm_t oxm;
-            of_oxm_header_init(&oxm.header, act.header.version, 0, 1);
-            oxm.header.wire_object = act.header.wire_object;
-            oxm.header.wire_object.obj_offset += 4; /* skip action header */
-            oxm.header.parent = &act.header;
-            of_object_wire_init(&oxm.header, OF_OXM, 0);
-            if (oxm.header.length == 0) {
-                LOG_ERROR("failed to parse set-field action");
-                return INDIGO_ERROR_COMPAT;
-            }
+            of_action_set_field_field_bind(&act.set_field, &oxm.header);
             switch (oxm.header.object_id) {
                 case OF_OXM_VLAN_VID: {
                     uint16_t vlan_vid;
