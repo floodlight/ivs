@@ -307,7 +307,7 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     }
 
     /* See the comment for ind_ovs_upcall_seen_key. */
-    if (ind_ovs_upcall_seen_key(thread, key)) {
+    if (!ind_ovs_disable_kflows && ind_ovs_upcall_seen_key(thread, key)) {
         /* Create a kflow with the given key and actions. */
         ind_ovs_bh_request_kflow(key);
     }

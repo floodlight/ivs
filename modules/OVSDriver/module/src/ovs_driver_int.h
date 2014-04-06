@@ -330,6 +330,15 @@ extern struct ind_ovs_port *ind_ovs_ports[IND_OVS_MAX_PORTS];
 extern bool ind_ovs_benchmark_mode;
 
 /*
+ * When debugging the controller (and using verbose logging on the switch)
+ * it's often helpful to see the pipeline logs for every packet. This flag
+ * prevents IVS from installing kernel flows, so every packet will be
+ * received as an upcall.
+ * Set it with the environment variable IVS_DISABLE_KFLOWS=1.
+ */
+extern bool ind_ovs_disable_kflows;
+
+/*
  * Random number used to prevent guests from deliberately causing hash
  * collisions.
  */
