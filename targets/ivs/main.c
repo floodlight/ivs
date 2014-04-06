@@ -325,6 +325,19 @@ aim_main(int argc, char* argv[])
 {
     AIM_LOG_STRUCT_REGISTER();
 
+    /*
+     * We queue many (up to 20) 64KB messages before sending them on the socket
+     * with a single writev(). After we free all the messages the malloc
+     * implementation would see we have more than 128KB (the default trim value)
+     * free and return it to the OS with a call to brk(). Every time we
+     * allocate a new message we have to get the memory with brk() all over
+     * again.
+     *
+     * Increasing the trim threshold above the size of our working set
+     * eliminates this churn.
+     */
+    mallopt(M_TRIM_THRESHOLD, 2*1024*1024);
+
     loci_logger = ivs_loci_logger;
 
     core_cfg.expire_flows = 1;
