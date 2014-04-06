@@ -45,6 +45,7 @@ int ind_ovs_dp_ifindex = 0;
 struct nl_sock *ind_ovs_socket;
 int ovs_datapath_family, ovs_packet_family, ovs_vport_family, ovs_flow_family;
 bool ind_ovs_benchmark_mode = false;
+bool ind_ovs_disable_kflows = false;
 uint32_t ind_ovs_salt;
 uint32_t ind_ovs_max_flows;
 
@@ -148,11 +149,18 @@ indigo_error_t
 ind_ovs_init(const char *datapath_name, uint32_t max_flows)
 {
     int ret;
+    char *env_str;
 
-    char *bm_str = getenv("INDIGO_BENCHMARK");
-    if (bm_str != NULL && atoi(bm_str) == 1) {
+    env_str = getenv("INDIGO_BENCHMARK");
+    if (env_str != NULL && atoi(env_str) == 1) {
         LOG_WARN("Benchmark mode enabled.");
         ind_ovs_benchmark_mode = true;
+    }
+
+    env_str = getenv("IVS_DISABLE_KFLOWS");
+    if (env_str != NULL && atoi(env_str) == 1) {
+        LOG_WARN("Kernel flow installation disabled.");
+        ind_ovs_disable_kflows = true;
     }
 
     ind_ovs_max_flows = max_flows;
