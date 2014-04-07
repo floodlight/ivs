@@ -49,6 +49,7 @@
 #include <icmpa/icmpa.h>
 #include <pipeline/pipeline.h>
 #include <dhcpra/dhcpra.h>
+#include <malloc.h>
 
 #define AIM_LOG_MODULE_NAME ivs
 #include <AIM/aim_log.h>
