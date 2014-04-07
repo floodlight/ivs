@@ -70,6 +70,7 @@ ind_ovs_handle_vport_multicast(struct nlmsghdr *nlh)
                 }
             }
         }
+        freeifaddrs(ifaddr);
     }
 
     if (gnlh->cmd == OVS_VPORT_CMD_NEW) {
