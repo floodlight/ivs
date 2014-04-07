@@ -51,8 +51,7 @@
 
 static void ind_ovs_dump_unknown_attr(const struct nlattr *attr);
 
-/* Not threadsafe but that's ok for now. Could make this thread-local. */
-static int indent = 0;
+static __thread int indent = 0;
 
 void
 ind_ovs_dump_nested(const struct nlattr *key, void (*cb)(const struct nlattr *attr))
