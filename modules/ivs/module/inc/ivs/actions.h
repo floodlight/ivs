@@ -65,7 +65,6 @@ enum {
     IND_OVS_ACTION_SET_L3_SRC_CLASS_ID,     /* uint32_t */
     IND_OVS_ACTION_SET_L3_DST_CLASS_ID,     /* uint32_t */
     IND_OVS_ACTION_SET_GLOBAL_VRF_ALLOWED,  /* uint8_t */
-    IND_OVS_ACTION_CHECK_NW_TTL,
     IND_OVS_ACTION_SET_EGR_PORT_GROUP_ID,   /* uint32_t */
 };
 
