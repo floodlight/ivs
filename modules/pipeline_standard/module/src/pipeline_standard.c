@@ -66,8 +66,8 @@ pipeline_standard_process(struct ind_ovs_parsed_key *key,
             ind_ovs_fwd_pipeline_lookup(table_id, &cfr, &result->stats);
         if (effects == NULL) {
             if (openflow_version < OF_VERSION_1_3) {
-                uint8_t reason = OF_PACKET_IN_REASON_NO_MATCH;
-                xbuf_append_attr(&result->actions, IND_OVS_ACTION_CONTROLLER, &reason, sizeof(reason));
+                uint64_t userdata = IVS_PKTIN_USERDATA(OF_PACKET_IN_REASON_NO_MATCH, 0);
+                xbuf_append_attr(&result->actions, IND_OVS_ACTION_CONTROLLER, &userdata, sizeof(userdata));
             }
             break;
         }

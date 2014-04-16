@@ -30,7 +30,7 @@
 
 enum {
     IND_OVS_ACTION_OUTPUT, /* of_port_no_t */
-    IND_OVS_ACTION_CONTROLLER, /* uint8_t reason */
+    IND_OVS_ACTION_CONTROLLER, /* uint64_t userdata (reason in bottom 8 bits, metadata in top 56 bits) */
     IND_OVS_ACTION_FLOOD,
     IND_OVS_ACTION_ALL,
     IND_OVS_ACTION_LOCAL,
