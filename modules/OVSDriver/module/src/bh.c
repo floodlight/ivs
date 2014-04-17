@@ -43,7 +43,8 @@ struct ind_ovs_bh_request {
 
     /* Only for packet-in */
     uint32_t in_port;
-    int reason;
+    uint8_t reason;
+    uint64_t metadata;
 
     /* Netlink attrs follow */
     struct nlattr attr_head[0];
@@ -78,7 +79,7 @@ ind_ovs_bh_request_kflow(struct nlattr *key)
 }
 
 void
-ind_ovs_bh_request_pktin(uint32_t in_port, struct nlattr *packet, struct nlattr *key, int reason)
+ind_ovs_bh_request_pktin(uint32_t in_port, struct nlattr *packet, struct nlattr *key, uint8_t reason, uint64_t metadata)
 {
     int packet_size = nla_total_size(nla_len(packet));
     int key_size = nla_total_size(nla_len(key));
@@ -88,6 +89,7 @@ ind_ovs_bh_request_pktin(uint32_t in_port, struct nlattr *packet, struct nlattr 
     req->len = packet_size + key_size;
     req->in_port = in_port;
     req->reason = reason;
+    req->metadata = metadata;
     memcpy(req->attr_head, packet, packet_size);
     memcpy(((void *)(req->attr_head)) + packet_size, key, key_size);
 
@@ -155,7 +157,7 @@ ind_ovs_bh_run()
             struct ind_ovs_parsed_key pkey;
             ind_ovs_parse_key(key, &pkey);
 
-            ind_fwd_pkt_in(req->in_port, nla_data(packet), nla_len(packet), req->reason, &pkey);
+            ind_fwd_pkt_in(req->in_port, nla_data(packet), nla_len(packet), req->reason, req->metadata, &pkey);
         } else {
             abort();
         }

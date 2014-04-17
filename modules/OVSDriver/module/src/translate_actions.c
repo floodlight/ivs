@@ -101,16 +101,16 @@ OVS_TUNNEL_KEY_FIELDS
     ctx->modified_attrs = 0;
 }
 
-/* Send the packet back to an upcall thread with the given reason as userdata */
+/* Send the packet back to an upcall thread with the given userdata */
 static void
-pktin(uint8_t reason, struct translate_context *ctx)
+pktin(uint64_t userdata, struct translate_context *ctx)
 {
     uint32_t ingress_port_no = ctx->current_key.in_port;
     ind_ovs_commit_set_field_actions(ctx);
     struct nlattr *action_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_USERSPACE);
     struct nl_sock *sk = ind_ovs_ports[ingress_port_no]->notify_socket;
     nla_put_u32(ctx->msg, OVS_USERSPACE_ATTR_PID, nl_socket_get_local_port(sk));
-    nla_put_u64(ctx->msg, OVS_USERSPACE_ATTR_USERDATA, reason);
+    nla_put_u64(ctx->msg, OVS_USERSPACE_ATTR_USERDATA, userdata);
     nla_nest_end(ctx->msg, action_attr);
 }
 
@@ -128,8 +128,8 @@ ind_ovs_action_output(struct nlattr *attr, struct translate_context *ctx)
 static void
 ind_ovs_action_controller(struct nlattr *attr, struct translate_context *ctx)
 {
-    uint8_t reason = *XBUF_PAYLOAD(attr, uint8_t);
-    pktin(reason, ctx);
+    uint64_t userdata = *XBUF_PAYLOAD(attr, uint64_t);
+    pktin(userdata, ctx);
 }
 
 static void
@@ -552,24 +552,6 @@ ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
         case IND_OVS_ACTION_GROUP:
             ind_ovs_action_group(attr, &ctx);
             break;
-        case IND_OVS_ACTION_CHECK_NW_TTL:
-            /* Special cased because it can drop the packet */
-            if (ATTR_BITMAP_TEST(ctx.current_key.populated, OVS_KEY_ATTR_IPV4)) {
-                ATTR_BITMAP_SET(ctx.modified_attrs, OVS_KEY_ATTR_IPV4);
-                if (ctx.current_key.ipv4.ipv4_ttl == 0
-                        || ctx.current_key.ipv4.ipv4_ttl == 1) {
-                    pktin(OF_PACKET_IN_REASON_INVALID_TTL, &ctx);
-                    return;
-                }
-            } else if (ATTR_BITMAP_TEST(ctx.current_key.populated, OVS_KEY_ATTR_IPV6)) {
-                ATTR_BITMAP_SET(ctx.modified_attrs, OVS_KEY_ATTR_IPV6);
-                if (ctx.current_key.ipv6.ipv6_hlimit == 0
-                        || ctx.current_key.ipv6.ipv6_hlimit == 1) {
-                    pktin(OF_PACKET_IN_REASON_INVALID_TTL, &ctx);
-                    return;
-                }
-            }
-            break;
         default:
             assert(0);
             break;
@@ -602,7 +584,8 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
                 case OF_PORT_DEST_CONTROLLER: {
                     uint8_t reason = table_miss ? OF_PACKET_IN_REASON_NO_MATCH :
                                                   OF_PACKET_IN_REASON_ACTION;
-                    xbuf_append_attr(xbuf, IND_OVS_ACTION_CONTROLLER, &reason, sizeof(reason));
+                    uint64_t userdata = IVS_PKTIN_USERDATA(reason, 0);
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_CONTROLLER, &userdata, sizeof(userdata));
                     break;
                 }
                 case OF_PORT_DEST_FLOOD:

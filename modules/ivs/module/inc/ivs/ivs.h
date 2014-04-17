@@ -54,6 +54,10 @@
 /* Use instead of assert for cases we should eventually handle. */
 #define NYI(x) assert(!(x))
 
+#define IVS_PKTIN_USERDATA(reason, metadata) (reason) | ((uint64_t)(metadata) << 8)
+#define IVS_PKTIN_REASON(userdata) (userdata) & 0xff
+#define IVS_PKTIN_METADATA(userdata) (userdata) >> 8
+
 /*
  * Derived from a flow's actions/instructions.
  */

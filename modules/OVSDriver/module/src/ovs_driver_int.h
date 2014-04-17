@@ -215,7 +215,7 @@ void ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey, of_version_t ve
 /* Internal interfaces to the forwarding module */
 indigo_error_t ind_ovs_fwd_init(void);
 void ind_ovs_fwd_finish(void);
-indigo_error_t ind_fwd_pkt_in(of_port_no_t of_port_num, uint8_t *data, unsigned int len, unsigned reason, struct ind_ovs_parsed_key *pkey);
+indigo_error_t ind_fwd_pkt_in(of_port_no_t of_port_num, uint8_t *data, unsigned int len, uint8_t reason, uint64_t metadata, struct ind_ovs_parsed_key *pkey);
 struct ind_ovs_flow_effects *ind_ovs_fwd_pipeline_lookup(int table_id, struct ind_ovs_cfr *cfr, struct xbuf *stats);
 
 /*
@@ -259,7 +259,7 @@ void ind_ovs_upcall_quiesce(struct ind_ovs_port *port);
 /* Interface of the bottom-half submodule */
 void ind_ovs_bh_init();
 void ind_ovs_bh_request_kflow(struct nlattr *key);
-void ind_ovs_bh_request_pktin(uint32_t in_port, struct nlattr *packet, struct nlattr *key, int reason);
+void ind_ovs_bh_request_pktin(uint32_t in_port, struct nlattr *packet, struct nlattr *key, uint8_t reason, uint64_t metadata);
 
 /* Interface of the multicast submodule */
 void ind_ovs_multicast_init(void);

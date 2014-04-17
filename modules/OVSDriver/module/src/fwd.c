@@ -508,7 +508,7 @@ indigo_fwd_table_stats_get(of_table_stats_request_t *table_stats_request,
 
 indigo_error_t
 ind_fwd_pkt_in(of_port_no_t in_port,
-               uint8_t *data, unsigned int len, unsigned reason,
+               uint8_t *data, unsigned int len, uint8_t reason, uint64_t metadata,
                struct ind_ovs_parsed_key *pkey)
 {
     LOG_TRACE("Sending packet-in");
@@ -533,6 +533,8 @@ ind_fwd_pkt_in(of_port_no_t in_port,
 
     of_match_t match;
     ind_ovs_key_to_match(pkey, ctrlr_of_version, &match);
+    match.fields.metadata = metadata;
+    OF_MATCH_MASK_METADATA_EXACT_SET(&match);
 
     if (ind_ovs_pktin_suppression_cfg.enabled && reason == OF_PACKET_IN_REASON_NO_MATCH) {
         LOG_TRACE("installing pktin suppression flow");
