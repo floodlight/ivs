@@ -673,7 +673,7 @@ link_change_cb(struct nl_cache *cache,
      * Ignore additions/deletions, already handled by
      * ind_ovs_handle_vport_multicast.
      */
-    if (action != NL_ACT_CHANGE) {
+    if (action != 5 /* NL_ACT_CHANGE */) {
         return;
     }
 
