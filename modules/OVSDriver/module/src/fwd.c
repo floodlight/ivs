@@ -215,6 +215,9 @@ init_effects(struct ind_ovs_flow_effects *effects,
             case OF_INSTRUCTION_BSN_PACKET_OF_DEATH:
                 effects->packet_of_death = 1;
                 break;
+            case OF_INSTRUCTION_BSN_PRIORITIZE_PDUS:
+                effects->prioritize_pdus = 1;
+                break;
             default:
                 return INDIGO_ERROR_COMPAT;
             }

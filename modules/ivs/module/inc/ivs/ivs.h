@@ -76,6 +76,7 @@ struct ind_ovs_flow_effects {
     unsigned permit : 1;
     unsigned deny : 1;
     unsigned packet_of_death : 1;
+    unsigned prioritize_pdus : 1;
 };
 
 struct ind_ovs_flow_stats {
