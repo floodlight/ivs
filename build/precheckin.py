@@ -57,14 +57,14 @@ def test(name, cmd):
 # Builds
 build('targets/ivs')
 build('targets/ivs-ctl')
-build('targets/flowtable-benchmark')
+build('targets/tcam-benchmark')
 build('targets/l2table-benchmark')
 build('targets/upcall-throughput-benchmark')
 build('targets/upcall-latency-benchmark')
 
 # Unit tests
 utestsdir = 'targets/utests'
-utests = ['flowtable', 'l2table', 'xbuf']
+utests = ['tcam', 'l2table', 'xbuf']
 for utest in utests:
     build(os.path.join(utestsdir, utest), toolchains=['gcc-local'])
     test(utest, "make -C %s" % os.path.join(utestsdir, utest))
