@@ -101,7 +101,9 @@ benchmark_iteration(void)
 
     for (i = 0; i < num_lookups_per_flow; i++) {
         for (j = 0; j < num_flows; j++) {
-            (void) tcam_match(tcam, &entries[j].key);
+            struct tcam_entry *result = tcam_match(tcam, entries[j].key);
+            AIM_TRUE_OR_DIE(result != NULL);
+            AIM_TRUE_OR_DIE(result == &entries[j] || result->priority >= entries[j].priority);
         }
     }
 
