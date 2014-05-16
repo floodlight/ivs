@@ -72,8 +72,8 @@ static struct tcam_shard *tcam_find_shard(struct tcam *tcam, const void *mask);
 static struct tcam_shard *tcam_shard_create(struct tcam *tcam, const void *mask);
 static void tcam_shard_destroy(struct tcam *tcam, struct tcam_shard *shard);
 static void tcam_shard_grow(struct tcam_shard *shard);
-static void copy_masked(void *__restrict__ dst, const void *__restrict__ src, const void *__restrict__ mask, int len);
-static uint32_t hash_key(const struct tcam *tcam, const void *key);
+static int memcmp_masked(const void *a, const void *b, const void *mask, int len);
+static uint32_t hash_key(const struct tcam *tcam, const void *key, const void *mask);
 
 /* Documented in tcam.h */
 struct tcam *
@@ -107,7 +107,7 @@ tcam_insert(struct tcam *tcam, struct tcam_entry *entry,
 {
     entry->key = aim_memdup((void *)key, tcam->key_size);
     entry->priority = priority;
-    entry->hash = hash_key(tcam, entry->key);
+    entry->hash = hash_key(tcam, entry->key, mask);
 
     struct tcam_shard *shard = tcam_find_shard(tcam, mask);
 
@@ -144,7 +144,7 @@ tcam_remove(struct tcam *tcam, struct tcam_entry *entry)
     AIM_ASSERT(shard != NULL, "shard does not exist during remove");
 
     /* Find the previous entry in the list to update its next pointer */
-    uint32_t hash = hash_key(tcam, entry->key);
+    uint32_t hash = hash_key(tcam, entry->key, entry->mask);
     struct tcam_entry **prev_ptr = &shard->buckets[hash & (shard->buckets_size - 1)];
     while (prev_ptr != NULL && *prev_ptr != entry) {
         prev_ptr = &(*prev_ptr)->next;
@@ -169,21 +169,18 @@ tcam_match(struct tcam *tcam, const void *key)
 {
     struct tcam_entry *found = NULL;
     list_links_t *cur;
-    uint8_t masked_key[tcam->key_size]; /* VLA */
     uint16_t cur_priority = 0;
 
     /* Check all shards for the matching entry with highest priority */
     LIST_FOREACH(&tcam->shard_list, cur) {
         struct tcam_shard *shard = container_of(cur, links, struct tcam_shard);
 
-        copy_masked(masked_key, key, shard->mask, tcam->key_size);
-
-        uint32_t hash = hash_key(tcam, masked_key);
+        uint32_t hash = hash_key(tcam, key, shard->mask);
         struct tcam_entry *entry = shard->buckets[hash & (shard->buckets_size - 1)];
 
         while (entry != NULL && entry->priority >= cur_priority) {
             if (entry->hash == hash &&
-                    !memcmp(masked_key, entry->key, tcam->key_size)) {
+                    !memcmp_masked(key, entry->key, shard->mask, tcam->key_size)) {
                 found = entry;
                 cur_priority = entry->priority;
                 break;
@@ -202,7 +199,7 @@ tcam_match(struct tcam *tcam, const void *key)
 static struct tcam_shard *
 tcam_find_shard(struct tcam *tcam, const void *mask)
 {
-    uint32_t hash = hash_key(tcam, mask);
+    uint32_t hash = hash_key(tcam, mask, mask);
     bighash_entry_t *cur;
 
     for (cur = bighash_first(tcam->shard_hashtable, hash);
@@ -225,7 +222,7 @@ tcam_shard_create(struct tcam *tcam, const void *mask)
     struct tcam_shard *shard = aim_zmalloc(sizeof(*shard));
     shard->mask = aim_memdup((void *)mask, tcam->key_size);
 
-    uint32_t hash = hash_key(tcam, mask);
+    uint32_t hash = hash_key(tcam, mask, mask);
     bighash_insert(tcam->shard_hashtable, &shard->hash_entry, hash);
 
     list_push(&tcam->shard_list, &shard->links);
@@ -303,26 +300,46 @@ tcam_shard_grow(struct tcam_shard *shard)
 }
 
 /*
- * Copy from 'src' to 'dst', masking with 'mask' as we go
+ * Compare 'a' and 'b' on the bits where 'mask' is set
+ *
+ * Returns 0 if the keys compare equal, 1 otherwise
  */
-static void
-copy_masked(void *__restrict__ dst,
-            const void *__restrict__ src,
-            const void *__restrict__ mask,
-            int len)
+static int
+memcmp_masked(const void *_a, const void *_b, const void *mask, int len)
 {
-    uint32_t *__restrict__ __attribute__((__may_alias__)) d = dst;
-    const uint32_t *__restrict__ __attribute__((__may_alias__)) s = src;
-    const uint32_t *__restrict__ __attribute__((__may_alias__)) m = mask;
+    const uint32_t *__attribute__((__may_alias__)) a = _a;
+    const uint32_t *__attribute__((__may_alias__)) b = _b;
+    const uint32_t *__attribute__((__may_alias__)) m = mask;
 
     int i;
     for (i = 0; i < len/4; i++) {
-        d[i] = s[i] & m[i];
+        if ((a[i] ^ b[i]) & m[i]) {
+            return 1;
+        }
     }
+
+    return 0;
 }
 
 static uint32_t
-hash_key(const struct tcam *tcam, const void *key)
+hash_key(const struct tcam *tcam, const void *key, const void *mask)
 {
-    return murmur_hash(key, tcam->key_size, tcam->salt);
+    const uint32_t *__attribute__((__may_alias__)) k = key;
+    const uint32_t *__attribute__((__may_alias__)) m = mask;
+
+    uint32_t state = tcam->salt;
+    unsigned i;
+    for (i = 0; i < tcam->key_size/sizeof(uint32_t); i += 1) {
+        /*
+         * Only hash words where the mask is nonzero. Most masks are
+         * sparse so this is a significant speedup. This could allow
+         * a malicious controller to create hash collisions by permuting
+         * the zero-mask words, so also mix in the index.
+         */
+        if (m[i]) {
+            state = murmur_round(state, (k[i] & m[i]) ^ i);
+        }
+    }
+
+    return murmur_finish(state, tcam->key_size);
 }
