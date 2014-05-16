@@ -40,11 +40,13 @@
 #include <BigHash/bighash.h>
 #include <tcam/tcam.h>
 #include <murmur/murmur.h>
+#include <bloom_filter/bloom_filter.h>
 #include "tcam_log.h"
 
 #define TCAM_SHARD_BUCKETS 32
 #define TCAM_INITIAL_ENTRY_BUCKETS 16
 #define TCAM_LOAD_FACTOR 0.5f
+#define TCAM_BLOOM_BITS_PER_ENTRY 8
 
 /*
  * A 'shard' contains all entries with a particular mask.
@@ -56,6 +58,7 @@ struct tcam_shard {
     uint32_t count; /* number of entries in this shard */
     uint32_t buckets_size;
     struct tcam_entry **buckets;
+    bloom_filter_t *bloom_filter;
 };
 
 /*
@@ -130,6 +133,8 @@ tcam_insert(struct tcam *tcam, struct tcam_entry *entry,
 
     shard->count++;
 
+    bloom_filter_add(shard->bloom_filter, entry->hash);
+
     if (shard->count > shard->buckets_size * TCAM_LOAD_FACTOR) {
         tcam_shard_grow(shard);
     }
@@ -155,6 +160,8 @@ tcam_remove(struct tcam *tcam, struct tcam_entry *entry)
     *prev_ptr = entry->next;
     shard->count--;
 
+    bloom_filter_remove(shard->bloom_filter, entry->hash);
+
     /* If no flows are present then free the shard */
     if (shard->count == 0) {
         tcam_shard_destroy(tcam, shard);
@@ -176,6 +183,11 @@ tcam_match(struct tcam *tcam, const void *key)
         struct tcam_shard *shard = container_of(cur, links, struct tcam_shard);
 
         uint32_t hash = hash_key(tcam, key, shard->mask);
+
+        if (!bloom_filter_lookup(shard->bloom_filter, hash)) {
+            continue;
+        }
+
         struct tcam_entry *entry = shard->buckets[hash & (shard->buckets_size - 1)];
 
         while (entry != NULL && entry->priority >= cur_priority) {
@@ -229,6 +241,7 @@ tcam_shard_create(struct tcam *tcam, const void *mask)
 
     shard->buckets_size = TCAM_INITIAL_ENTRY_BUCKETS;
     shard->buckets = aim_zmalloc(sizeof(shard->buckets[0]) * shard->buckets_size);
+    shard->bloom_filter = bloom_filter_create(shard->buckets_size*TCAM_BLOOM_BITS_PER_ENTRY);
 
     return shard;
 }
@@ -247,6 +260,7 @@ tcam_shard_destroy(struct tcam *tcam, struct tcam_shard *shard)
 
     aim_free(shard->mask);
     aim_free(shard->buckets);
+    bloom_filter_destroy(shard->bloom_filter);
     aim_free(shard);
 }
 
@@ -263,6 +277,9 @@ tcam_shard_grow(struct tcam_shard *shard)
 {
     int new_buckets_size = shard->buckets_size * 2;
     struct tcam_entry **new_buckets = aim_malloc(sizeof(new_buckets[0]) * new_buckets_size);
+
+    bloom_filter_destroy(shard->bloom_filter);
+    shard->bloom_filter = bloom_filter_create(new_buckets_size*TCAM_BLOOM_BITS_PER_ENTRY);
 
     /* Bit that decides whether we go in the hi or lo bucket */
     uint32_t bit = shard->buckets_size;
@@ -287,6 +304,8 @@ tcam_shard_grow(struct tcam_shard *shard)
             /* Add cur to the end of the list */
             *new_tail = cur;
             cur->next = NULL;
+
+            bloom_filter_add(shard->bloom_filter, cur->hash);
 
             /* Advance local list pointers */
             *new_tail_ptr = &cur->next;
