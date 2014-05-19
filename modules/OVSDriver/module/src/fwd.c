@@ -290,11 +290,6 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
 
     bool table_miss = is_table_miss(flow_add->version, &masks, priority);
 
-    flowtable_entry_init(&flow->fte,
-                         (struct flowtable_key *)&fields,
-                         (struct flowtable_key *)&masks,
-                         priority);
-
     if ((result = init_effects(&flow->effects, flow_add, table_miss)) < 0) {
         goto done;
     }
@@ -317,7 +312,7 @@ indigo_fwd_flow_create(indigo_cookie_t flow_id,
     struct ind_ovs_table *table = &ind_ovs_tables[flow->table_id];
 
     ind_ovs_fwd_write_lock();
-    flowtable_insert(table->ft, &flow->fte);
+    tcam_insert(table->tcam, &flow->tcam_entry, &fields, &masks, priority);
     ind_ovs_fwd_write_unlock();
 
     ind_ovs_kflow_invalidate_all();
@@ -354,8 +349,8 @@ indigo_fwd_flow_modify(indigo_cookie_t flow_id,
     LOG_TRACE("Flow modify called\n");
 
     bool table_miss = is_table_miss(flow_modify->version,
-                                    (struct ind_ovs_cfr *)&flow->fte.mask,
-                                    flow->fte.priority);
+                                    (struct ind_ovs_cfr *)&flow->tcam_entry.mask,
+                                    flow->tcam_entry.priority);
 
     struct ind_ovs_flow_effects effects, old_effects;
     if ((result = init_effects(&effects, flow_modify, table_miss)) < 0) {
@@ -395,7 +390,7 @@ indigo_fwd_flow_delete(indigo_cookie_t flow_id,
     struct ind_ovs_table *table = &ind_ovs_tables[flow->table_id];
 
     ind_ovs_fwd_write_lock();
-    flowtable_remove(table->ft, &flow->fte);
+    tcam_remove(table->tcam, &flow->tcam_entry);
     ind_ovs_fwd_write_unlock();
 
     ind_ovs_kflow_invalidate_all();
@@ -780,16 +775,15 @@ ind_ovs_fwd_pipeline_lookup(int table_id, struct ind_ovs_cfr *cfr,
     ind_ovs_dump_cfr(cfr);
 #endif
 
-    struct flowtable_entry *fte = flowtable_match(table->ft,
-                                                  (struct flowtable_key *)cfr);
-    if (fte == NULL) {
+    struct tcam_entry *entry = tcam_match(table->tcam, cfr);
+    if (entry == NULL) {
         if (stats != NULL) {
             xbuf_append_ptr(stats, &table->missed_stats);
         }
         return NULL;
     }
 
-    struct ind_ovs_flow *flow = container_of(fte, fte, struct ind_ovs_flow);
+    struct ind_ovs_flow *flow = container_of(entry, tcam_entry, struct ind_ovs_flow);
 
     if (stats != NULL) {
         xbuf_append_ptr(stats, &table->matched_stats);
@@ -819,10 +813,7 @@ ind_ovs_fwd_init(void)
         memset(table, 0, sizeof(*table));
         snprintf(table->name, sizeof(table->name), "Table %d", i);
         table->max_flows = ind_ovs_max_flows;
-        table->ft = flowtable_create();
-        if (table->ft == NULL) {
-            abort();
-        }
+        table->tcam = tcam_create(sizeof(struct ind_ovs_cfr), ind_ovs_salt);
     }
 
     aim_ratelimiter_init(&ind_ovs_pktin_limiter, PKTIN_INTERVAL,
@@ -853,7 +844,7 @@ ind_ovs_fwd_finish(void)
 
     for (i = 0; i < IND_OVS_NUM_TABLES; i++) {
         struct ind_ovs_table *table = &ind_ovs_tables[i];
-        flowtable_destroy(table->ft);
+        tcam_destroy(table->tcam);
     }
 
     /* Free all the flows */

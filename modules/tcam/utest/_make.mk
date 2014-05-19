@@ -1,6 +1,6 @@
 ################################################################
 #
-#        Copyright 2013, Big Switch Networks, Inc.
+#        Copyright 2014, Big Switch Networks, Inc.
 #
 # Licensed under the Eclipse Public License, Version 1.0 (the
 # "License"); you may not use this file except in compliance
@@ -17,6 +17,6 @@
 #
 ################################################################
 
-LIBRARY := flowtable
-$(LIBRARY)_SUBDIR := $(dir $(lastword $(MAKEFILE_LIST)))
-include $(BUILDER)/lib.mk
+UMODULE := tcam
+UMODULE_SUBDIR := $(dir $(lastword $(MAKEFILE_LIST)))
+include $(BUILDER)/utest.mk

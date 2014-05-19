@@ -17,6 +17,19 @@
 #
 ################################################################
 
-UMODULE := flowtable
-UMODULE_SUBDIR := $(dir $(lastword $(MAKEFILE_LIST)))
-include $(BUILDER)/utest.mk
+###############################################################################
+#
+#  tcam Unit Testing Module Makefile
+#
+#
+#
+###############################################################################
+MODULE := tcam_utest
+NOMODULEMAKE := 1
+TEST_MODULE :=  tcam
+DEPENDMODULES := AIM murmur BigHash
+GLOBAL_CFLAGS += -DAIM_CONFIG_INCLUDE_POSIX=1
+GLOBAL_CFLAGS += -DAIM_CONFIG_INCLUDE_MAIN=1
+OS_MAKE_CONFIG_AUTOSELECT := 1
+PEDANTIC := 1
+include ../make/utestmodule.mk

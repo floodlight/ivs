@@ -16,7 +16,32 @@
 # License.
 #
 ################################################################
+include ../../init.mk
 
-THIS_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
-flowtable_INCLUDES := -I $(THIS_DIR)inc
-flowtable_INTERNAL_INCLUDES := -I $(THIS_DIR)src
+ALLOW_DECLARATION_AFTER_STATEMENT = 1
+
+MODULE := tcam_benchmark
+include $(BUILDER)/standardinit.mk
+
+LIBRARY := tcam_benchmark_main
+$(LIBRARY)_SUBDIR := $(dir $(lastword $(MAKEFILE_LIST)))
+include $(BUILDER)/lib.mk
+
+DEPENDMODULES := tcam AIM murmur BigHash
+include $(BUILDER)/dependmodules.mk
+
+BINARY := tcam-benchmark
+
+$(BINARY)_LIBRARIES := $(LIBRARY_TARGETS)
+include $(BUILDER)/bin.mk
+
+include $(BUILDER)/targets.mk
+
+GLOBAL_CFLAGS += -g
+GLOBAL_CFLAGS += -O3
+GLOBAL_CFLAGS += -fno-omit-frame-pointer
+GLOBAL_LINK_LIBS += -lrt
+
+ifdef USE_CALLGRIND
+GLOBAL_CFLAGS += -DUSE_CALLGRIND
+endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *        Copyright 2013, Big Switch Networks, Inc.
+ *        Copyright 2014, Big Switch Networks, Inc.
  *
  * Licensed under the Eclipse Public License, Version 1.0 (the
  * "License"); you may not use this file except in compliance
@@ -24,7 +24,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <AIM/aim.h>
-#include <flowtable/flowtable.h>
+#include <tcam/tcam.h>
 
 #ifdef USE_CALLGRIND
 #include <valgrind/callgrind.h>
@@ -33,10 +33,16 @@
 #define CALLGRIND_STOP_INSTRUMENTATION
 #endif
 
+#define TCAM_KEY_SIZE 32
+
+struct tcam_key {
+    uint64_t data[TCAM_KEY_SIZE/8];
+};
+
 const int num_iters = 100;
 const int num_flows = 20000;
 const int num_lookups_per_flow = 5;
-const int max_unique_masks = 8;
+const int max_unique_masks = 32;
 
 uint32_t ind_ovs_salt = 42;
 
@@ -51,19 +57,19 @@ monotonic_ns(void)
 }
 
 static void
-make_random_mask(struct flowtable_key *mask)
+make_random_mask(struct tcam_key *mask)
 {
     memset(mask, 0, sizeof(*mask));
     mask->data[0] = 0xffffffffffffffff;
     mask->data[1] = 0x00000000ffffffff;
-    mask->data[FLOWTABLE_KEY_SIZE/8-1] = random()%max_unique_masks;
+    mask->data[TCAM_KEY_SIZE/8-1] = random()%max_unique_masks;
 }
 
 static void
-make_random_key(struct flowtable_key *key, const struct flowtable_key *mask)
+make_random_key(struct tcam_key *key, const struct tcam_key *mask)
 {
     int i;
-    for (i = 0; i < FLOWTABLE_KEY_SIZE/8; i++) {
+    for (i = 0; i < TCAM_KEY_SIZE/8; i++) {
         key->data[i] = 0;
         int j;
         for (j = 0; j < 8; j++) {
@@ -79,15 +85,14 @@ benchmark_iteration(void)
 {
     int i, j;
 
-    struct flowtable_entry *ftes = calloc(num_flows, sizeof(*ftes));
-    struct flowtable *ft = flowtable_create();
+    struct tcam_entry *entries = calloc(num_flows, sizeof(*entries));
+    struct tcam *tcam = tcam_create(sizeof(struct tcam_key), random());
 
     for (i = 0; i < num_flows; i++) {
-        struct flowtable_key key, mask;
+        struct tcam_key key, mask;
         make_random_mask(&mask);
         make_random_key(&key, &mask);
-        flowtable_entry_init(&ftes[i], &key, &mask, i % 4);
-        flowtable_insert(ft, &ftes[i]);
+        tcam_insert(tcam, &entries[i], &key, &mask, i % 4);
     }
 
     uint64_t start_time = monotonic_ns();
@@ -96,7 +101,9 @@ benchmark_iteration(void)
 
     for (i = 0; i < num_lookups_per_flow; i++) {
         for (j = 0; j < num_flows; j++) {
-            (void) flowtable_match(ft, &ftes[j].key);
+            struct tcam_entry *result = tcam_match(tcam, entries[j].key);
+            AIM_TRUE_OR_DIE(result != NULL);
+            AIM_TRUE_OR_DIE(result == &entries[j] || result->priority >= entries[j].priority);
         }
     }
 
@@ -105,11 +112,11 @@ benchmark_iteration(void)
     CALLGRIND_STOP_INSTRUMENTATION;
 
     for (i = 0; i < num_flows; i++) {
-        flowtable_remove(ft, &ftes[i]);
+        tcam_remove(tcam, &entries[i]);
     }
 
-    free(ftes);
-    flowtable_destroy(ft);
+    free(entries);
+    tcam_destroy(tcam);
 
     uint64_t elapsed = end_time - start_time;
     total_elapsed += elapsed;

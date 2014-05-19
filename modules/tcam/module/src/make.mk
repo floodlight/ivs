@@ -1,6 +1,6 @@
 ################################################################
 #
-#        Copyright 2013, Big Switch Networks, Inc.
+#        Copyright 2014, Big Switch Networks, Inc.
 #
 # Licensed under the Eclipse Public License, Version 1.0 (the
 # "License"); you may not use this file except in compliance
@@ -16,32 +16,7 @@
 # License.
 #
 ################################################################
-include ../../init.mk
 
-ALLOW_DECLARATION_AFTER_STATEMENT = 1
-
-MODULE := flowtable_benchmark
-include $(BUILDER)/standardinit.mk
-
-LIBRARY := flowtable_benchmark_main
+LIBRARY := tcam
 $(LIBRARY)_SUBDIR := $(dir $(lastword $(MAKEFILE_LIST)))
 include $(BUILDER)/lib.mk
-
-DEPENDMODULES := flowtable AIM murmur
-include $(BUILDER)/dependmodules.mk
-
-BINARY := flowtable-benchmark
-
-$(BINARY)_LIBRARIES := $(LIBRARY_TARGETS)
-include $(BUILDER)/bin.mk
-
-include $(BUILDER)/targets.mk
-
-GLOBAL_CFLAGS += -g
-GLOBAL_CFLAGS += -O3
-GLOBAL_CFLAGS += -fno-omit-frame-pointer
-GLOBAL_LINK_LIBS += -lrt
-
-ifdef USE_CALLGRIND
-GLOBAL_CFLAGS += -DUSE_CALLGRIND
-endif

@@ -41,7 +41,7 @@ include $(BUILDER)/lib.mk
 # Set the modules we want to automatically build for this binary
 #
 DEPENDMODULES := SocketManager OFConnectionManager OFStateManager OVSDriver \
-                 Configuration loci indigo BigList BigHash ivs_common pipeline pipeline_standard flowtable xbuf \
+                 Configuration loci indigo BigList BigHash ivs_common pipeline pipeline_standard tcam xbuf \
                  lldpa lacpa arpa router_ip_table icmpa dhcpra PPE IOF \
                  AIM murmur cjson OS uCli debug_counter timer_wheel
 

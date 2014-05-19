@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *        Copyright 2013, Big Switch Networks, Inc.
+ *        Copyright 2014, Big Switch Networks, Inc.
  *
  * Licensed under the Eclipse Public License, Version 1.0 (the
  * "License"); you may not use this file except in compliance
@@ -17,14 +17,10 @@
  *
  ****************************************************************/
 
-#include "flowtable_log.h"
+#ifndef __TCAM_LOG_H__
+#define __TCAM_LOG_H__
 
-/*
- * flowtable log struct.
- */
-AIM_LOG_STRUCT_DEFINE(
-                      AIM_LOG_OPTIONS_DEFAULT,
-                      AIM_LOG_BITS_DEFAULT,
-                      NULL, /* Custom log map */
-                      0
-                      );
+#define AIM_LOG_MODULE_NAME tcam
+#include <AIM/aim_log.h>
+
+#endif /* __TCAM_LOG_H__ */

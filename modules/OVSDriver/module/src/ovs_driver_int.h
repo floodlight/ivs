@@ -37,7 +37,7 @@
 #include "ivs/ivs.h"
 #include "ivs/actions.h"
 #include "pipeline/pipeline.h"
-#include "flowtable/flowtable.h"
+#include "tcam/tcam.h"
 #include "BigHash/bighash.h"
 
 #define IND_OVS_MAX_PORTS 1024
@@ -92,8 +92,6 @@
 #define PPE_FAILURE(x)  ((x) < 0)
 #define PPE_SUCCESS(x)  (!PPE_FAILURE(x))
 
-AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == FLOWTABLE_KEY_SIZE);
-
 
 /* Internal datastructures */
 
@@ -127,7 +125,7 @@ struct ind_ovs_port {
  * An OpenFlow flow.
  */
 struct ind_ovs_flow {
-    struct flowtable_entry fte;
+    struct tcam_entry tcam_entry;
 
     /* Updated periodically from the kernel flows */
     struct ind_ovs_flow_stats stats;
@@ -175,7 +173,7 @@ struct ind_ovs_pktin_suppression_cfg {
 
 /* An OpenFlow table */
 struct ind_ovs_table {
-    struct flowtable *ft;
+    struct tcam *tcam;
     uint32_t num_flows;
     uint32_t max_flows;
     struct ind_ovs_flow_stats matched_stats;
