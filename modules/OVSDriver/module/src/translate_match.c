@@ -97,7 +97,11 @@ ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey,
     of_match_fields_t *fields = &match->fields;
 
     assert(ATTR_BITMAP_TEST(pkey->populated, OVS_KEY_ATTR_IN_PORT));
-    fields->in_port = pkey->in_port;
+    if (pkey->in_port == OVSP_LOCAL) {
+        fields->in_port = OF_PORT_DEST_LOCAL;
+    } else {
+        fields->in_port = pkey->in_port;
+    }
     OF_MATCH_MASK_IN_PORT_EXACT_SET(match);
 
     assert(ATTR_BITMAP_TEST(pkey->populated, OVS_KEY_ATTR_ETHERNET));
