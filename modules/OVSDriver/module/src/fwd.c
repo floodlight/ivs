@@ -630,6 +630,9 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
 
     int netlink_pid;
     if (use_table) {
+        if (of_port_num == OF_PORT_DEST_CONTROLLER) {
+            of_port_num = OF_PORT_DEST_LOCAL;
+        }
         /* Send the packet to in_port's upcall thread */
         struct ind_ovs_port *in_port = ind_ovs_port_lookup(of_port_num);
         if (in_port == NULL) {
