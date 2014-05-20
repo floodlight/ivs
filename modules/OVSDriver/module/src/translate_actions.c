@@ -106,6 +106,10 @@ static void
 pktin(uint64_t userdata, struct translate_context *ctx)
 {
     uint32_t ingress_port_no = ctx->current_key.in_port;
+    if (ingress_port_no > IND_OVS_MAX_PORTS || ind_ovs_ports[ingress_port_no] == NULL) {
+        return;
+    }
+
     ind_ovs_commit_set_field_actions(ctx);
     struct nlattr *action_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_USERSPACE);
     struct nl_sock *sk = ind_ovs_ports[ingress_port_no]->notify_socket;
