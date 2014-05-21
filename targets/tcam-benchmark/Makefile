@@ -27,7 +27,7 @@ LIBRARY := tcam_benchmark_main
 $(LIBRARY)_SUBDIR := $(dir $(lastword $(MAKEFILE_LIST)))
 include $(BUILDER)/lib.mk
 
-DEPENDMODULES := tcam AIM murmur BigHash
+DEPENDMODULES := tcam AIM murmur BigHash bloom_filter
 include $(BUILDER)/dependmodules.mk
 
 BINARY := tcam-benchmark
