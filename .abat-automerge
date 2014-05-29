@@ -21,6 +21,7 @@ ROOTDIR=$(dirname $(readlink -f $0))
 cd "$ROOTDIR"
 
 ./build/setup.sh
+./build/precheckin.py
 scan-build --status-bugs ./build/precheckin.py
 
 export BUILD_ID=$(date +'%F.%R%z')-$(git rev-parse -q --short HEAD)
