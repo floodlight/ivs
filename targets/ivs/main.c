@@ -226,6 +226,7 @@ parse_options(int argc, char **argv)
             break;
 
         case OPT_DPID:
+            AIM_ASSERT(optarg != NULL, "clang-analyzer workaround");
             dpid = strtoll(optarg, NULL, 16);
             break;
 
@@ -243,6 +244,7 @@ parse_options(int argc, char **argv)
             break;
 
         case OPT_MAX_FLOWS:
+            AIM_ASSERT(optarg != NULL, "clang-analyzer workaround");
             max_flows = strtoll(optarg, NULL, 0);
             core_cfg.max_flowtable_entries = max_flows;
             AIM_LOG_MSG("Setting max flows to %d", max_flows);
