@@ -98,7 +98,6 @@ static char *datapath_name = "indigo";
 static char *config_filename = NULL;
 static char *openflow_version = NULL;
 static char *pipeline = NULL;
-static uint32_t max_flows = 262144;
 
 static int
 parse_controller(const char *str,
@@ -237,10 +236,7 @@ parse_options(int argc, char **argv)
             break;
 
         case OPT_MAX_FLOWS:
-            AIM_ASSERT(optarg != NULL, "clang-analyzer workaround");
-            max_flows = strtoll(optarg, NULL, 0);
-            core_cfg.max_flowtable_entries = max_flows;
-            AIM_LOG_MSG("Setting max flows to %d", max_flows);
+            /* Ignored for compatibility */
             break;
 
         case OPT_PIPELINE:
@@ -380,7 +376,7 @@ aim_main(int argc, char* argv[])
         return 1;
     }
 
-    if (ind_ovs_init(datapath_name, max_flows) < 0) {
+    if (ind_ovs_init(datapath_name) < 0) {
         AIM_LOG_FATAL("Failed to initialize OVSDriver module");
         return 1;
     }

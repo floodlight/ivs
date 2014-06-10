@@ -300,9 +300,4 @@ extern bool ind_ovs_disable_kflows;
  */
 extern uint32_t ind_ovs_salt;
 
-/*
- * Maximum number of flows allowed across all flowtables.
- */
-extern uint32_t ind_ovs_max_flows;
-
 #endif

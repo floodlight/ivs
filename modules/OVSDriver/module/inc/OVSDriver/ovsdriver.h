@@ -23,7 +23,7 @@
 struct xbuf;
 struct ind_ovs_cfr;
 
-indigo_error_t ind_ovs_init(const char *datapath_name, uint32_t max_flows);
+indigo_error_t ind_ovs_init(const char *datapath_name);
 void ind_ovs_finish(void);
 
 #endif
