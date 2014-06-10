@@ -140,15 +140,6 @@ struct ind_ovs_kflow {
     struct nlattr key[0];
 };
 
-/* Configuration for the bsn_pktin_suppression extension */
-struct ind_ovs_pktin_suppression_cfg {
-    uint8_t enabled;
-    uint16_t idle_timeout;
-    uint16_t hard_timeout;
-    uint16_t priority;
-    uint64_t cookie;
-};
-
 /* An OpenFlow group bucket */
 struct ind_ovs_group_bucket {
     struct xbuf actions;
@@ -308,11 +299,6 @@ extern bool ind_ovs_disable_kflows;
  * collisions.
  */
 extern uint32_t ind_ovs_salt;
-
-/*
- * Configuration for the bsn_pktin_suppression extension.
- */
-extern struct ind_ovs_pktin_suppression_cfg ind_ovs_pktin_suppression_cfg;
 
 /*
  * Maximum number of flows allowed across all flowtables.

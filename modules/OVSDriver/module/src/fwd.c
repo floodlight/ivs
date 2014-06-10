@@ -43,8 +43,6 @@ uint64_t ind_fwd_packet_in_bytes;
 uint64_t ind_fwd_packet_out_packets;
 uint64_t ind_fwd_packet_out_bytes;
 
-struct ind_ovs_pktin_suppression_cfg ind_ovs_pktin_suppression_cfg;
-
 indigo_error_t
 indigo_fwd_forwarding_features_get(of_features_reply_t *features)
 {
@@ -121,20 +119,6 @@ ind_fwd_pkt_in(of_port_no_t in_port,
     ind_ovs_key_to_match(pkey, ctrlr_of_version, &match);
     match.fields.metadata = metadata;
     OF_MATCH_MASK_METADATA_EXACT_SET(&match);
-
-    if (ind_ovs_pktin_suppression_cfg.enabled && reason == OF_PACKET_IN_REASON_NO_MATCH) {
-        LOG_TRACE("installing pktin suppression flow");
-        of_flow_add_t *flow_mod = of_flow_add_new(match.version);
-        of_flow_add_hard_timeout_set(flow_mod, ind_ovs_pktin_suppression_cfg.hard_timeout);
-        of_flow_add_idle_timeout_set(flow_mod, ind_ovs_pktin_suppression_cfg.idle_timeout);
-        of_flow_add_cookie_set(flow_mod, ind_ovs_pktin_suppression_cfg.cookie);
-        of_flow_add_priority_set(flow_mod, ind_ovs_pktin_suppression_cfg.priority);
-        of_flow_add_buffer_id_set(flow_mod, -1);
-        if (of_flow_add_match_set(flow_mod, &match)) {
-            abort();
-        }
-        indigo_core_receive_controller_message(INDIGO_CXN_ID_UNSPECIFIED, flow_mod);
-    }
 
     of_octets_t of_octets = { .data = data, .bytes = len };
 
@@ -362,8 +346,6 @@ ind_ovs_fwd_init(void)
 
     aim_ratelimiter_init(&ind_ovs_pktin_limiter, PKTIN_INTERVAL,
                          PKTIN_BURST_SIZE, NULL);
-
-    ind_ovs_pktin_suppression_cfg.enabled = false;
 
     return (INDIGO_ERROR_NONE);
 }

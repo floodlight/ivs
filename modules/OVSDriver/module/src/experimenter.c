@@ -112,48 +112,12 @@ ind_ovs_handle_bsn_get_interfaces_request(
 }
 
 indigo_error_t
-ind_ovs_handle_bsn_set_pktin_suppression_request(of_experimenter_t *experimenter,
-                                                 indigo_cxn_id_t cxn_id)
-{
-    of_bsn_set_pktin_suppression_request_t *obj = experimenter;
-    of_bsn_set_pktin_suppression_request_enabled_get(obj, &ind_ovs_pktin_suppression_cfg.enabled);
-    of_bsn_set_pktin_suppression_request_idle_timeout_get(obj, &ind_ovs_pktin_suppression_cfg.idle_timeout);
-    of_bsn_set_pktin_suppression_request_hard_timeout_get(obj, &ind_ovs_pktin_suppression_cfg.hard_timeout);
-    of_bsn_set_pktin_suppression_request_priority_get(obj, &ind_ovs_pktin_suppression_cfg.priority);
-    of_bsn_set_pktin_suppression_request_cookie_get(obj, &ind_ovs_pktin_suppression_cfg.cookie);
-
-    if (ind_ovs_pktin_suppression_cfg.idle_timeout == 0 &&
-        ind_ovs_pktin_suppression_cfg.hard_timeout == 0 &&
-        ind_ovs_pktin_suppression_cfg.enabled == 1) {
-        ind_ovs_pktin_suppression_cfg.enabled = 0;
-        LOG_ERROR("Ignoring pktin_suppression request with zero timeouts");
-    }
-
-    of_bsn_set_pktin_suppression_reply_t *reply = of_bsn_set_pktin_suppression_reply_new(obj->version);
-    if (reply == NULL) {
-        return INDIGO_ERROR_RESOURCE;
-    }
-
-    uint32_t xid;
-    of_bsn_set_pktin_suppression_request_xid_get(obj, &xid);
-    of_bsn_set_pktin_suppression_reply_xid_set(reply, xid);
-
-    of_bsn_set_pktin_suppression_reply_status_set(reply, 0);
-
-    indigo_cxn_send_controller_message(cxn_id, reply);
-
-    return INDIGO_ERROR_NONE;
-}
-
-indigo_error_t
 indigo_fwd_experimenter(of_experimenter_t *experimenter,
                         indigo_cxn_id_t cxn_id)
 {
     switch (experimenter->object_id) {
     case OF_BSN_GET_INTERFACES_REQUEST:
         return ind_ovs_handle_bsn_get_interfaces_request(experimenter, cxn_id);
-    case OF_BSN_SET_PKTIN_SUPPRESSION_REQUEST:
-        return ind_ovs_handle_bsn_set_pktin_suppression_request(experimenter, cxn_id);
     default:
         return INDIGO_ERROR_NOT_SUPPORTED;
     }
