@@ -122,28 +122,6 @@ struct ind_ovs_port {
 };
 
 /*
- * An OpenFlow flow.
- */
-struct ind_ovs_flow {
-    struct tcam_entry tcam_entry;
-
-    /* Updated periodically from the kernel flows */
-    struct ind_ovs_flow_stats stats;
-
-    /* Packet stats from the last hit bit check */
-    /* See indigo_fwd_table_stats_get */
-    uint64_t last_hit_check_packets;
-
-    indigo_cookie_t  flow_id;
-    struct list_links flow_id_links; /* (global) ind_ovs_flow_id_buckets */
-
-    /* Modified by of_flow_modify messages */
-    struct ind_ovs_flow_effects effects;
-
-    uint8_t table_id;
-};
-
-/*
  * A cached kernel flow.
  *
  * A kflow caches the actions for a particular openvswitch flow key. A kflow
@@ -169,16 +147,6 @@ struct ind_ovs_pktin_suppression_cfg {
     uint16_t hard_timeout;
     uint16_t priority;
     uint64_t cookie;
-};
-
-/* An OpenFlow table */
-struct ind_ovs_table {
-    struct tcam *tcam;
-    uint32_t num_flows;
-    uint32_t max_flows;
-    struct ind_ovs_flow_stats matched_stats;
-    struct ind_ovs_flow_stats missed_stats;
-    of_table_name_t name;
 };
 
 /* An OpenFlow group bucket */
@@ -214,7 +182,6 @@ void ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey, of_version_t ve
 indigo_error_t ind_ovs_fwd_init(void);
 void ind_ovs_fwd_finish(void);
 indigo_error_t ind_fwd_pkt_in(of_port_no_t of_port_num, uint8_t *data, unsigned int len, uint8_t reason, uint64_t metadata, struct ind_ovs_parsed_key *pkey);
-struct ind_ovs_flow_effects *ind_ovs_fwd_pipeline_lookup(int table_id, struct ind_ovs_cfr *cfr, struct xbuf *stats);
 
 /*
  * Synchronization of the flow table between the main thread and upcall
@@ -341,11 +308,6 @@ extern bool ind_ovs_disable_kflows;
  * collisions.
  */
 extern uint32_t ind_ovs_salt;
-
-/*
- * OpenFlow tables. Protected by ind_ovs_fwd_{read,write}_{lock,unlock}.
- */
-struct ind_ovs_table ind_ovs_tables[IND_OVS_NUM_TABLES];
 
 /*
  * Configuration for the bsn_pktin_suppression extension.
