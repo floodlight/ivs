@@ -26,6 +26,4 @@ struct ind_ovs_cfr;
 indigo_error_t ind_ovs_init(const char *datapath_name, uint32_t max_flows);
 void ind_ovs_finish(void);
 
-indigo_error_t ind_ovs_tunnel_init(void);
-
 #endif
