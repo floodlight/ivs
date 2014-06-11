@@ -43,7 +43,6 @@
 #include <bloom_filter/bloom_filter.h>
 #include "tcam_log.h"
 
-#define TCAM_SHARD_BUCKETS 32
 #define TCAM_INITIAL_ENTRY_BUCKETS 16
 #define TCAM_LOAD_FACTOR 0.5f
 #define TCAM_BLOOM_BITS_PER_ENTRY 8
@@ -86,7 +85,7 @@ tcam_create(uint16_t key_size, uint32_t salt)
 
     struct tcam *tcam = aim_malloc(sizeof(*tcam));
 
-    tcam->shard_hashtable = bighash_table_create(TCAM_SHARD_BUCKETS);
+    tcam->shard_hashtable = bighash_table_create(BIGHASH_AUTOGROW);
     list_init(&tcam->shard_list);
     tcam->key_size = key_size;
     tcam->salt = salt;
