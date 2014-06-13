@@ -1,32 +1,27 @@
+
 /*
- * Copyright (c) 2007-2011 Nicira, Inc.
+ * Copyright (c) 2007-2013 Nicira, Inc.
  *
- * This file is offered under your choice of two licenses: Apache 2.0 or GNU
- * GPL 2.0 or later.  The permission statements for each of these licenses is
- * given below.  You may license your modifications to this file under either
- * of these licenses or both.  If you wish to license your modifications under
- * only one of these licenses, delete the permission text for the other
- * license.
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of version 2 of the GNU General Public
+ * License as published by the Free Software Foundation.
  *
- * ----------------------------------------------------------------------
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at:
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- * ----------------------------------------------------------------------
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301, USA
  */
 
-#ifndef _LINUX_OPENVSWITCH_H
-#define _LINUX_OPENVSWITCH_H 1
+#ifndef _UAPI__LINUX_OPENVSWITCH_H
+#define _UAPI__LINUX_OPENVSWITCH_H 1
 
 #include <linux/types.h>
+#include <linux/if_ether.h>
 
 /**
  * struct ovs_header - header for OVS Generic Netlink messages.
@@ -45,7 +40,15 @@ struct ovs_header {
 
 #define OVS_DATAPATH_FAMILY  "ovs_datapath"
 #define OVS_DATAPATH_MCGROUP "ovs_datapath"
-#define OVS_DATAPATH_VERSION 0x1
+
+/* V2:
+ *   - API users are expected to provide OVS_DP_ATTR_USER_FEATURES
+ *     when creating the datapath.
+ */
+#define OVS_DATAPATH_VERSION 2
+
+/* First OVS datapath version to support features */
+#define OVS_DP_VER_FEATURES 2
 
 enum ovs_datapath_cmd {
 	OVS_DP_CMD_UNSPEC,
@@ -68,15 +71,19 @@ enum ovs_datapath_cmd {
  * not be sent.
  * @OVS_DP_ATTR_STATS: Statistics about packets that have passed through the
  * datapath.  Always present in notifications.
+ * @OVS_DP_ATTR_MEGAFLOW_STATS: Statistics about mega flow masks usage for the
+ * datapath. Always present in notifications.
  *
  * These attributes follow the &struct ovs_header within the Generic Netlink
  * payload for %OVS_DP_* commands.
  */
 enum ovs_datapath_attr {
 	OVS_DP_ATTR_UNSPEC,
-	OVS_DP_ATTR_NAME,       /* name of dp_ifindex netdev */
-	OVS_DP_ATTR_UPCALL_PID, /* Netlink PID to receive upcalls */
-	OVS_DP_ATTR_STATS,      /* struct ovs_dp_stats */
+	OVS_DP_ATTR_NAME,		/* name of dp_ifindex netdev */
+	OVS_DP_ATTR_UPCALL_PID,		/* Netlink PID to receive upcalls */
+	OVS_DP_ATTR_STATS,		/* struct ovs_dp_stats */
+	OVS_DP_ATTR_MEGAFLOW_STATS,	/* struct ovs_dp_megaflow_stats */
+	OVS_DP_ATTR_USER_FEATURES,	/* OVS_DP_F_*  */
 	__OVS_DP_ATTR_MAX
 };
 
@@ -87,6 +94,14 @@ struct ovs_dp_stats {
 	__u64 n_missed;          /* Number of flow table misses. */
 	__u64 n_lost;            /* Number of misses not sent to userspace. */
 	__u64 n_flows;           /* Number of flows present */
+};
+
+struct ovs_dp_megaflow_stats {
+	__u64 n_mask_hit;	 /* Number of masks used for flow lookups. */
+	__u32 n_masks;		 /* Number of masks for the datapath. */
+	__u32 pad0;		 /* Pad for future expension. */
+	__u64 pad1;		 /* Pad for future expension. */
+	__u64 pad2;		 /* Pad for future expension. */
 };
 
 struct ovs_vport_stats {
@@ -100,8 +115,11 @@ struct ovs_vport_stats {
 	__u64   tx_dropped;		/* no space available in linux  */
 };
 
+/* Allow last Netlink attribute to be unaligned */
+#define OVS_DP_F_UNALIGNED	(1 << 0)
+
 /* Fixed logical ports. */
-#define OVSP_LOCAL      ((__u16)0)
+#define OVSP_LOCAL      ((__u32)0)
 
 /* Packet transfer. */
 
@@ -134,7 +152,8 @@ enum ovs_packet_cmd {
  * for %OVS_PACKET_CMD_EXECUTE.  It has nested %OVS_ACTION_ATTR_* attributes.
  * @OVS_PACKET_ATTR_USERDATA: Present for an %OVS_PACKET_CMD_ACTION
  * notification if the %OVS_ACTION_ATTR_USERSPACE action specified an
- * %OVS_USERSPACE_ATTR_USERDATA attribute.
+ * %OVS_USERSPACE_ATTR_USERDATA attribute, with the same length and content
+ * specified there.
  *
  * These attributes follow the &struct ovs_header within the Generic Netlink
  * payload for %OVS_PACKET_* commands.
@@ -144,7 +163,7 @@ enum ovs_packet_attr {
 	OVS_PACKET_ATTR_PACKET,      /* Packet data. */
 	OVS_PACKET_ATTR_KEY,         /* Nested OVS_KEY_ATTR_* attributes. */
 	OVS_PACKET_ATTR_ACTIONS,     /* Nested OVS_ACTION_ATTR_* attributes. */
-	OVS_PACKET_ATTR_USERDATA,    /* u64 OVS_ACTION_ATTR_USERSPACE arg. */
+	OVS_PACKET_ATTR_USERDATA,    /* OVS_ACTION_ATTR_USERSPACE arg. */
 	__OVS_PACKET_ATTR_MAX
 };
 
@@ -168,11 +187,8 @@ enum ovs_vport_type {
 	OVS_VPORT_TYPE_UNSPEC,
 	OVS_VPORT_TYPE_NETDEV,   /* network device */
 	OVS_VPORT_TYPE_INTERNAL, /* network device implemented by datapath */
-	OVS_VPORT_TYPE_FT_GRE,	 /* Flow based GRE tunnel. */
-	OVS_VPORT_TYPE_PATCH = 100, /* virtual tunnel connecting two vports */
-	OVS_VPORT_TYPE_GRE,      /* GRE tunnel */
-	OVS_VPORT_TYPE_CAPWAP,   /* CAPWAP tunnel */
-	OVS_VPORT_TYPE_GRE64 = 104, /* GRE tunnel with 64-bit keys */
+	OVS_VPORT_TYPE_GRE,      /* GRE tunnel. */
+	OVS_VPORT_TYPE_VXLAN,	 /* VXLAN tunnel. */
 	__OVS_VPORT_TYPE_MAX
 };
 
@@ -192,7 +208,6 @@ enum ovs_vport_type {
  * this port.  A value of zero indicates that upcalls should not be sent.
  * @OVS_VPORT_ATTR_STATS: A &struct ovs_vport_stats giving statistics for
  * packets sent or received through the vport.
- * @OVS_VPORT_ATTR_ADDRESS: A 6-byte Ethernet address for the vport.
  *
  * These attributes follow the &struct ovs_header within the Generic Netlink
  * payload for %OVS_VPORT_* commands.
@@ -201,8 +216,7 @@ enum ovs_vport_type {
  * %OVS_VPORT_ATTR_NAME attributes are required.  %OVS_VPORT_ATTR_PORT_NO is
  * optional; if not specified a free port number is automatically selected.
  * Whether %OVS_VPORT_ATTR_OPTIONS is required or optional depends on the type
- * of vport.  %OVS_VPORT_ATTR_STATS and %OVS_VPORT_ATTR_ADDRESS are optional,
- * and other attributes are ignored.
+ * of vport.
  *
  * For other requests, if %OVS_VPORT_ATTR_NAME is specified then it is used to
  * look up the vport to operate on; otherwise dp_idx from the &struct
@@ -216,20 +230,20 @@ enum ovs_vport_attr {
 	OVS_VPORT_ATTR_OPTIONS, /* nested attributes, varies by vport type */
 	OVS_VPORT_ATTR_UPCALL_PID, /* u32 Netlink PID to receive upcalls */
 	OVS_VPORT_ATTR_STATS,	/* struct ovs_vport_stats */
-	OVS_VPORT_ATTR_ADDRESS = 100, /* hardware address */
 	__OVS_VPORT_ATTR_MAX
 };
 
 #define OVS_VPORT_ATTR_MAX (__OVS_VPORT_ATTR_MAX - 1)
 
-/* OVS_VPORT_ATTR_OPTIONS attributes for patch vports. */
+/* OVS_VPORT_ATTR_OPTIONS attributes for tunnels.
+ */
 enum {
-	OVS_PATCH_ATTR_UNSPEC,
-	OVS_PATCH_ATTR_PEER,	/* name of peer vport, as a string */
-	__OVS_PATCH_ATTR_MAX
+	OVS_TUNNEL_ATTR_UNSPEC,
+	OVS_TUNNEL_ATTR_DST_PORT, /* 16-bit UDP port, used by L4 tunnels. */
+	__OVS_TUNNEL_ATTR_MAX
 };
 
-#define OVS_PATCH_ATTR_MAX (__OVS_PATCH_ATTR_MAX - 1)
+#define OVS_TUNNEL_ATTR_MAX (__OVS_TUNNEL_ATTR_MAX - 1)
 
 /* Flows. */
 
@@ -267,25 +281,26 @@ enum ovs_key_attr {
 	OVS_KEY_ATTR_ARP,       /* struct ovs_key_arp */
 	OVS_KEY_ATTR_ND,        /* struct ovs_key_nd */
 	OVS_KEY_ATTR_SKB_MARK,  /* u32 skb mark */
-	OVS_KEY_ATTR_TUNNEL,	/* Nested set of ovs_tunnel attributes */
+	OVS_KEY_ATTR_TUNNEL,    /* Nested set of ovs_tunnel attributes */
+	OVS_KEY_ATTR_SCTP,      /* struct ovs_key_sctp */
+	OVS_KEY_ATTR_TCP_FLAGS,	/* be16 TCP flags. */
 
 #ifdef __KERNEL__
 	OVS_KEY_ATTR_IPV4_TUNNEL,  /* struct ovs_key_ipv4_tunnel */
 #endif
-	OVS_KEY_ATTR_TUN_ID = 63,  /* be64 tunnel ID */
 	__OVS_KEY_ATTR_MAX
 };
 
 #define OVS_KEY_ATTR_MAX (__OVS_KEY_ATTR_MAX - 1)
 
 enum ovs_tunnel_key_attr {
-	OVS_TUNNEL_KEY_ATTR_ID,			/* be64 Tunnel ID */
-	OVS_TUNNEL_KEY_ATTR_IPV4_SRC,		/* be32 src IP address. */
-	OVS_TUNNEL_KEY_ATTR_IPV4_DST,		/* be32 dst IP address. */
-	OVS_TUNNEL_KEY_ATTR_TOS,		/* u8 Tunnel IP ToS. */
-	OVS_TUNNEL_KEY_ATTR_TTL,		/* u8 Tunnel IP TTL. */
-	OVS_TUNNEL_KEY_ATTR_DONT_FRAGMENT,	/* No argument, set DF. */
-	OVS_TUNNEL_KEY_ATTR_CSUM,		/* No argument. CSUM packet. */
+	OVS_TUNNEL_KEY_ATTR_ID,                 /* be64 Tunnel ID */
+	OVS_TUNNEL_KEY_ATTR_IPV4_SRC,           /* be32 src IP address. */
+	OVS_TUNNEL_KEY_ATTR_IPV4_DST,           /* be32 dst IP address. */
+	OVS_TUNNEL_KEY_ATTR_TOS,                /* u8 Tunnel IP ToS. */
+	OVS_TUNNEL_KEY_ATTR_TTL,                /* u8 Tunnel IP TTL. */
+	OVS_TUNNEL_KEY_ATTR_DONT_FRAGMENT,      /* No argument, set DF. */
+	OVS_TUNNEL_KEY_ATTR_CSUM,               /* No argument. CSUM packet. */
 	__OVS_TUNNEL_KEY_ATTR_MAX
 };
 
@@ -310,8 +325,8 @@ enum ovs_frag_type {
 #define OVS_FRAG_TYPE_MAX (__OVS_FRAG_TYPE_MAX - 1)
 
 struct ovs_key_ethernet {
-	__u8	 eth_src[6];
-	__u8	 eth_dst[6];
+	__u8	 eth_src[ETH_ALEN];
+	__u8	 eth_dst[ETH_ALEN];
 };
 
 struct ovs_key_ipv4 {
@@ -343,6 +358,11 @@ struct ovs_key_udp {
 	__be16 udp_dst;
 };
 
+struct ovs_key_sctp {
+	__be16 sctp_src;
+	__be16 sctp_dst;
+};
+
 struct ovs_key_icmp {
 	__u8 icmp_type;
 	__u8 icmp_code;
@@ -357,14 +377,14 @@ struct ovs_key_arp {
 	__be32 arp_sip;
 	__be32 arp_tip;
 	__be16 arp_op;
-	__u8   arp_sha[6];
-	__u8   arp_tha[6];
+	__u8   arp_sha[ETH_ALEN];
+	__u8   arp_tha[ETH_ALEN];
 };
 
 struct ovs_key_nd {
 	__u32 nd_target[4];
-	__u8  nd_sll[6];
-	__u8  nd_tll[6];
+	__u8  nd_sll[ETH_ALEN];
+	__u8  nd_tll[ETH_ALEN];
 };
 
 /**
@@ -389,6 +409,12 @@ struct ovs_key_nd {
  * @OVS_FLOW_ATTR_CLEAR: If present in a %OVS_FLOW_CMD_SET request, clears the
  * last-used time, accumulated TCP flags, and statistics for this flow.
  * Otherwise ignored in requests.  Never present in notifications.
+ * @OVS_FLOW_ATTR_MASK: Nested %OVS_KEY_ATTR_* attributes specifying the
+ * mask bits for wildcarded flow match. Mask bit value '1' specifies exact
+ * match with corresponding flow key bit, while mask bit value '0' specifies
+ * a wildcarded match. Omitting attribute is treated as wildcarding all
+ * corresponding fields. Optional for all requests. If not present,
+ * all flow key bits are exact match bits.
  *
  * These attributes follow the &struct ovs_header within the Generic Netlink
  * payload for %OVS_FLOW_* commands.
@@ -401,6 +427,7 @@ enum ovs_flow_attr {
 	OVS_FLOW_ATTR_TCP_FLAGS, /* 8-bit OR'd TCP flags. */
 	OVS_FLOW_ATTR_USED,      /* u64 msecs last used in monotonic time. */
 	OVS_FLOW_ATTR_CLEAR,     /* Flag to clear stats, tcp_flags, used. */
+	OVS_FLOW_ATTR_MASK,      /* Sequence of OVS_KEY_ATTR_* attributes. */
 	__OVS_FLOW_ATTR_MAX
 };
 
@@ -431,13 +458,13 @@ enum ovs_sample_attr {
  * enum ovs_userspace_attr - Attributes for %OVS_ACTION_ATTR_USERSPACE action.
  * @OVS_USERSPACE_ATTR_PID: u32 Netlink PID to which the %OVS_PACKET_CMD_ACTION
  * message should be sent.  Required.
- * @OVS_USERSPACE_ATTR_USERDATA: If present, its u64 argument is copied to the
- * %OVS_PACKET_CMD_ACTION message as %OVS_PACKET_ATTR_USERDATA,
+ * @OVS_USERSPACE_ATTR_USERDATA: If present, its variable-length argument is
+ * copied to the %OVS_PACKET_CMD_ACTION message as %OVS_PACKET_ATTR_USERDATA.
  */
 enum ovs_userspace_attr {
 	OVS_USERSPACE_ATTR_UNSPEC,
 	OVS_USERSPACE_ATTR_PID,	      /* u32 Netlink PID to receive upcalls. */
-	OVS_USERSPACE_ATTR_USERDATA,  /* u64 optional user-specified cookie. */
+	OVS_USERSPACE_ATTR_USERDATA,  /* Optional user-specified cookie. */
 	__OVS_USERSPACE_ATTR_MAX
 };
 

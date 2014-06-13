@@ -30,7 +30,6 @@
 #include "indigo/error.h"
 #include "indigo/types.h"
 #include "openvswitch.h"
-#include "tunnel.h"
 #include "AIM/aim_rl.h"
 #include "AIM/aim_utils.h"
 #include "xbuf/xbuf.h"

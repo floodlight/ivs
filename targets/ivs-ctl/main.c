@@ -100,12 +100,7 @@ vport_type_str__(uint32_t type)
     switch (type) {
     case OVS_VPORT_TYPE_NETDEV: return "";
     case OVS_VPORT_TYPE_INTERNAL: return "(internal)";
-    case OVS_VPORT_TYPE_FT_GRE: return "(gre)";
-    /* case OVS_VPORT_TYPE_VXLAN: return "(vxlan)"; */
-    case OVS_VPORT_TYPE_PATCH: return "(patch)";
     case OVS_VPORT_TYPE_GRE: return "(gre)";
-    case OVS_VPORT_TYPE_CAPWAP: return "(capwap)";
-    case OVS_VPORT_TYPE_GRE64: return "(gre64)";
     default: return "(unknown vport type)";
     }
 }
