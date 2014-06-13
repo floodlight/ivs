@@ -106,6 +106,7 @@ ind_ovs_vport_type_str(uint32_t type)
     case OVS_VPORT_TYPE_NETDEV: return "netdev";
     case OVS_VPORT_TYPE_INTERNAL: return "internal";
     case OVS_VPORT_TYPE_GRE: return "gre";
+    case OVS_VPORT_TYPE_GRE64: return "gre64";
     default: return "unknown";
     }
 }

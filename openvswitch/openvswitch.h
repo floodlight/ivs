@@ -1,7 +1,26 @@
-
 /*
- * Copyright (c) 2007-2013 Nicira, Inc.
+ * Copyright (c) 2007-2014 Nicira, Inc.
  *
+ * This file is offered under your choice of two licenses: Apache 2.0 or GNU
+ * GPL 2.0 or later.  The permission statements for each of these licenses is
+ * given below.  You may license your modifications to this file under either
+ * of these licenses or both.  If you wish to license your modifications under
+ * only one of these licenses, delete the permission text for the other
+ * license.
+ *
+ * ----------------------------------------------------------------------
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ----------------------------------------------------------------------
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of version 2 of the GNU General Public
  * License as published by the Free Software Foundation.
@@ -15,13 +34,15 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
  * 02110-1301, USA
+ * ----------------------------------------------------------------------
  */
 
-#ifndef _UAPI__LINUX_OPENVSWITCH_H
-#define _UAPI__LINUX_OPENVSWITCH_H 1
+#ifndef _LINUX_OPENVSWITCH_H
+#define _LINUX_OPENVSWITCH_H 1
 
 #include <linux/types.h>
 #include <linux/if_ether.h>
+#include <stdint.h>
 
 /**
  * struct ovs_header - header for OVS Generic Netlink messages.
@@ -40,12 +61,13 @@ struct ovs_header {
 
 #define OVS_DATAPATH_FAMILY  "ovs_datapath"
 #define OVS_DATAPATH_MCGROUP "ovs_datapath"
+#define OVS_DATAPATH_VERSION 0x1
 
 /* V2:
  *   - API users are expected to provide OVS_DP_ATTR_USER_FEATURES
  *     when creating the datapath.
  */
-#define OVS_DATAPATH_VERSION 2
+#define OVS_DATAPATH_VERSION_2 2
 
 /* First OVS datapath version to support features */
 #define OVS_DP_VER_FEATURES 2
@@ -89,6 +111,7 @@ enum ovs_datapath_attr {
 
 #define OVS_DP_ATTR_MAX (__OVS_DP_ATTR_MAX - 1)
 
+/* All 64-bit integers within Netlink messages are 4-byte aligned only. */
 struct ovs_dp_stats {
 	__u64 n_hit;             /* Number of flow table matches. */
 	__u64 n_missed;          /* Number of flow table misses. */
@@ -117,6 +140,9 @@ struct ovs_vport_stats {
 
 /* Allow last Netlink attribute to be unaligned */
 #define OVS_DP_F_UNALIGNED	(1 << 0)
+
+/* Allow datapath to associate multiple Netlink PIDs to each vport */
+#define OVS_DP_F_VPORT_PIDS	(1 << 1)
 
 /* Fixed logical ports. */
 #define OVSP_LOCAL      ((__u32)0)
@@ -147,7 +173,9 @@ enum ovs_packet_cmd {
  * @OVS_PACKET_ATTR_KEY: Present for all notifications.  Contains the flow key
  * extracted from the packet as nested %OVS_KEY_ATTR_* attributes.  This allows
  * userspace to adapt its flow setup strategy by comparing its notion of the
- * flow key against the kernel's.
+ * flow key against the kernel's.  When used with %OVS_PACKET_CMD_EXECUTE, only
+ * metadata key fields (e.g. priority, skb mark) are honored.  All the packet
+ * header fields are parsed from the packet instead.
  * @OVS_PACKET_ATTR_ACTIONS: Contains actions for the packet.  Used
  * for %OVS_PACKET_CMD_EXECUTE.  It has nested %OVS_ACTION_ATTR_* attributes.
  * @OVS_PACKET_ATTR_USERDATA: Present for an %OVS_PACKET_CMD_ACTION
@@ -187,8 +215,10 @@ enum ovs_vport_type {
 	OVS_VPORT_TYPE_UNSPEC,
 	OVS_VPORT_TYPE_NETDEV,   /* network device */
 	OVS_VPORT_TYPE_INTERNAL, /* network device implemented by datapath */
-	OVS_VPORT_TYPE_GRE,      /* GRE tunnel. */
-	OVS_VPORT_TYPE_VXLAN,	 /* VXLAN tunnel. */
+	OVS_VPORT_TYPE_GRE,	 /* GRE tunnel. */
+	OVS_VPORT_TYPE_VXLAN,    /* VXLAN tunnel */
+	OVS_VPORT_TYPE_GRE64 = 104, /* GRE tunnel with 64-bit keys */
+	OVS_VPORT_TYPE_LISP = 105,  /* LISP tunnel */
 	__OVS_VPORT_TYPE_MAX
 };
 
@@ -203,9 +233,10 @@ enum ovs_vport_type {
  * this is the name of the network device.  Maximum length %IFNAMSIZ-1 bytes
  * plus a null terminator.
  * @OVS_VPORT_ATTR_OPTIONS: Vport-specific configuration information.
- * @OVS_VPORT_ATTR_UPCALL_PID: The Netlink socket in userspace that
- * OVS_PACKET_CMD_MISS upcalls will be directed to for packets received on
- * this port.  A value of zero indicates that upcalls should not be sent.
+ * @OVS_VPORT_ATTR_UPCALL_PID: The array of Netlink socket pids in userspace
+ * among which OVS_PACKET_CMD_MISS upcalls will be distributed for packets
+ * received on this port.  If this is a single-element array of value 0,
+ * upcalls should not be sent.
  * @OVS_VPORT_ATTR_STATS: A &struct ovs_vport_stats giving statistics for
  * packets sent or received through the vport.
  *
@@ -216,7 +247,8 @@ enum ovs_vport_type {
  * %OVS_VPORT_ATTR_NAME attributes are required.  %OVS_VPORT_ATTR_PORT_NO is
  * optional; if not specified a free port number is automatically selected.
  * Whether %OVS_VPORT_ATTR_OPTIONS is required or optional depends on the type
- * of vport.
+ * of vport.  %OVS_VPORT_ATTR_STATS is optional and other attributes are
+ * ignored.
  *
  * For other requests, if %OVS_VPORT_ATTR_NAME is specified then it is used to
  * look up the vport to operate on; otherwise dp_idx from the &struct
@@ -228,7 +260,8 @@ enum ovs_vport_attr {
 	OVS_VPORT_ATTR_TYPE,	/* u32 OVS_VPORT_TYPE_* constant. */
 	OVS_VPORT_ATTR_NAME,	/* string name, up to IFNAMSIZ bytes long */
 	OVS_VPORT_ATTR_OPTIONS, /* nested attributes, varies by vport type */
-	OVS_VPORT_ATTR_UPCALL_PID, /* u32 Netlink PID to receive upcalls */
+	OVS_VPORT_ATTR_UPCALL_PID, /* array of u32 Netlink socket PIDs for */
+				/* receiving upcalls */
 	OVS_VPORT_ATTR_STATS,	/* struct ovs_vport_stats */
 	__OVS_VPORT_ATTR_MAX
 };
@@ -281,26 +314,34 @@ enum ovs_key_attr {
 	OVS_KEY_ATTR_ARP,       /* struct ovs_key_arp */
 	OVS_KEY_ATTR_ND,        /* struct ovs_key_nd */
 	OVS_KEY_ATTR_SKB_MARK,  /* u32 skb mark */
-	OVS_KEY_ATTR_TUNNEL,    /* Nested set of ovs_tunnel attributes */
+	OVS_KEY_ATTR_TUNNEL,	/* Nested set of ovs_tunnel attributes */
 	OVS_KEY_ATTR_SCTP,      /* struct ovs_key_sctp */
 	OVS_KEY_ATTR_TCP_FLAGS,	/* be16 TCP flags. */
-
+	OVS_KEY_ATTR_DP_HASH,	/* u32 hash value. Value 0 indicates the hash
+				   is not computed by the datapath. */
+	OVS_KEY_ATTR_RECIRC_ID, /* u32 recirc id */
 #ifdef __KERNEL__
+	/* Only used within kernel data path. */
 	OVS_KEY_ATTR_IPV4_TUNNEL,  /* struct ovs_key_ipv4_tunnel */
 #endif
+	/* Experimental */
+
+	OVS_KEY_ATTR_MPLS = 62, /* array of struct ovs_key_mpls.
+				 * The implementation may restrict
+				 * the accepted length of the array. */
 	__OVS_KEY_ATTR_MAX
 };
 
 #define OVS_KEY_ATTR_MAX (__OVS_KEY_ATTR_MAX - 1)
 
 enum ovs_tunnel_key_attr {
-	OVS_TUNNEL_KEY_ATTR_ID,                 /* be64 Tunnel ID */
-	OVS_TUNNEL_KEY_ATTR_IPV4_SRC,           /* be32 src IP address. */
-	OVS_TUNNEL_KEY_ATTR_IPV4_DST,           /* be32 dst IP address. */
-	OVS_TUNNEL_KEY_ATTR_TOS,                /* u8 Tunnel IP ToS. */
-	OVS_TUNNEL_KEY_ATTR_TTL,                /* u8 Tunnel IP TTL. */
-	OVS_TUNNEL_KEY_ATTR_DONT_FRAGMENT,      /* No argument, set DF. */
-	OVS_TUNNEL_KEY_ATTR_CSUM,               /* No argument. CSUM packet. */
+	OVS_TUNNEL_KEY_ATTR_ID,			/* be64 Tunnel ID */
+	OVS_TUNNEL_KEY_ATTR_IPV4_SRC,		/* be32 src IP address. */
+	OVS_TUNNEL_KEY_ATTR_IPV4_DST,		/* be32 dst IP address. */
+	OVS_TUNNEL_KEY_ATTR_TOS,		/* u8 Tunnel IP ToS. */
+	OVS_TUNNEL_KEY_ATTR_TTL,		/* u8 Tunnel IP TTL. */
+	OVS_TUNNEL_KEY_ATTR_DONT_FRAGMENT,	/* No argument, set DF. */
+	OVS_TUNNEL_KEY_ATTR_CSUM,		/* No argument. CSUM packet. */
 	__OVS_TUNNEL_KEY_ATTR_MAX
 };
 
@@ -327,6 +368,10 @@ enum ovs_frag_type {
 struct ovs_key_ethernet {
 	__u8	 eth_src[ETH_ALEN];
 	__u8	 eth_dst[ETH_ALEN];
+};
+
+struct ovs_key_mpls {
+	__be32 mpls_lse;
 };
 
 struct ovs_key_ipv4 {
@@ -395,7 +440,9 @@ struct ovs_key_nd {
  * @OVS_FLOW_ATTR_ACTIONS: Nested %OVS_ACTION_ATTR_* attributes specifying
  * the actions to take for packets that match the key.  Always present in
  * notifications.  Required for %OVS_FLOW_CMD_NEW requests, optional for
- * %OVS_FLOW_CMD_SET requests.
+ * %OVS_FLOW_CMD_SET requests.  An %OVS_FLOW_CMD_SET without
+ * %OVS_FLOW_ATTR_ACTIONS will not modify the actions.  To clear the actions,
+ * an %OVS_FLOW_ATTR_ACTIONS without any nested attributes must be given.
  * @OVS_FLOW_ATTR_STATS: &struct ovs_flow_stats giving statistics for this
  * flow.  Present in notifications if the stats would be nonzero.  Ignored in
  * requests.
@@ -471,6 +518,19 @@ enum ovs_userspace_attr {
 #define OVS_USERSPACE_ATTR_MAX (__OVS_USERSPACE_ATTR_MAX - 1)
 
 /**
+ * struct ovs_action_push_mpls - %OVS_ACTION_ATTR_PUSH_MPLS action argument.
+ * @mpls_lse: MPLS label stack entry to push.
+ * @mpls_ethertype: Ethertype to set in the encapsulating ethernet frame.
+ *
+ * The only values @mpls_ethertype should ever be given are %ETH_P_MPLS_UC and
+ * %ETH_P_MPLS_MC, indicating MPLS unicast or multicast. Other are rejected.
+ */
+struct ovs_action_push_mpls {
+	__be32 mpls_lse;
+	__be16 mpls_ethertype; /* Either %ETH_P_MPLS_UC or %ETH_P_MPLS_MC */
+};
+
+/**
  * struct ovs_action_push_vlan - %OVS_ACTION_ATTR_PUSH_VLAN action argument.
  * @vlan_tpid: Tag protocol identifier (TPID) to push.
  * @vlan_tci: Tag control identifier (TCI) to push.  The CFI bit must be set
@@ -486,20 +546,50 @@ struct ovs_action_push_vlan {
 	__be16 vlan_tci;	/* 802.1Q TCI (VLAN ID and priority). */
 };
 
+/* Data path hash algorithm for computing Datapath hash.
+ *
+ * The algorithm type only specifies the fields in a flow
+ * will be used as part of the hash. Each datapath is free
+ * to use its own hash algorithm. The hash value will be
+ * opaque to the user space daemon.
+ */
+enum ovs_hash_alg {
+	OVS_HASH_ALG_L4,
+};
+/*
+ * struct ovs_action_hash - %OVS_ACTION_ATTR_HASH action argument.
+ * @hash_alg: Algorithm used to compute hash prior to recirculation.
+ * @hash_basis: basis used for computing hash.
+ */
+struct ovs_action_hash {
+	uint32_t  hash_alg;	/* One of ovs_hash_alg. */
+	uint32_t  hash_basis;
+};
+
 /**
  * enum ovs_action_attr - Action types.
  *
  * @OVS_ACTION_ATTR_OUTPUT: Output packet to port.
  * @OVS_ACTION_ATTR_USERSPACE: Send packet to userspace according to nested
  * %OVS_USERSPACE_ATTR_* attributes.
- * @OVS_ACTION_ATTR_SET: Replaces the contents of an existing header.  The
- * single nested %OVS_KEY_ATTR_* attribute specifies a header to modify and its
- * value.
  * @OVS_ACTION_ATTR_PUSH_VLAN: Push a new outermost 802.1Q header onto the
  * packet.
  * @OVS_ACTION_ATTR_POP_VLAN: Pop the outermost 802.1Q header off the packet.
  * @OVS_ACTION_ATTR_SAMPLE: Probabilitically executes actions, as specified in
  * the nested %OVS_SAMPLE_ATTR_* attributes.
+ * @OVS_ACTION_ATTR_SET: Replaces the contents of an existing header.  The
+ * single nested %OVS_KEY_ATTR_* attribute specifies a header to modify and its
+ * value.
+ * @OVS_ACTION_ATTR_PUSH_MPLS: Push a new MPLS label stack entry onto the
+ * top of the packets MPLS label stack.  Set the ethertype of the
+ * encapsulating frame to either %ETH_P_MPLS_UC or %ETH_P_MPLS_MC to
+ * indicate the new packet contents.
+ * @OVS_ACTION_ATTR_POP_MPLS: Pop an MPLS label stack entry off of the
+ * packet's MPLS label stack.  Set the encapsulating frame's ethertype to
+ * indicate the new packet contents. This could potentially still be
+ * %ETH_P_MPLS if the resulting MPLS label stack is not empty.  If there
+ * is no MPLS label stack, as determined by ethertype, no action is taken.
+ * @OVS_ACTION_RECIRC: Recirculate within the data path.
  *
  * Only a single header can be set with a single %OVS_ACTION_ATTR_SET.  Not all
  * fields within a header are modifiable, e.g. the IPv4 protocol and fragment
@@ -514,6 +604,10 @@ enum ovs_action_attr {
 	OVS_ACTION_ATTR_PUSH_VLAN,    /* struct ovs_action_push_vlan. */
 	OVS_ACTION_ATTR_POP_VLAN,     /* No argument. */
 	OVS_ACTION_ATTR_SAMPLE,       /* Nested OVS_SAMPLE_ATTR_*. */
+	OVS_ACTION_ATTR_PUSH_MPLS,    /* struct ovs_action_push_mpls. */
+	OVS_ACTION_ATTR_POP_MPLS,     /* __be16 ethertype. */
+	OVS_ACTION_ATTR_RECIRC,	      /* u32 recirc_id. */
+	OVS_ACTION_ATTR_HASH,	      /* struct ovs_action_hash. */
 	__OVS_ACTION_ATTR_MAX
 };
 
