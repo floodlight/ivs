@@ -139,7 +139,8 @@ AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == 14*8);
     field(OVS_KEY_ATTR_ICMP,      icmp,      struct ovs_key_icmp) \
     field(OVS_KEY_ATTR_ICMPV6,    icmpv6,    struct ovs_key_icmpv6) \
     field(OVS_KEY_ATTR_ARP,       arp,       struct ovs_key_arp) \
-    field(OVS_KEY_ATTR_ND,        nd,        struct ovs_key_nd)
+    field(OVS_KEY_ATTR_ND,        nd,        struct ovs_key_nd) \
+    field(OVS_KEY_ATTR_TCP_FLAGS, tcp_flags, uint16_t)
 
 #define OVS_TUNNEL_KEY_FIELDS \
     field(OVS_TUNNEL_KEY_ATTR_ID,       id,       uint64_t) \
@@ -174,6 +175,7 @@ struct ind_ovs_parsed_key {
         struct ovs_key_arp arp;
         struct ovs_key_nd nd;
     };
+    uint16_t tcp_flags;
     struct {
         uint64_t id;
         uint32_t ipv4_src;
