@@ -188,9 +188,13 @@ struct ind_ovs_parsed_key {
 /*
  * Exported from OVSDriver for use by the pipeline
  */
-struct ind_ovs_flow_effects *ind_ovs_fwd_pipeline_lookup(int table_id, struct ind_ovs_cfr *cfr, struct xbuf *stats);
 indigo_error_t ind_ovs_group_select(uint32_t id, uint32_t hash, struct xbuf **actions);
 indigo_error_t ind_ovs_group_indirect(uint32_t id, struct xbuf **actions);
+void ind_ovs_kflow_invalidate_all(void);
+void ind_ovs_fwd_write_lock();
+void ind_ovs_fwd_write_unlock();
+extern uint32_t ind_ovs_salt;
+indigo_error_t ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf, bool table_miss);
 
 /* Translate an OVS key into a CFR */
 void ind_ovs_key_to_cfr(const struct ind_ovs_parsed_key *pkey, struct ind_ovs_cfr *cfr);
