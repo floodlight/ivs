@@ -105,45 +105,9 @@ ind_ovs_vport_type_str(uint32_t type)
     switch (type) {
     case OVS_VPORT_TYPE_NETDEV: return "netdev";
     case OVS_VPORT_TYPE_INTERNAL: return "internal";
-    case OVS_VPORT_TYPE_FT_GRE: return "ft_gre";
-    /* case OVS_VPORT_TYPE_VXLAN: return "vxlan"; */
-    case OVS_VPORT_TYPE_PATCH: return "patch";
     case OVS_VPORT_TYPE_GRE: return "gre";
-    case OVS_VPORT_TYPE_CAPWAP: return "capwap";
     case OVS_VPORT_TYPE_GRE64: return "gre64";
     default: return "unknown";
-    }
-}
-
-static void
-ind_ovs_dump_tunnel_attr(const struct nlattr *attr)
-{
-    switch (nla_type(attr)) {
-    leaf(OVS_TUNNEL_ATTR_DST_IPV4, uint8_t, FORMAT_IPV4, VALUE_IPV4(x));
-    leaf(OVS_TUNNEL_ATTR_SRC_IPV4, uint8_t, FORMAT_IPV4, VALUE_IPV4(x));
-    leaf(OVS_TUNNEL_ATTR_OUT_KEY, uint64_t, "0x%"PRIx64, be64toh(*x));
-    leaf(OVS_TUNNEL_ATTR_IN_KEY, uint64_t, "0x%"PRIx64, be64toh(*x));
-    leaf(OVS_TUNNEL_ATTR_TOS, uint8_t, "%hhu", *x);
-    leaf(OVS_TUNNEL_ATTR_TTL, uint8_t, "%hhu", *x);
-    leaf(OVS_TUNNEL_ATTR_DST_PORT, uint16_t, "%hu", *x);
-
-    case OVS_TUNNEL_ATTR_FLAGS: {
-        uint32_t flags = nla_get_u32((void *)attr);
-        if (flags != 0) {
-            nest_start(OVS_TUNNEL_ATTR_FLAGS);
-            if (flags & TNL_F_CSUM) output("csum");
-            if (flags & TNL_F_TOS_INHERIT) output("tos inherit");
-            if (flags & TNL_F_TTL_INHERIT) output("ttl inherit");
-            if (flags & TNL_F_DF_INHERIT) output("df inherit");
-            if (flags & TNL_F_DF_DEFAULT) output("df default");
-            if (flags & TNL_F_PMTUD) output("pmtud");
-            if (flags & TNL_F_IPSEC) output("ipsec");
-            nest_end();
-        }
-        break;
-    }
-
-    default: ind_ovs_dump_unknown_attr(attr);
     }
 }
 
@@ -160,14 +124,12 @@ ind_ovs_dump_vport_attr(const struct nlattr *attr)
          "tx (%"PRIu64"/%"PRIu64"/%"PRIu64"/%"PRIu64")",
          x->rx_packets, x->rx_bytes, x->rx_errors, x->rx_dropped,
          x->tx_packets, x->tx_bytes, x->tx_errors, x->tx_dropped);
-    leaf(OVS_VPORT_ATTR_ADDRESS, uint8_t, FORMAT_MAC, VALUE_MAC(x));
 
     case OVS_VPORT_ATTR_OPTIONS:
         if (nla_len(attr) > 0) {
             nest_start(OVS_VPORT_ATTR_OPTIONS);
             /* TODO options attr namespace depends on port type, which is hard to
             * get from here. For now assume tunnel options. */
-            ind_ovs_dump_nested(attr, ind_ovs_dump_tunnel_attr);
             nest_end();
         }
         break;

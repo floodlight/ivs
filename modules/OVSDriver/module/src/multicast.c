@@ -51,27 +51,21 @@ ind_ovs_handle_vport_multicast(struct nlmsghdr *nlh)
     assert(attrs[OVS_VPORT_ATTR_NAME]);
     const char *ifname = nla_get_string(attrs[OVS_VPORT_ATTR_NAME]);
 
-    of_mac_addr_t mac_addr;
-    if (attrs[OVS_VPORT_ATTR_ADDRESS]) {
-        memcpy(mac_addr.addr, nla_data(attrs[OVS_VPORT_ATTR_ADDRESS]),
-               OF_MAC_ADDR_BYTES);
-    } else {
-        mac_addr = of_mac_addr_all_zeros;
-        struct ifaddrs *ifaddr, *ifa;
-        if (getifaddrs(&ifaddr) != -1) {
-            for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-                if (!strcmp(ifname, ifa->ifa_name)) {
-                    struct sockaddr_ll *sa = (struct sockaddr_ll *)ifa->ifa_addr;
-                    if (sa != NULL && sa->sll_family == AF_PACKET) {
-                        memcpy(mac_addr.addr, &sa->sll_addr, OF_MAC_ADDR_BYTES);
-                        LOG_INFO("Using MAC from interface %s", ifa->ifa_name);
-                        break;
-                    }
+    of_mac_addr_t mac_addr = of_mac_addr_all_zeros;
+    struct ifaddrs *ifaddr, *ifa;
+    if (getifaddrs(&ifaddr) != -1) {
+        for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+            if (!strcmp(ifname, ifa->ifa_name)) {
+                struct sockaddr_ll *sa = (struct sockaddr_ll *)ifa->ifa_addr;
+                if (sa != NULL && sa->sll_family == AF_PACKET) {
+                    memcpy(mac_addr.addr, &sa->sll_addr, OF_MAC_ADDR_BYTES);
+                    LOG_INFO("Using MAC from interface %s", ifa->ifa_name);
+                    break;
                 }
             }
         }
-        freeifaddrs(ifaddr);
     }
+    freeifaddrs(ifaddr);
 
     if (gnlh->cmd == OVS_VPORT_CMD_NEW) {
         ind_ovs_port_added(port_no, ifname, mac_addr);
