@@ -43,7 +43,7 @@ include $(BUILDER)/lib.mk
 DEPENDMODULES := SocketManager OFConnectionManager OFStateManager OVSDriver \
                  Configuration loci indigo BigList BigHash ivs_common pipeline pipeline_standard tcam xbuf \
                  lldpa lacpa arpa router_ip_table icmpa dhcpra PPE IOF \
-                 AIM murmur cjson OS uCli debug_counter timer_wheel bloom_filter
+                 AIM murmur cjson OS uCli debug_counter timer_wheel bloom_filter BigRing minimatch
 
 ifdef USE_LUAJIT
 DEPENDMODULES += luajit
@@ -97,6 +97,7 @@ GLOBAL_CFLAGS += -DAIM_CONFIG_INCLUDE_MAIN=1
 GLOBAL_CFLAGS += -DAIM_CONFIG_INCLUDE_PVS_SYSLOG=1
 GLOBAL_CFLAGS += -DAIM_CONFIG_LOG_INCLUDE_ENV_VARIABLES=0
 GLOBAL_CFLAGS += -DSOCKETMANAGER_CONFIG_MAX_TIMERS=512
+GLOBAL_CFLAGS += -DBIGRING_CONFIG_INCLUDE_LOCKING=0
 GLOBAL_CFLAGS += -g
 GLOBAL_CFLAGS += -I .
 GLOBAL_CFLAGS += -I $(ROOT)/openvswitch
