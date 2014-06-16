@@ -42,8 +42,6 @@
 #define IP_ECN_MASK 0x03
 #define IPV6_FLABEL_MASK 0x000fffff
 
-#define ARRAY_SIZE(a)  (sizeof(a) / sizeof((a)[0]))
-
 #define ALIGN8(x) (((x) + 7) & ~7)
 
 /* Manage a uint64_t bitmap of OVS key attributes. */
@@ -58,70 +56,10 @@
 #define IVS_PKTIN_REASON(userdata) (userdata) & 0xff
 #define IVS_PKTIN_METADATA(userdata) (userdata) >> 8
 
-/*
- * Derived from a flow's actions/instructions.
- */
-struct ind_ovs_flow_effects {
-    struct xbuf apply_actions;
-    struct xbuf write_actions;
-    uint64_t metadata;
-    uint64_t metadata_mask;
-    uint32_t meter_id;
-    uint8_t next_table_id;
-    unsigned clear_actions : 1;
-    unsigned disable_src_mac_check : 1;
-    unsigned arp_offload : 1;
-    unsigned dhcp_offload : 1;
-    unsigned disable_split_horizon_check : 1;
-    unsigned permit : 1;
-    unsigned deny : 1;
-    unsigned packet_of_death : 1;
-    unsigned prioritize_pdus : 1;
-};
-
 struct ind_ovs_flow_stats {
     uint64_t packets;
     uint64_t bytes;
 };
-
-/*
- * Canonical Flow Representation
- * Compressed version of the OpenFlow match fields for use in matching.
- * Does not contain the non-OpenFlow fields of the flow key.
- * Wildcarded fields must be zeroed in the flow entry's CFR.
- * sizeof(struct ind_ovs_cfr) must be a multiple of 8.
- * All fields are in network byte order except in_port, lag_id, the
- * class_ids, egr_port_group_id, and global_vrf_allowed.
- */
-
-struct ind_ovs_cfr {
-    uint32_t in_port;           /* Input switch port. */
-    uint8_t dl_dst[6];          /* Ethernet destination address. */
-    uint8_t dl_src[6];          /* Ethernet source address. */
-    uint16_t dl_type;           /* Ethernet frame type. */
-    uint16_t dl_vlan;           /* VLAN id and priority, same as wire format
-                                   plus CFI bit set if tag present. */
-    uint8_t nw_tos;             /* IPv4 DSCP. */
-    uint8_t nw_proto;           /* IP protocol. */
-    uint16_t global_vrf_allowed:1;  /* bsn_global_vrf_allowed extension */
-    uint32_t pad:15;
-    uint32_t nw_src;            /* IP source address. */
-    uint32_t nw_dst;            /* IP destination address. */
-    uint16_t tp_src;            /* TCP/UDP source port. */
-    uint16_t tp_dst;            /* TCP/UDP destination port. */
-    uint32_t ipv6_src[4];       /* IPv6 source address. */
-    uint32_t ipv6_dst[4];       /* IPv6 destination address. */
-    uint32_t in_ports[4];       /* bsn_in_ports extension */
-    uint32_t lag_id;            /* bsn_lag_id extension */
-    uint32_t vrf;               /* bsn_vrf extension */
-    uint32_t l3_interface_class_id;  /* bsn_l3_interface_class_id extension */
-    uint32_t l3_src_class_id;   /* bsn_l3_src_class_id extension */
-    uint32_t l3_dst_class_id;   /* bsn_l3_dst_class_id extension */
-    uint32_t egr_port_group_id; /* bsn_egr_port_group_id extension */
-    uint32_t pad2;
-} __attribute__ ((aligned (8)));
-
-AIM_STATIC_ASSERT(CFR_SIZE, sizeof(struct ind_ovs_cfr) == 14*8);
 
 /*
  * X-macro representation of the OVS key (nlattr type, key field, type).
@@ -185,8 +123,6 @@ struct ind_ovs_parsed_key {
     } tunnel;
 };
 
-#define IVS_MAX_BITMAP_IN_PORT 127
-
 /*
  * Exported from OVSDriver for use by the pipeline
  */
@@ -197,11 +133,5 @@ void ind_ovs_fwd_write_lock();
 void ind_ovs_fwd_write_unlock();
 extern uint32_t ind_ovs_salt;
 indigo_error_t ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf, bool table_miss);
-
-/* Translate an OVS key into a CFR */
-void ind_ovs_key_to_cfr(const struct ind_ovs_parsed_key *pkey, struct ind_ovs_cfr *cfr);
-
-/* Translate an OpenFlow match into a CFR and mask */
-void ind_ovs_match_to_cfr(const of_match_t *match, struct ind_ovs_cfr *cfr, struct ind_ovs_cfr *mask);
 
 #endif

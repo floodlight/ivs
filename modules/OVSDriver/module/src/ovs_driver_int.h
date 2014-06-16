@@ -234,7 +234,6 @@ void ind_ovs_dump_userspace_attr(const struct nlattr *nla);
 void ind_ovs_dump_sample_attr(const struct nlattr *nla);
 void ind_ovs_dump_action_attr(const struct nlattr *nla);
 void ind_ovs_dump_key(const struct nlattr *key);
-void ind_ovs_dump_cfr(const struct ind_ovs_cfr *cfr);
 
 /* Return the name of the given generic netlink command. */
 const char *ind_ovs_cmd_str(int family, uint8_t cmd);

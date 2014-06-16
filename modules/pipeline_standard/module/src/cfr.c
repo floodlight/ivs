@@ -24,25 +24,19 @@
 #include <byteswap.h>
 #include <linux/if_ether.h>
 #include <arpa/inet.h>
+#include "cfr.h"
+
+#define AIM_LOG_MODULE_NAME pipeline_standard
+#include <AIM/aim_log.h>
 
 void
-ind_ovs_key_to_cfr(const struct ind_ovs_parsed_key *pkey,
-                   struct ind_ovs_cfr *cfr)
+pipeline_standard_key_to_cfr(const struct ind_ovs_parsed_key *pkey,
+                             struct pipeline_standard_cfr *cfr)
 {
     if (pkey->in_port == OVSP_LOCAL) {
         cfr->in_port = OF_PORT_DEST_LOCAL;
     } else {
         cfr->in_port = pkey->in_port;
-    }
-
-    /* Set a bit in the in_ports bitmap */
-    {
-        uint32_t idx = IVS_MAX_BITMAP_IN_PORT < cfr->in_port ?
-            IVS_MAX_BITMAP_IN_PORT : cfr->in_port;
-        uint32_t word = IVS_MAX_BITMAP_IN_PORT/32 - idx/32;
-        uint32_t bit = idx % 32;
-        memset(cfr->in_ports, 0, sizeof(cfr->in_ports));
-        cfr->in_ports[word] = 1 << bit;
     }
 
     memcpy(cfr->dl_dst, pkey->ethernet.eth_dst, OF_MAC_ADDR_BYTES);
@@ -108,34 +102,21 @@ ind_ovs_key_to_cfr(const struct ind_ovs_parsed_key *pkey,
         cfr->tp_dst = 0;
     }
 
-    cfr->lag_id = 0;
-    cfr->vrf = 0;
-    cfr->l3_interface_class_id = 0;
-    cfr->l3_src_class_id = 0;
-    cfr->l3_dst_class_id = 0;
-    cfr->global_vrf_allowed = 0;
     cfr->pad = 0;
-    cfr->egr_port_group_id = 0;
     cfr->pad2 = 0;
 }
 
 void
-ind_ovs_match_to_cfr(const of_match_t *match,
-                     struct ind_ovs_cfr *fields, struct ind_ovs_cfr *masks)
+pipeline_standard_match_to_cfr(const of_match_t *match,
+                               struct pipeline_standard_cfr *fields,
+                               struct pipeline_standard_cfr *masks)
 {
-    /* TODO support OF 1.1+ match fields */
-
     memset(fields, 0, sizeof(*fields));
     memset(masks, 0, sizeof(*masks));
 
     /* input port */
     fields->in_port = match->fields.in_port;
     masks->in_port = match->masks.in_port;
-
-    masks->in_ports[0] = match->masks.bsn_in_ports_128.hi >> 32;
-    masks->in_ports[1] = match->masks.bsn_in_ports_128.hi;
-    masks->in_ports[2] = match->masks.bsn_in_ports_128.lo >> 32;
-    masks->in_ports[3] = match->masks.bsn_in_ports_128.lo;
 
     /* ether addrs */
     memcpy(fields->dl_dst, &match->fields.eth_dst, OF_MAC_ADDR_BYTES);
@@ -240,31 +221,42 @@ ind_ovs_match_to_cfr(const of_match_t *match,
         }
     }
 
-    /* Metadata */
-    fields->lag_id = match->fields.bsn_lag_id;
-    masks->lag_id = match->masks.bsn_lag_id;
-    fields->vrf = match->fields.bsn_vrf;
-    masks->vrf = match->masks.bsn_vrf;
-    fields->l3_interface_class_id = match->fields.bsn_l3_interface_class_id;
-    masks->l3_interface_class_id = match->masks.bsn_l3_interface_class_id;
-    fields->l3_src_class_id = match->fields.bsn_l3_src_class_id;
-    masks->l3_src_class_id = match->masks.bsn_l3_src_class_id;
-    fields->l3_dst_class_id = match->fields.bsn_l3_dst_class_id;
-    masks->l3_dst_class_id = match->masks.bsn_l3_dst_class_id;
-    fields->global_vrf_allowed = match->fields.bsn_global_vrf_allowed & 1;
-    masks->global_vrf_allowed = match->masks.bsn_global_vrf_allowed & 1;
-    fields->pad = 0;
-    masks->pad = 0;
-    fields->egr_port_group_id = match->fields.bsn_egr_port_group_id;
-    masks->egr_port_group_id = match->masks.bsn_egr_port_group_id;
-    fields->pad2 = 0;
-    masks->pad2 = 0;
-
     /* normalize the flow entry */
     int i;
     char *f = (char *)fields;
     char *m = (char *)masks;
-    for (i = 0; i < sizeof (struct ind_ovs_cfr); i++) {
+    for (i = 0; i < sizeof (struct pipeline_standard_cfr); i++) {
         f[i] &= m[i];
     }
+}
+
+void
+pipeline_standard_dump_cfr(const struct pipeline_standard_cfr *cfr)
+{
+    if (!aim_log_fid_get(AIM_LOG_STRUCT_POINTER, AIM_LOG_FLAG_VERBOSE)) {
+        /* Exit early if we wouldn't log anything */
+        return;
+    }
+
+#define output(fmt, ...) AIM_LOG_VERBOSE("  " fmt, ##__VA_ARGS__)
+
+    output("dl_dst=%{mac}", cfr->dl_dst);
+    output("dl_src=%{mac}", cfr->dl_src);
+    output("in_port=%u", cfr->in_port);
+    output("dl_type=0x%04x", ntohs(cfr->dl_type));
+    output("dl_vlan=0x%04x", ntohs(cfr->dl_vlan));
+    output("nw_tos=0x%x", cfr->nw_tos);
+    output("nw_proto=0x%x", cfr->nw_proto);
+    output("nw_src=%{ipv4a}", ntohl(cfr->nw_src));
+    output("nw_dst=%{ipv4a}", ntohl(cfr->nw_dst));
+    output("tp_src=%u", ntohs(cfr->tp_src));
+    output("tp_dst=%u", ntohs(cfr->tp_dst));
+
+    char src[INET6_ADDRSTRLEN], dst[INET6_ADDRSTRLEN];
+    inet_ntop(AF_INET6, cfr->ipv6_src, src, INET6_ADDRSTRLEN);
+    inet_ntop(AF_INET6, cfr->ipv6_dst, dst, INET6_ADDRSTRLEN);
+    output("ipv6_src=%s", src);
+    output("ipv6_dst=%s", dst);
+
+#undef output
 }

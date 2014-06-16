@@ -18,9 +18,8 @@
  ****************************************************************/
 
 /*
- * Translate between OpenFlow matches (of_match_t), internal
- * match structure (struct ind_ovs_cfr), and OVS flow key
- * (struct ind_ovs_parsed_key / nlattrs).
+ * Translate between OpenFlow matches (of_match_t)
+ * and OVS flow key (struct ind_ovs_parsed_key / nlattrs).
  */
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC optimize (4)

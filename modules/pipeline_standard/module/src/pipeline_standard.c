@@ -28,6 +28,7 @@
 #include <tcam/tcam.h>
 #include <indigo/indigo.h>
 #include <indigo/of_state_manager.h>
+#include "cfr.h"
 
 #define AIM_LOG_MODULE_NAME pipeline_standard
 #include <AIM/aim_log.h>
@@ -68,7 +69,7 @@ struct flowtable_entry {
     bool table_miss;
 };
 
-static void pipeline_standard_update_cfr(struct ind_ovs_cfr *cfr, struct xbuf *actions);
+static void pipeline_standard_update_cfr(struct pipeline_standard_cfr *cfr, struct xbuf *actions);
 
 static int openflow_version = -1;
 static struct flowtable *flowtables[NUM_TABLES];
@@ -89,7 +90,7 @@ pipeline_standard_init(const char *name)
     for (i = 0; i < NUM_TABLES; i++) {
         struct flowtable *flowtable = aim_zmalloc(sizeof(*flowtable));
         flowtable->table_id = i;
-        flowtable->tcam = tcam_create(sizeof(struct ind_ovs_cfr), ind_ovs_salt);
+        flowtable->tcam = tcam_create(sizeof(struct pipeline_standard_cfr), ind_ovs_salt);
         of_table_name_t name;
         snprintf(name, sizeof(name), "table %d", i);
         indigo_core_table_register(i, name, &table_ops, flowtable);
@@ -112,8 +113,8 @@ indigo_error_t
 pipeline_standard_process(struct ind_ovs_parsed_key *key,
                           struct pipeline_result *result)
 {
-    struct ind_ovs_cfr cfr;
-    ind_ovs_key_to_cfr(key, &cfr);
+    struct pipeline_standard_cfr cfr;
+    pipeline_standard_key_to_cfr(key, &cfr);
 
     uint8_t table_id = 0;
     if (flowtables[table_id] == NULL) {
@@ -176,7 +177,7 @@ __pipeline_standard_module_init__(void)
  * Scan actions list for field modifications and update the CFR accordingly
  */
 static void
-pipeline_standard_update_cfr(struct ind_ovs_cfr *cfr, struct xbuf *actions)
+pipeline_standard_update_cfr(struct pipeline_standard_cfr *cfr, struct xbuf *actions)
 {
     struct nlattr *attr;
     XBUF_FOREACH(xbuf_data(actions), xbuf_length(actions), attr) {
@@ -311,9 +312,9 @@ parse_value(of_flow_add_t *flow_mod, struct flowtable_value *value,
 }
 
 static bool
-is_table_miss(int version, const struct ind_ovs_cfr *mask, uint16_t priority)
+is_table_miss(int version, const struct pipeline_standard_cfr *mask, uint16_t priority)
 {
-    static struct ind_ovs_cfr table_miss_mask; /* all zeroes */
+    static struct pipeline_standard_cfr table_miss_mask; /* all zeroes */
     return version >= OF_VERSION_1_3 &&
            priority == 0 &&
            memcmp(mask, &table_miss_mask, sizeof(table_miss_mask)) == 0;
@@ -328,8 +329,8 @@ flowtable_entry_create(
     indigo_error_t rv;
     struct flowtable_entry *entry = aim_zmalloc(sizeof(*entry));
     of_match_t match;
-    struct ind_ovs_cfr key;
-    struct ind_ovs_cfr mask;
+    struct pipeline_standard_cfr key;
+    struct pipeline_standard_cfr mask;
     uint16_t priority;
 
     if (of_flow_add_match_get(obj, &match) < 0) {
@@ -339,7 +340,7 @@ flowtable_entry_create(
 
     of_flow_add_priority_get(obj, &priority);
 
-    ind_ovs_match_to_cfr(&match, &key, &mask);
+    pipeline_standard_match_to_cfr(&match, &key, &mask);
 
     entry->table_miss = is_table_miss(openflow_version, &mask, priority);
 
@@ -348,6 +349,12 @@ flowtable_entry_create(
         aim_free(entry);
         return rv;
     }
+
+    AIM_LOG_VERBOSE("Creating flow:");
+    AIM_LOG_VERBOSE("Key:");
+    pipeline_standard_dump_cfr(&key);
+    AIM_LOG_VERBOSE("Mask:");
+    pipeline_standard_dump_cfr(&mask);
 
     ind_ovs_fwd_write_lock();
     tcam_insert(flowtable->tcam, &entry->tcam_entry, &key, &mask, priority);
