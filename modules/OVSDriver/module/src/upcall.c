@@ -102,7 +102,7 @@ ind_ovs_upcall_thread_main(void *arg)
     while (!thread->finished) {
         struct epoll_event events[128];
         thread->log_upcalls = aim_log_enabled(AIM_LOG_STRUCT_POINTER, AIM_LOG_FLAG_VERBOSE);
-        int n = epoll_wait(thread->epfd, events, ARRAY_SIZE(events),
+        int n = epoll_wait(thread->epfd, events, AIM_ARRAYSIZE(events),
                            1000 /* check finished flag once per second */);
         if (n < 0 && errno != EINTR) {
             LOG_ERROR("epoll_wait failed: %s", strerror(errno));

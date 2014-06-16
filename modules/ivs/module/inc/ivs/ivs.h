@@ -42,8 +42,6 @@
 #define IP_ECN_MASK 0x03
 #define IPV6_FLABEL_MASK 0x000fffff
 
-#define ARRAY_SIZE(a)  (sizeof(a) / sizeof((a)[0]))
-
 #define ALIGN8(x) (((x) + 7) & ~7)
 
 /* Manage a uint64_t bitmap of OVS key attributes. */
@@ -57,27 +55,6 @@
 #define IVS_PKTIN_USERDATA(reason, metadata) (reason) | ((uint64_t)(metadata) << 8)
 #define IVS_PKTIN_REASON(userdata) (userdata) & 0xff
 #define IVS_PKTIN_METADATA(userdata) (userdata) >> 8
-
-/*
- * Derived from a flow's actions/instructions.
- */
-struct ind_ovs_flow_effects {
-    struct xbuf apply_actions;
-    struct xbuf write_actions;
-    uint64_t metadata;
-    uint64_t metadata_mask;
-    uint32_t meter_id;
-    uint8_t next_table_id;
-    unsigned clear_actions : 1;
-    unsigned disable_src_mac_check : 1;
-    unsigned arp_offload : 1;
-    unsigned dhcp_offload : 1;
-    unsigned disable_split_horizon_check : 1;
-    unsigned permit : 1;
-    unsigned deny : 1;
-    unsigned packet_of_death : 1;
-    unsigned prioritize_pdus : 1;
-};
 
 struct ind_ovs_flow_stats {
     uint64_t packets;
@@ -145,8 +122,6 @@ struct ind_ovs_parsed_key {
         uint8_t ttl;
     } tunnel;
 };
-
-#define IVS_MAX_BITMAP_IN_PORT 127
 
 /*
  * Exported from OVSDriver for use by the pipeline
