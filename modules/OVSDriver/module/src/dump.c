@@ -182,6 +182,8 @@ ind_ovs_dump_key_attr(const struct nlattr *attr)
         }
         leaf(OVS_KEY_ATTR_TCP, struct ovs_key_tcp,
              "src=%hu dst=%hu", ntohs(x->tcp_src), ntohs(x->tcp_dst));
+        leaf(OVS_KEY_ATTR_TCP_FLAGS, uint16_t,
+             "flags=%#x", ntohs(*x));
         leaf(OVS_KEY_ATTR_UDP, struct ovs_key_udp,
              "src=%hu dst=%hu", ntohs(x->udp_src), ntohs(x->udp_dst));
         leaf(OVS_KEY_ATTR_ICMP, struct ovs_key_icmp,
