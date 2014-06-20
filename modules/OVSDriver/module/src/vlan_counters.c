@@ -20,6 +20,11 @@
 #include <ivs/ivs.h>
 #include <indigo/forwarding.h>
 
+struct vlan_counters {
+    struct ind_ovs_flow_stats rx_stats;
+    struct ind_ovs_flow_stats tx_stats;
+};
+
 static struct vlan_counters vcounters[4096];
 
 void
@@ -35,26 +40,18 @@ indigo_fwd_vlan_stats_get(uint16_t vlan_vid, indigo_fi_vlan_stats_t *vlan_stats)
     vlan_stats->tx_packets = vcounters[vlan_vid].tx_stats.packets;
 }
 
-indigo_error_t
-ind_ovs_rx_vlan_stats_select(uint16_t vlan_vid, struct ind_ovs_flow_stats **vlan_stats)
+struct ind_ovs_flow_stats *
+ind_ovs_rx_vlan_stats_select(uint16_t vlan_vid)
 {
-    if (vlan_vid < 1 || vlan_vid > 4095) {
-        return INDIGO_ERROR_PARAM;
-    }
+    AIM_ASSERT(vlan_vid < 1 || vlan_vid > 4095);
 
-    *vlan_stats = &vcounters[vlan_vid].rx_stats;
-
-    return INDIGO_ERROR_NONE;
+    return &vcounters[vlan_vid].rx_stats;
 }
 
-indigo_error_t
-ind_ovs_tx_vlan_stats_select(uint16_t vlan_vid, struct ind_ovs_flow_stats **vlan_stats)
+struct ind_ovs_flow_stats *
+ind_ovs_tx_vlan_stats_select(uint16_t vlan_vid)
 {
-    if (vlan_vid < 1 || vlan_vid > 4095) {
-        return INDIGO_ERROR_PARAM;
-    }
+    AIM_ASSERT(vlan_vid < 1 || vlan_vid > 4095);
 
-    *vlan_stats = &vcounters[vlan_vid].tx_stats;
-
-    return INDIGO_ERROR_NONE;
+    return &vcounters[vlan_vid].tx_stats;
 }

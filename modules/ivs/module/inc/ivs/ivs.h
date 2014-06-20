@@ -123,11 +123,6 @@ struct ind_ovs_parsed_key {
     } tunnel;
 };
 
-struct vlan_counters {
-    struct ind_ovs_flow_stats rx_stats;
-    struct ind_ovs_flow_stats tx_stats;
-};
-
 /*
  * Exported from OVSDriver for use by the pipeline
  */
@@ -138,7 +133,7 @@ void ind_ovs_fwd_write_lock();
 void ind_ovs_fwd_write_unlock();
 extern uint32_t ind_ovs_salt;
 indigo_error_t ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf, bool table_miss);
-indigo_error_t ind_ovs_rx_vlan_stats_select(uint16_t vlan_vid, struct ind_ovs_flow_stats **vlan_stats);
-indigo_error_t ind_ovs_tx_vlan_stats_select(uint16_t vlan_vid, struct ind_ovs_flow_stats **vlan_stats);
+struct ind_ovs_flow_stats * ind_ovs_rx_vlan_stats_select(uint16_t vlan_vid);
+struct ind_ovs_flow_stats * ind_ovs_tx_vlan_stats_select(uint16_t vlan_vid);
 
 #endif
