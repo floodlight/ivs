@@ -133,5 +133,7 @@ void ind_ovs_fwd_write_lock();
 void ind_ovs_fwd_write_unlock();
 extern uint32_t ind_ovs_salt;
 indigo_error_t ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf, bool table_miss);
+struct ind_ovs_flow_stats * ind_ovs_rx_vlan_stats_select(uint16_t vlan_vid);
+struct ind_ovs_flow_stats * ind_ovs_tx_vlan_stats_select(uint16_t vlan_vid);
 
 #endif
