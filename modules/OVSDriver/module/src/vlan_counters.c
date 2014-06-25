@@ -43,7 +43,7 @@ indigo_fwd_vlan_stats_get(uint16_t vlan_vid, indigo_fi_vlan_stats_t *vlan_stats)
 struct ind_ovs_flow_stats *
 ind_ovs_rx_vlan_stats_select(uint16_t vlan_vid)
 {
-    AIM_ASSERT(vlan_vid < 1 || vlan_vid > 4095);
+    AIM_ASSERT(vlan_vid > 0 && vlan_vid < 4096);
 
     return &vcounters[vlan_vid].rx_stats;
 }
@@ -51,7 +51,7 @@ ind_ovs_rx_vlan_stats_select(uint16_t vlan_vid)
 struct ind_ovs_flow_stats *
 ind_ovs_tx_vlan_stats_select(uint16_t vlan_vid)
 {
-    AIM_ASSERT(vlan_vid < 1 || vlan_vid > 4095);
+    AIM_ASSERT(vlan_vid > 0 && vlan_vid < 4096);
 
     return &vcounters[vlan_vid].tx_stats;
 }
