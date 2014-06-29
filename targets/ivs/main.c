@@ -92,6 +92,7 @@ static enum loglevel {
 static biglist_t *controllers = NULL;
 static biglist_t *listeners = NULL;
 static biglist_t *interfaces = NULL;
+static biglist_t *uplinks = NULL;
 static uint64_t dpid = 0;
 static int use_syslog = 0;
 static char *datapath_name = "indigo";
@@ -172,6 +173,7 @@ parse_options(int argc, char **argv)
             {"pipeline",    optional_argument, 0,  OPT_PIPELINE },
             {"dpid",        required_argument, 0,  OPT_DPID },
             {"syslog",      no_argument,       0,  OPT_SYSLOG },
+            {"uplink",      required_argument, 0,  OPT_DPID },
             {"help",        no_argument,       0,  'h' },
             {"version",     no_argument,       0,  OPT_VERSION },
             /* Undocumented options */
@@ -182,7 +184,7 @@ parse_options(int argc, char **argv)
             {0,             0,                 0,  0 }
         };
 
-        int c = getopt_long(argc, argv, "vtl:i:c:f:hV:",
+        int c = getopt_long(argc, argv, "vtl:i:u:c:f:hV:",
                             long_options, &option_index);
         if (c == -1) {
             break;
@@ -207,6 +209,10 @@ parse_options(int argc, char **argv)
 
         case 'i':
             interfaces = biglist_append(interfaces, optarg);
+            break;
+
+        case 'u':
+            uplinks = biglist_append(uplinks, optarg);
             break;
 
         case 'f':
@@ -466,18 +472,34 @@ aim_main(int argc, char* argv[])
         return 1;
     }
 
+    of_port_no_t port_no = 1;
+
+    /* Add uplinks from command line */
+    {
+        biglist_t *element;
+        char *str;
+        BIGLIST_FOREACH_DATA(element, uplinks, char *, str) {
+            AIM_LOG_MSG("Adding uplink %s (port %d)", str, port_no);
+            if (indigo_port_interface_add(str, port_no, NULL)) {
+                AIM_LOG_FATAL("Failed to add uplink %s", str);
+                return 1;
+            }
+            ind_ovs_uplink_add(port_no);
+            port_no++;
+        }
+    }
+
     /* Add interfaces from command line */
     {
         biglist_t *element;
         char *str;
-        int index = 1;
         BIGLIST_FOREACH_DATA(element, interfaces, char *, str) {
-            AIM_LOG_MSG("Adding interface %s (port %d)", str, index);
-            if (indigo_port_interface_add(str, index, NULL)) {
+            AIM_LOG_MSG("Adding interface %s (port %d)", str, port_no);
+            if (indigo_port_interface_add(str, port_no, NULL)) {
                 AIM_LOG_FATAL("Failed to add interface %s", str);
                 return 1;
             }
-            index++;
+            port_no++;
         }
     }
 

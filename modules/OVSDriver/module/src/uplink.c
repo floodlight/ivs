@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *        Copyright 2013, Big Switch Networks, Inc.
+ *        Copyright 2014, Big Switch Networks, Inc.
  *
  * Licensed under the Eclipse Public License, Version 1.0 (the
  * "License"); you may not use this file except in compliance
@@ -17,14 +17,10 @@
  *
  ****************************************************************/
 
-#ifndef __OVSDRIVER_H__
-#define __OVSDRIVER_H__
+#include "ovs_driver_int.h"
+#include "ovsdriver_log.h"
 
-struct xbuf;
-
-indigo_error_t ind_ovs_init(const char *datapath_name);
-void ind_ovs_finish(void);
-
-void ind_ovs_uplink_add(of_port_no_t port_no);
-
-#endif
+void
+ind_ovs_uplink_add(of_port_no_t port_no)
+{
+}
