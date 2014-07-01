@@ -72,6 +72,9 @@ ind_ovs_dump_dp_attr(const struct nlattr *attr)
     leaf(OVS_DP_ATTR_STATS, struct ovs_dp_stats,
          "hit=%"PRIu64" miss=%"PRIu64" lost=%"PRIu64" flows=%"PRIu64,
          x->n_hit, x->n_missed, x->n_lost, x->n_flows);
+    leaf(OVS_DP_ATTR_MEGAFLOW_STATS, struct ovs_dp_megaflow_stats,
+         "n_mask_hit=%"PRIu64" n_masks=%u", x->n_mask_hit, x->n_masks);
+    unimplemented(OVS_DP_ATTR_USER_FEATURES);
     default: ind_ovs_dump_unknown_attr(attr);
     }
 }
@@ -106,6 +109,7 @@ ind_ovs_vport_type_str(uint32_t type)
     case OVS_VPORT_TYPE_NETDEV: return "netdev";
     case OVS_VPORT_TYPE_INTERNAL: return "internal";
     case OVS_VPORT_TYPE_GRE: return "gre";
+    case OVS_VPORT_TYPE_VXLAN: return "vxlan";
     case OVS_VPORT_TYPE_GRE64: return "gre64";
     default: return "unknown";
     }
@@ -182,8 +186,6 @@ ind_ovs_dump_key_attr(const struct nlattr *attr)
         }
         leaf(OVS_KEY_ATTR_TCP, struct ovs_key_tcp,
              "src=%hu dst=%hu", ntohs(x->tcp_src), ntohs(x->tcp_dst));
-        leaf(OVS_KEY_ATTR_TCP_FLAGS, uint16_t,
-             "flags=%#x", ntohs(*x));
         leaf(OVS_KEY_ATTR_UDP, struct ovs_key_udp,
              "src=%hu dst=%hu", ntohs(x->udp_src), ntohs(x->udp_dst));
         leaf(OVS_KEY_ATTR_ICMP, struct ovs_key_icmp,
@@ -197,7 +199,21 @@ ind_ovs_dump_key_attr(const struct nlattr *attr)
              VALUE_IPV4((uint8_t *)&x->arp_tip),
              VALUE_MAC(x->arp_sha),
              VALUE_MAC(x->arp_tha));
-        unimplemented(OVS_KEY_ATTR_ND);
+        case OVS_KEY_ATTR_ND: {
+            struct ovs_key_nd *x = nla_data(attr);
+            char target[INET6_ADDRSTRLEN];
+            inet_ntop(AF_INET6, x->nd_target, target, INET6_ADDRSTRLEN);
+            output("OVS_KEY_ATTR_ND: target=%s sll="FORMAT_MAC" tll="FORMAT_MAC,
+                   target, VALUE_MAC(x->nd_sll), VALUE_MAC(x->nd_tll));
+            break;
+        }
+        leaf(OVS_KEY_ATTR_SKB_MARK, uint32_t, "%#x", *x);
+        leaf(OVS_KEY_ATTR_SCTP, struct ovs_key_sctp,
+             "src=%hu dst=%hu", ntohs(x->sctp_src), ntohs(x->sctp_dst));
+        leaf(OVS_KEY_ATTR_TCP_FLAGS, uint16_t,
+             "flags=%#x", ntohs(*x));
+        leaf(OVS_KEY_ATTR_DP_HASH, uint32_t, "%#x", *x);
+        leaf(OVS_KEY_ATTR_RECIRC_ID, uint32_t, "%#x", *x);
         default: ind_ovs_dump_unknown_attr(attr);
     }
 }
@@ -298,6 +314,13 @@ ind_ovs_dump_action_attr(const struct nlattr *attr)
             ind_ovs_dump_nested(attr, ind_ovs_dump_sample_attr);
             nest_end();
             break;
+
+        leaf(OVS_ACTION_ATTR_PUSH_MPLS, struct ovs_action_push_mpls,
+             "lse=%u ethertype=%#x", ntohl(x->mpls_lse), ntohs(x->mpls_ethertype));
+        leaf(OVS_ACTION_ATTR_POP_MPLS, uint16_t, "ethertype=%#x", ntohs(*x));
+        leaf(OVS_ACTION_ATTR_RECIRC, uint32_t, "recirc_id=%u", *x);
+        leaf(OVS_ACTION_ATTR_HASH, struct ovs_action_hash,
+             "alg=%u basis=%#x", x->hash_alg, x->hash_basis);
 
         default: ind_ovs_dump_unknown_attr(attr);
     }
