@@ -22,7 +22,6 @@
 #include <arpa/inet.h>
 
 #include <ivs/ivs.h>
-#include <ivs/actions.h>
 #include <loci/loci.h>
 
 #define AIM_LOG_MODULE_NAME pipeline
@@ -121,30 +120,9 @@ pipeline_list(of_desc_str_t **ret_pipelines, int *num_pipelines)
 
 indigo_error_t
 pipeline_process(struct ind_ovs_parsed_key *key,
-                 struct pipeline_result *result)
+                 struct xbuf *stats,
+                 struct action_context *actx)
 {
     AIM_TRUE_OR_DIE(current_pipeline != NULL);
-    return current_pipeline->ops->process(key, result);
-}
-
-void
-pipeline_result_init(struct pipeline_result *result)
-{
-    xbuf_init(&result->actions);
-    xbuf_init(&result->stats);
-}
-
-/* Reinitialize without reallocating memory */
-void
-pipeline_result_reset(struct pipeline_result *result)
-{
-    xbuf_reset(&result->actions);
-    xbuf_reset(&result->stats);
-}
-
-void
-pipeline_result_cleanup(struct pipeline_result *result)
-{
-    xbuf_cleanup(&result->actions);
-    xbuf_cleanup(&result->stats);
+    return current_pipeline->ops->process(key, stats, actx);
 }

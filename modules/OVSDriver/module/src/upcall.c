@@ -51,7 +51,7 @@ struct ind_ovs_upcall_thread {
     int epfd;
 
     /* Cached here so we don't need to reallocate it every time */
-    struct pipeline_result result;
+    struct xbuf stats;
 
     /* Preallocated messages used by the upcall thread for send and recv. */
     struct nl_msg *msgs[NUM_UPCALL_BUFFERS];
@@ -250,15 +250,22 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key(key, &pkey);
 
-    struct pipeline_result *result = &thread->result;
-    pipeline_result_reset(result);
-    indigo_error_t err = pipeline_process(&pkey, result);
+    xbuf_reset(&thread->stats);
+
+    struct nlattr *actions = nla_nest_start(msg, OVS_PACKET_ATTR_ACTIONS);
+
+    struct action_context actx;
+    action_context_init(&actx, &pkey, msg);
+
+    indigo_error_t err = pipeline_process(&pkey, &thread->stats, &actx);
     if (err < 0) {
         return;
     }
 
-    struct ind_ovs_flow_stats **stats_ptrs = xbuf_data(&result->stats);
-    int num_stats_ptrs = xbuf_length(&result->stats) / sizeof(void *);
+    ind_ovs_nla_nest_end(msg, actions);
+
+    struct ind_ovs_flow_stats **stats_ptrs = xbuf_data(&thread->stats);
+    int num_stats_ptrs = xbuf_length(&thread->stats) / sizeof(void *);
     int i;
     for (i = 0; i < num_stats_ptrs; i++) {
         struct ind_ovs_flow_stats *stats = stats_ptrs[i];
@@ -266,33 +273,8 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
         __sync_fetch_and_add(&stats->bytes, nla_len(packet));
     }
 
-    /* Check for a single controller action */
-    {
-        uint32_t actions_length = xbuf_length(&result->actions);
-        struct nlattr *first_action = xbuf_data(&result->actions);
-        if (actions_length >= NLA_HDRLEN &&
-                actions_length == NLA_ALIGN(first_action->nla_len) &&
-                first_action->nla_type == IND_OVS_ACTION_CONTROLLER) {
-            /*
-             * The only action is sending the packet to the controller.
-             * It's wasteful to send it all the way through the kernel
-             * to be received as another upcall, so request a pktin
-             * directly here.
-             */
-            uint64_t userdata = *XBUF_PAYLOAD(first_action, uint64_t);
-            ind_ovs_upcall_request_pktin(pkey.in_port, port, packet, key,
-                                         IVS_PKTIN_REASON(userdata),
-                                         IVS_PKTIN_METADATA(userdata));
-            return;
-        }
-    }
-
     /* Reuse the incoming message for the packet execute */
     gnlh->cmd = OVS_PACKET_CMD_EXECUTE;
-
-    struct nlattr *actions = nla_nest_start(msg, OVS_PACKET_ATTR_ACTIONS);
-    ind_ovs_translate_actions(&pkey, &result->actions, msg);
-    ind_ovs_nla_nest_end(msg, actions);
 
     /* Don't send the packet back out if it would be dropped. */
     if (nla_len(actions) > 0) {
@@ -487,7 +469,7 @@ ind_ovs_upcall_init(void)
             abort();
         }
 
-        pipeline_result_init(&thread->result);
+        xbuf_init(&thread->stats);
 
         for (j = 0; j < NUM_UPCALL_BUFFERS; j++) {
             thread->msgs[j] = nlmsg_alloc();
@@ -531,7 +513,7 @@ ind_ovs_upcall_finish(void)
         struct ind_ovs_upcall_thread *thread = ind_ovs_upcall_threads[i];
         pthread_join(thread->pthread, NULL);
         close(thread->epfd);
-        pipeline_result_cleanup(&thread->result);
+        xbuf_cleanup(&thread->stats);
         for (j = 0; j < NUM_UPCALL_BUFFERS; j++) {
             nlmsg_free(thread->msgs[j]);
         }

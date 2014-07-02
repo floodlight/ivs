@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *        Copyright 2013, Big Switch Networks, Inc.
+ *        Copyright 2014, Big Switch Networks, Inc.
  *
  * Licensed under the Eclipse Public License, Version 1.0 (the
  * "License"); you may not use this file except in compliance
@@ -17,6 +17,15 @@
  *
  ****************************************************************/
 
+#ifndef PIPELINE_STANDARD_ACTION_H
+#define PIPELINE_STANDARD_ACTION_H
+
+#include <ivs/ivs.h>
+#include <xbuf/xbuf.h>
+#include <loci/loci.h>
+#include <indigo/error.h>
+#include <action/action.h>
+
 /*
  * IVS actions
  *
@@ -24,9 +33,6 @@
  * than the LOCI of_list_action_t. It also helps to abstract some of the
  * differences between OpenFlow 1.0 and 1.3.
  */
-
-#ifndef OVSDRIVER_ACTIONS_H
-#define OVSDRIVER_ACTIONS_H
 
 enum {
     IND_OVS_ACTION_OUTPUT, /* of_port_no_t */
@@ -55,5 +61,11 @@ enum {
     IND_OVS_ACTION_SET_IPV6_SRC,    /* of_ipv6_t */
     IND_OVS_ACTION_SET_IPV6_FLABEL, /* uint32_t */
 };
+
+/* Translate OpenFlow actions into IVS actions */
+indigo_error_t pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf, bool table_miss);
+
+/* Translate IVS actions into OVS actions */
+void pipeline_standard_translate_actions(struct action_context *ctx, struct xbuf *actions);
 
 #endif

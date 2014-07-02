@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *        Copyright 2013, Big Switch Networks, Inc.
+ *        Copyright 2014, Big Switch Networks, Inc.
  *
  * Licensed under the Eclipse Public License, Version 1.0 (the
  * "License"); you may not use this file except in compliance
@@ -23,133 +23,133 @@
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC optimize (4)
 #endif
-#include "ovs_driver_int.h"
-#include "xbuf/xbuf.h"
+#include "action.h"
 #include <byteswap.h>
 #include <linux/if_ether.h>
 #include <action/action.h>
 
-void
-ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey,
-                          struct xbuf *xbuf, struct nl_msg *msg)
-{
-    struct action_context ctx;
-    action_context_init(&ctx, pkey, msg);
+#define AIM_LOG_MODULE_NAME pipeline_standard
+#include <AIM/aim_log.h>
 
+void
+pipeline_standard_translate_actions(
+    struct action_context *ctx,
+    struct xbuf *xbuf)
+{
     struct nlattr *attr;
     XBUF_FOREACH(xbuf_data(xbuf), xbuf_length(xbuf), attr) {
         switch (attr->nla_type) {
         /* Output actions */
         case IND_OVS_ACTION_CONTROLLER:
-            action_controller(&ctx, *XBUF_PAYLOAD(attr, uint64_t));
+            action_controller(ctx, *XBUF_PAYLOAD(attr, uint64_t));
             break;
         case IND_OVS_ACTION_OUTPUT:
-            action_output(&ctx, *XBUF_PAYLOAD(attr, uint32_t));
+            action_output(ctx, *XBUF_PAYLOAD(attr, uint32_t));
             break;
         case IND_OVS_ACTION_LOCAL:
-            action_output_local(&ctx);
+            action_output_local(ctx);
             break;
         case IND_OVS_ACTION_IN_PORT:
-            action_output_in_port(&ctx);
+            action_output_in_port(ctx);
             break;
 
         /* Ethernet actions */
         case IND_OVS_ACTION_SET_ETH_DST:
-            action_set_eth_dst(&ctx, *XBUF_PAYLOAD(attr, of_mac_addr_t));
+            action_set_eth_dst(ctx, *XBUF_PAYLOAD(attr, of_mac_addr_t));
             break;
         case IND_OVS_ACTION_SET_ETH_SRC:
-            action_set_eth_src(&ctx, *XBUF_PAYLOAD(attr, of_mac_addr_t));
+            action_set_eth_src(ctx, *XBUF_PAYLOAD(attr, of_mac_addr_t));
             break;
 
         /* VLAN actions */
         case IND_OVS_ACTION_SET_VLAN_VID:
-            action_set_vlan_vid(&ctx, *XBUF_PAYLOAD(attr, uint16_t));
+            action_set_vlan_vid(ctx, *XBUF_PAYLOAD(attr, uint16_t));
             break;
         case IND_OVS_ACTION_SET_VLAN_PCP:
-            action_set_vlan_pcp(&ctx, *XBUF_PAYLOAD(attr, uint8_t));
+            action_set_vlan_pcp(ctx, *XBUF_PAYLOAD(attr, uint8_t));
             break;
         case IND_OVS_ACTION_POP_VLAN:
-            action_pop_vlan(&ctx);
+            action_pop_vlan(ctx);
             break;
         case IND_OVS_ACTION_PUSH_VLAN:
-            action_push_vlan(&ctx);
+            action_push_vlan(ctx);
             break;
 
         /* IPv4 actions */
         case IND_OVS_ACTION_SET_IPV4_DST:
-            action_set_ipv4_dst(&ctx, *XBUF_PAYLOAD(attr, uint32_t));
+            action_set_ipv4_dst(ctx, *XBUF_PAYLOAD(attr, uint32_t));
             break;
         case IND_OVS_ACTION_SET_IPV4_SRC:
-            action_set_ipv4_src(&ctx, *XBUF_PAYLOAD(attr, uint32_t));
+            action_set_ipv4_src(ctx, *XBUF_PAYLOAD(attr, uint32_t));
             break;
 
         /* IPv6 actions */
         case IND_OVS_ACTION_SET_IPV6_DST:
-            action_set_ipv6_dst(&ctx, *XBUF_PAYLOAD(attr, of_ipv6_t));
+            action_set_ipv6_dst(ctx, *XBUF_PAYLOAD(attr, of_ipv6_t));
             break;
         case IND_OVS_ACTION_SET_IPV6_SRC:
-            action_set_ipv6_src(&ctx, *XBUF_PAYLOAD(attr, of_ipv6_t));
+            action_set_ipv6_src(ctx, *XBUF_PAYLOAD(attr, of_ipv6_t));
             break;
         case IND_OVS_ACTION_SET_IPV6_FLABEL:
-            action_set_ipv6_flabel(&ctx, *XBUF_PAYLOAD(attr, uint32_t));
+            action_set_ipv6_flabel(ctx, *XBUF_PAYLOAD(attr, uint32_t));
             break;
 
         /* Generic IP actions */
         case IND_OVS_ACTION_SET_IP_DSCP:
-            action_set_ipv4_dscp(&ctx, *XBUF_PAYLOAD(attr, uint8_t));
-            action_set_ipv6_dscp(&ctx, *XBUF_PAYLOAD(attr, uint8_t));
+            action_set_ipv4_dscp(ctx, *XBUF_PAYLOAD(attr, uint8_t));
+            action_set_ipv6_dscp(ctx, *XBUF_PAYLOAD(attr, uint8_t));
             break;
         case IND_OVS_ACTION_SET_IP_ECN:
-            action_set_ipv4_ecn(&ctx, *XBUF_PAYLOAD(attr, uint8_t));
-            action_set_ipv6_ecn(&ctx, *XBUF_PAYLOAD(attr, uint8_t));
+            action_set_ipv4_ecn(ctx, *XBUF_PAYLOAD(attr, uint8_t));
+            action_set_ipv6_ecn(ctx, *XBUF_PAYLOAD(attr, uint8_t));
             break;
         case IND_OVS_ACTION_DEC_NW_TTL:
             /* Special cased because it can drop the packet */
-            if (ATTR_BITMAP_TEST(ctx.current_key.populated, OVS_KEY_ATTR_IPV4)) {
-                ATTR_BITMAP_SET(ctx.modified_attrs, OVS_KEY_ATTR_IPV4);
-                if (ctx.current_key.ipv4.ipv4_ttl == 0
-                    || --ctx.current_key.ipv4.ipv4_ttl == 0) {
+            if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV4)) {
+                ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV4);
+                if (ctx->current_key.ipv4.ipv4_ttl == 0
+                    || --ctx->current_key.ipv4.ipv4_ttl == 0) {
                     return;
                 }
             }
 
-            if (ATTR_BITMAP_TEST(ctx.current_key.populated, OVS_KEY_ATTR_IPV6)) {
-                ATTR_BITMAP_SET(ctx.modified_attrs, OVS_KEY_ATTR_IPV6);
-                if (ctx.current_key.ipv6.ipv6_hlimit == 0
-                    || --ctx.current_key.ipv6.ipv6_hlimit == 0) {
+            if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV6)) {
+                ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV6);
+                if (ctx->current_key.ipv6.ipv6_hlimit == 0
+                    || --ctx->current_key.ipv6.ipv6_hlimit == 0) {
                     return;
                 }
             }
             break;
         case IND_OVS_ACTION_SET_NW_TTL:
-            action_set_ipv4_ttl(&ctx, *XBUF_PAYLOAD(attr, uint8_t));
-            action_set_ipv6_ttl(&ctx, *XBUF_PAYLOAD(attr, uint8_t));
+            action_set_ipv4_ttl(ctx, *XBUF_PAYLOAD(attr, uint8_t));
+            action_set_ipv6_ttl(ctx, *XBUF_PAYLOAD(attr, uint8_t));
             break;
 
         /* TCP actions */
         case IND_OVS_ACTION_SET_TCP_DST:
-            action_set_tcp_dst(&ctx, *XBUF_PAYLOAD(attr, uint16_t));
+            action_set_tcp_dst(ctx, *XBUF_PAYLOAD(attr, uint16_t));
             break;
         case IND_OVS_ACTION_SET_TCP_SRC:
-            action_set_tcp_src(&ctx, *XBUF_PAYLOAD(attr, uint16_t));
+            action_set_tcp_src(ctx, *XBUF_PAYLOAD(attr, uint16_t));
             break;
 
         /* UDP actions */
         case IND_OVS_ACTION_SET_UDP_DST:
-            action_set_udp_dst(&ctx, *XBUF_PAYLOAD(attr, uint16_t));
+            action_set_udp_dst(ctx, *XBUF_PAYLOAD(attr, uint16_t));
             break;
         case IND_OVS_ACTION_SET_UDP_SRC:
-            action_set_udp_src(&ctx, *XBUF_PAYLOAD(attr, uint16_t));
+            action_set_udp_src(ctx, *XBUF_PAYLOAD(attr, uint16_t));
             break;
 
         /* Generic L4 actions */
         case IND_OVS_ACTION_SET_TP_DST:
-            action_set_tcp_dst(&ctx, *XBUF_PAYLOAD(attr, uint16_t));
-            action_set_udp_dst(&ctx, *XBUF_PAYLOAD(attr, uint16_t));
+            action_set_tcp_dst(ctx, *XBUF_PAYLOAD(attr, uint16_t));
+            action_set_udp_dst(ctx, *XBUF_PAYLOAD(attr, uint16_t));
             break;
         case IND_OVS_ACTION_SET_TP_SRC:
-            action_set_tcp_src(&ctx, *XBUF_PAYLOAD(attr, uint16_t));
-            action_set_udp_src(&ctx, *XBUF_PAYLOAD(attr, uint16_t));
+            action_set_tcp_src(ctx, *XBUF_PAYLOAD(attr, uint16_t));
+            action_set_udp_src(ctx, *XBUF_PAYLOAD(attr, uint16_t));
             break;
 
         default:
@@ -188,13 +188,13 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
                     break;
                 }
                 case OF_PORT_DEST_ALL:
-                    LOG_ERROR("unsupported output port OFPP_ALL");
+                    AIM_LOG_ERROR("unsupported output port OFPP_ALL");
                     return INDIGO_ERROR_COMPAT;
                 case OF_PORT_DEST_FLOOD:
-                    LOG_ERROR("unsupported output port OFPP_FLOOD");
+                    AIM_LOG_ERROR("unsupported output port OFPP_FLOOD");
                     return INDIGO_ERROR_COMPAT;
                 case OF_PORT_DEST_USE_TABLE:
-                    LOG_ERROR("unsupported output port OFPP_TABLE");
+                    AIM_LOG_ERROR("unsupported output port OFPP_TABLE");
                     return INDIGO_ERROR_COMPAT;
                 case OF_PORT_DEST_LOCAL:
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_LOCAL, NULL, 0);
@@ -203,15 +203,10 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_IN_PORT, NULL, 0);
                     break;
                 case OF_PORT_DEST_NORMAL:
-                    LOG_ERROR("unsupported output port OFPP_NORMAL");
+                    AIM_LOG_ERROR("unsupported output port OFPP_NORMAL");
                     return INDIGO_ERROR_COMPAT;
                 default: {
-                    if (port_no < IND_OVS_MAX_PORTS) {
-                        xbuf_append_attr(xbuf, IND_OVS_ACTION_OUTPUT, &port_no, sizeof(port_no));
-                    } else {
-                        LOG_ERROR("invalid output port %u", port_no);
-                        return INDIGO_ERROR_COMPAT;
-                    }
+                    xbuf_append_attr(xbuf, IND_OVS_ACTION_OUTPUT, &port_no, sizeof(port_no));
                     break;
                 }
             }
@@ -262,7 +257,7 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
                     of_oxm_ip_dscp_value_get(&oxm.ip_dscp, &ip_dscp);
 
                     if (ip_dscp > ((uint8_t)IP_DSCP_MASK >> 2)) {
-                        LOG_ERROR("invalid dscp %d in action %s", ip_dscp,
+                        AIM_LOG_ERROR("invalid dscp %d in action %s", ip_dscp,
                                 of_object_id_str[act.header.object_id]);
                         return INDIGO_ERROR_COMPAT;
                     }
@@ -276,7 +271,7 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
                     of_oxm_ip_ecn_value_get(&oxm.ip_ecn, &ip_ecn);
 
                     if (ip_ecn > IP_ECN_MASK) {
-                        LOG_ERROR("invalid ecn %d in action %s", ip_ecn,
+                        AIM_LOG_ERROR("invalid ecn %d in action %s", ip_ecn,
                                 of_object_id_str[act.header.object_id]);
                         return INDIGO_ERROR_COMPAT;
                     }
@@ -301,7 +296,7 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
                     of_oxm_ipv6_flabel_value_get(&oxm.ipv6_flabel, &flabel);
 
                     if (flabel > IPV6_FLABEL_MASK) {
-                        LOG_ERROR("invalid flabel 0x%04x in action %s", flabel,
+                        AIM_LOG_ERROR("invalid flabel 0x%04x in action %s", flabel,
                                 of_object_id_str[act.header.object_id]);
                         return INDIGO_ERROR_COMPAT;
                     }
@@ -334,7 +329,7 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
                     break;
                 }
                 default:
-                    LOG_ERROR("unsupported set-field oxm %s", of_object_id_str[oxm.header.object_id]);
+                    AIM_LOG_ERROR("unsupported set-field oxm %s", of_object_id_str[oxm.header.object_id]);
                     return INDIGO_ERROR_COMPAT;
             }
             break;
@@ -403,7 +398,7 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
             of_action_push_vlan_ethertype_get(&act.push_vlan, &eth_type);
 
             if (eth_type != ETH_P_8021Q) {
-                LOG_ERROR("unsupported eth_type 0x%04x in action %s", eth_type,
+                AIM_LOG_ERROR("unsupported eth_type 0x%04x in action %s", eth_type,
                            of_object_id_str[act.header.object_id]);
                 return INDIGO_ERROR_COMPAT;
             }
@@ -423,7 +418,7 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
             break;
         }
         default:
-            LOG_ERROR("unsupported action %s", of_object_id_str[act.header.object_id]);
+            AIM_LOG_ERROR("unsupported action %s", of_object_id_str[act.header.object_id]);
             return INDIGO_ERROR_COMPAT;
         }
     }
