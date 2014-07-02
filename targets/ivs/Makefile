@@ -43,7 +43,7 @@ include $(BUILDER)/lib.mk
 DEPENDMODULES := SocketManager OFConnectionManager OFStateManager OVSDriver \
                  Configuration loci indigo BigList BigHash ivs_common pipeline pipeline_standard tcam xbuf \
                  lldpa lacpa arpa router_ip_table icmpa dhcpra PPE IOF \
-                 AIM murmur cjson OS uCli debug_counter timer_wheel bloom_filter BigRing minimatch
+                 AIM murmur cjson OS uCli debug_counter timer_wheel bloom_filter BigRing minimatch action
 
 ifdef USE_LUAJIT
 DEPENDMODULES += luajit

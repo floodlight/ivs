@@ -31,11 +31,8 @@
 enum {
     IND_OVS_ACTION_OUTPUT, /* of_port_no_t */
     IND_OVS_ACTION_CONTROLLER, /* uint64_t userdata (reason in bottom 8 bits, metadata in top 56 bits) */
-    IND_OVS_ACTION_FLOOD,
-    IND_OVS_ACTION_ALL,
     IND_OVS_ACTION_LOCAL,
     IND_OVS_ACTION_IN_PORT,
-    IND_OVS_ACTION_NORMAL,
     IND_OVS_ACTION_SET_ETH_DST, /* of_mac_addr_t */
     IND_OVS_ACTION_SET_ETH_SRC, /* of_mac_addr_t */
     IND_OVS_ACTION_SET_IPV4_DST, /* uint32_t */
@@ -54,18 +51,9 @@ enum {
     IND_OVS_ACTION_PUSH_VLAN,    /* uint16_t */
     IND_OVS_ACTION_DEC_NW_TTL,
     IND_OVS_ACTION_SET_NW_TTL,   /* uint8_t */
-    IND_OVS_ACTION_SET_TUNNEL_DST, /* uint32_t */
     IND_OVS_ACTION_SET_IPV6_DST,    /* of_ipv6_t */
     IND_OVS_ACTION_SET_IPV6_SRC,    /* of_ipv6_t */
     IND_OVS_ACTION_SET_IPV6_FLABEL, /* uint32_t */
-    IND_OVS_ACTION_GROUP,           /* uint32_t */
-    IND_OVS_ACTION_SET_LAG_ID,      /* uint32_t */
-    IND_OVS_ACTION_SET_VRF,         /* uint32_t */
-    IND_OVS_ACTION_SET_L3_INTERFACE_CLASS_ID,  /* uint32_t */
-    IND_OVS_ACTION_SET_L3_SRC_CLASS_ID,     /* uint32_t */
-    IND_OVS_ACTION_SET_L3_DST_CLASS_ID,     /* uint32_t */
-    IND_OVS_ACTION_SET_GLOBAL_VRF_ALLOWED,  /* uint8_t */
-    IND_OVS_ACTION_SET_EGR_PORT_GROUP_ID,   /* uint32_t */
 };
 
 #endif

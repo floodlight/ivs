@@ -1,6 +1,6 @@
 ################################################################
 #
-#        Copyright 2013, Big Switch Networks, Inc.
+#        Copyright 2014, Big Switch Networks, Inc.
 #
 # Licensed under the Eclipse Public License, Version 1.0 (the
 # "License"); you may not use this file except in compliance
@@ -17,14 +17,6 @@
 #
 ################################################################
 
-BASEDIR := $(dir $(lastword $(MAKEFILE_LIST)))
-OVSDriver_BASEDIR := $(BASEDIR)/OVSDriver
-flowtable_BASEDIR := $(BASEDIR)/flowtable
-l2table_BASEDIR := $(BASEDIR)/l2table
-luajit_BASEDIR := $(BASEDIR)/luajit
-xbuf_BASEDIR := $(BASEDIR)/xbuf
-pipeline_BASEDIR := $(BASEDIR)/pipeline
-pipeline_standard_BASEDIR := $(BASEDIR)/pipeline_standard
-ivs_common_BASEDIR := $(BASEDIR)/ivs
-tcam_BASEDIR := $(BASEDIR)/tcam
-action_BASEDIR := $(BASEDIR)/action
+LIBRARY := action
+$(LIBRARY)_SUBDIR := $(dir $(lastword $(MAKEFILE_LIST)))
+include $(BUILDER)/lib.mk
