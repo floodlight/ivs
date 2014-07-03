@@ -786,6 +786,8 @@ ind_ovs_port_init(void)
         LOG_ERROR("failed to allocate netlink callbacks");
         abort();
     }
+
+    aim_ratelimiter_init(&nl_cache_refill_limiter, 1000*1000, 0, NULL);
 }
 
 void
