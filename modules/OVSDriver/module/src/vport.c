@@ -42,6 +42,17 @@ static struct nl_cb *netlink_callbacks;
 static indigo_error_t port_status_notify(uint32_t port_no, unsigned reason);
 static void port_desc_set(of_port_desc_t *of_port_desc, of_port_no_t of_port_num);
 
+aim_ratelimiter_t nl_cache_refill_limiter;
+
+static void
+ind_ovs_update_link_stats()
+{
+    if (aim_ratelimiter_limit(&nl_cache_refill_limiter, monotonic_us()) == 0) {
+        /* Refresh statistics */
+        nl_cache_refill(route_cache_sock, link_cache);
+    }
+}
+
 struct ind_ovs_port *
 ind_ovs_port_lookup(of_port_no_t port_no)
 {
@@ -434,8 +445,7 @@ indigo_port_extended_stats_get(
         return;
     }
 
-    /* Refresh statistics */
-    nl_cache_refill(route_cache_sock, link_cache);
+    ind_ovs_update_link_stats();
 
     struct rtnl_link *link;
     if ((link = rtnl_link_get_by_name(link_cache, port->ifname))) {
@@ -479,8 +489,7 @@ indigo_port_stats_get(
     of_port_stats_request_port_no_get(port_stats_request, &req_of_port_num);
     int dump_all = req_of_port_num == OF_PORT_DEST_NONE_BY_VERSION(port_stats_request->version);
 
-    /* Refresh statistics */
-    nl_cache_refill(route_cache_sock, link_cache);
+    ind_ovs_update_link_stats();
 
     struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_GET);
     if (dump_all) {
