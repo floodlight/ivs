@@ -418,6 +418,46 @@ port_stats_iterator(struct nl_msg *msg, void *arg)
     return NL_OK;
 }
 
+void
+indigo_port_extended_stats_get(
+    of_port_no_t port_no,
+    indigo_fi_port_stats_t *port_stats)
+{
+    AIM_ASSERT(port_stats != NULL);
+
+    if (port_no == OF_PORT_DEST_LOCAL) {
+        return;
+    }
+
+    struct ind_ovs_port *port = ind_ovs_port_lookup(port_no);
+    if (port == NULL) {
+        return;
+    }
+
+    /* Refresh statistics */
+    nl_cache_refill(route_cache_sock, link_cache);
+
+    struct rtnl_link *link;
+    if ((link = rtnl_link_get_by_name(link_cache, port->ifname))) {
+        port_stats->rx_bytes = rtnl_link_get_stat(link, RTNL_LINK_RX_BYTES);
+        port_stats->rx_dropped = rtnl_link_get_stat(link, RTNL_LINK_RX_DROPPED);
+        port_stats->rx_errors = rtnl_link_get_stat(link, RTNL_LINK_RX_ERRORS);
+        port_stats->tx_bytes = rtnl_link_get_stat(link, RTNL_LINK_TX_BYTES);
+        port_stats->tx_dropped = rtnl_link_get_stat(link, RTNL_LINK_TX_DROPPED);
+        port_stats->tx_errors = rtnl_link_get_stat(link, RTNL_LINK_TX_ERRORS);
+        port_stats->rx_alignment_errors = rtnl_link_get_stat(link, RTNL_LINK_RX_FRAME_ERR);
+        port_stats->rx_crc_errors = rtnl_link_get_stat(link, RTNL_LINK_RX_CRC_ERR);
+        port_stats->tx_collisions = rtnl_link_get_stat(link, RTNL_LINK_COLLISIONS);
+        port_stats->rx_packets = rtnl_link_get_stat(link, RTNL_LINK_RX_PACKETS);
+        port_stats->tx_packets = rtnl_link_get_stat(link, RTNL_LINK_TX_PACKETS);
+        port_stats->rx_length_errors = rtnl_link_get_stat(link, RTNL_LINK_RX_LEN_ERR);
+        port_stats->rx_overflow_errors = rtnl_link_get_stat(link, RTNL_LINK_RX_OVER_ERR);
+        port_stats->tx_carrier_errors = rtnl_link_get_stat(link, RTNL_LINK_TX_CARRIER_ERR);
+
+        rtnl_link_put(link);
+    }
+}
+
 indigo_error_t
 indigo_port_stats_get(
     of_port_stats_request_t *port_stats_request,
