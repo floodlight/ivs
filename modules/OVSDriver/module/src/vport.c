@@ -41,6 +41,9 @@ static struct nl_cb *netlink_callbacks;
 
 static indigo_error_t port_status_notify(uint32_t port_no, unsigned reason);
 static void port_desc_set(of_port_desc_t *of_port_desc, of_port_no_t of_port_num);
+static void alloc_port_counters(struct ind_ovs_port_counters *pcounters);
+static void free_port_counters(struct ind_ovs_port_counters *pcounters);
+static uint64_t get_packet_stats(struct stats_handle *handle);
 
 aim_ratelimiter_t nl_cache_refill_limiter;
 
@@ -219,6 +222,7 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname, of_mac_addr_t mac_addr)
     aim_ratelimiter_init(&port->pktin_limiter, PORT_PKTIN_INTERVAL, PORT_PKTIN_BURST_SIZE, NULL);
     pthread_mutex_init(&port->quiesce_lock, NULL);
     pthread_cond_init(&port->quiesce_cvar, NULL);
+    alloc_port_counters(&port->pcounters);
 
     port->notify_socket = ind_ovs_create_nlsock();
     if (port->notify_socket == NULL) {
@@ -286,6 +290,7 @@ cleanup_port:
     if (port->pktin_socket) {
         nl_socket_free(port->pktin_socket);
     }
+    free_port_counters(&port->pcounters);
     aim_free(port);
 }
 
@@ -329,6 +334,7 @@ ind_ovs_port_deleted(uint32_t port_no)
     nl_socket_free(port->pktin_socket);
     pthread_mutex_destroy(&port->quiesce_lock);
     pthread_cond_destroy(&port->quiesce_cvar);
+    free_port_counters(&port->pcounters);
     aim_free(port);
     ind_ovs_ports[port_no] = NULL;
     ind_ovs_fwd_write_unlock();
@@ -495,12 +501,12 @@ indigo_port_extended_stats_get(
 
         rtnl_link_put(link);
 
-        port_stats->rx_packets_unicast = port->pcounters.rx_unicast_stats.packets;
-        port_stats->rx_packets_broadcast = port->pcounters.rx_broadcast_stats.packets;
-        port_stats->rx_packets_multicast = port->pcounters.rx_multicast_stats.packets;
-        port_stats->tx_packets_unicast = port->pcounters.tx_unicast_stats.packets;
-        port_stats->tx_packets_broadcast = port->pcounters.tx_broadcast_stats.packets;
-        port_stats->tx_packets_multicast = port->pcounters.tx_multicast_stats.packets;
+        port_stats->rx_packets_unicast = get_packet_stats(&port->pcounters.rx_unicast_stats_handle);
+        port_stats->rx_packets_broadcast = get_packet_stats(&port->pcounters.rx_broadcast_stats_handle);
+        port_stats->rx_packets_multicast = get_packet_stats(&port->pcounters.rx_multicast_stats_handle);
+        port_stats->tx_packets_unicast = get_packet_stats(&port->pcounters.tx_unicast_stats_handle);
+        port_stats->tx_packets_broadcast = get_packet_stats(&port->pcounters.tx_broadcast_stats_handle);
+        port_stats->tx_packets_multicast = get_packet_stats(&port->pcounters.tx_multicast_stats_handle);
     }
 }
 
@@ -843,4 +849,34 @@ ind_ovs_port_stats_select(of_port_no_t port_no)
     }
 
     return &port->pcounters;
+}
+
+static void
+alloc_port_counters(struct ind_ovs_port_counters *pcounters)
+{
+    stats_alloc(&pcounters->rx_unicast_stats_handle);
+    stats_alloc(&pcounters->tx_unicast_stats_handle);
+    stats_alloc(&pcounters->rx_broadcast_stats_handle);
+    stats_alloc(&pcounters->tx_broadcast_stats_handle);
+    stats_alloc(&pcounters->rx_multicast_stats_handle);
+    stats_alloc(&pcounters->tx_multicast_stats_handle);
+}
+
+static void
+free_port_counters(struct ind_ovs_port_counters *pcounters)
+{
+    stats_free(&pcounters->rx_unicast_stats_handle);
+    stats_free(&pcounters->tx_unicast_stats_handle);
+    stats_free(&pcounters->rx_broadcast_stats_handle);
+    stats_free(&pcounters->tx_broadcast_stats_handle);
+    stats_free(&pcounters->rx_multicast_stats_handle);
+    stats_free(&pcounters->tx_multicast_stats_handle);
+}
+
+static uint64_t
+get_packet_stats(struct stats_handle *handle)
+{
+    struct stats stats;
+    stats_get(handle, &stats);
+    return stats.packets;
 }

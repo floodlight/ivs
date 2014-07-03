@@ -28,6 +28,7 @@
 #include <indigo/indigo.h>
 #include <xbuf/xbuf.h>
 #include <action/action.h>
+#include <stats/stats.h>
 
 struct ind_ovs_parsed_key;
 
@@ -77,9 +78,9 @@ void pipeline_list(of_desc_str_t **ret_pipelines, int *num_pipelines);
  * Send a packet through the pipeline.
  *
  * 'stats' should be an initialized, empty xbuf. It will be be filled with
- * pointers to struct ind_ovs_flow_stats. These stats objects may belong to
- * flows or tables (and in the future meters or groups). For example, every
- * table a packet matched in will have its matched_stats field added here.
+ * struct stats_handle. These stats objects may belong to flows or tables
+ * (and in the future meters or groups). For example, every table a packet
+ * matched in will have its matched_stats added here.
  *
  * 'actx' should be an initialized action_context.
  */
@@ -87,5 +88,17 @@ indigo_error_t
 pipeline_process(struct ind_ovs_parsed_key *key,
                  struct xbuf *stats,
                  struct action_context *actx);
+
+/*
+ * Convenience function to append a stats handle to an xbuf
+ *
+ * This is used by pipeline implementations to fill the stats xbuf passed to
+ * pipeline_process.
+ */
+static inline void
+pipeline_add_stats(struct xbuf *stats, struct stats_handle *stats_handle)
+{
+    xbuf_append(stats, stats_handle, sizeof(*stats_handle));
+}
 
 #endif

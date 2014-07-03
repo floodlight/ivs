@@ -29,6 +29,7 @@
 #include <xbuf/xbuf.h>
 #include <indigo/error.h>
 #include <loci/loci.h>
+#include <stats/stats.h>
 
 #define VLAN_CFI_BIT (1<<12)
 #define VLAN_TCI(vid, pcp) ( (((pcp) & 0x7) << 13) | ((vid) & 0xfff) )
@@ -55,20 +56,6 @@
 #define IVS_PKTIN_USERDATA(reason, metadata) (reason) | ((uint64_t)(metadata) << 8)
 #define IVS_PKTIN_REASON(userdata) (userdata) & 0xff
 #define IVS_PKTIN_METADATA(userdata) (userdata) >> 8
-
-struct ind_ovs_flow_stats {
-    uint64_t packets;
-    uint64_t bytes;
-};
-
-struct ind_ovs_port_counters {
-    struct ind_ovs_flow_stats rx_unicast_stats;
-    struct ind_ovs_flow_stats tx_unicast_stats;
-    struct ind_ovs_flow_stats rx_broadcast_stats;
-    struct ind_ovs_flow_stats tx_broadcast_stats;
-    struct ind_ovs_flow_stats rx_multicast_stats;
-    struct ind_ovs_flow_stats tx_multicast_stats;
-};
 
 /*
  * X-macro representation of the OVS key (nlattr type, key field, type).
@@ -132,6 +119,15 @@ struct ind_ovs_parsed_key {
     } tunnel;
 };
 
+struct ind_ovs_port_counters {
+    struct stats_handle rx_unicast_stats_handle;
+    struct stats_handle tx_unicast_stats_handle;
+    struct stats_handle rx_broadcast_stats_handle;
+    struct stats_handle tx_broadcast_stats_handle;
+    struct stats_handle rx_multicast_stats_handle;
+    struct stats_handle tx_multicast_stats_handle;
+};
+
 /*
  * Exported from OVSDriver for use by the pipeline
  */
@@ -142,9 +138,9 @@ void ind_ovs_fwd_write_lock();
 void ind_ovs_fwd_write_unlock();
 extern uint32_t ind_ovs_salt;
 indigo_error_t ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf, bool table_miss);
-struct ind_ovs_flow_stats * ind_ovs_rx_vlan_stats_select(uint16_t vlan_vid);
-struct ind_ovs_flow_stats * ind_ovs_tx_vlan_stats_select(uint16_t vlan_vid);
-struct ind_ovs_port_counters * ind_ovs_port_stats_select(of_port_no_t port_no);
+struct stats_handle *ind_ovs_rx_vlan_stats_select(uint16_t vlan_vid);
+struct stats_handle *ind_ovs_tx_vlan_stats_select(uint16_t vlan_vid);
+struct ind_ovs_port_counters *ind_ovs_port_stats_select(of_port_no_t port_no);
 uint32_t ind_ovs_port_lookup_netlink(of_port_no_t port_no);
 
 #endif

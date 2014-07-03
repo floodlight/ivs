@@ -21,8 +21,8 @@
 #include <indigo/forwarding.h>
 
 struct vlan_counters {
-    struct ind_ovs_flow_stats rx_stats;
-    struct ind_ovs_flow_stats tx_stats;
+    struct stats_handle rx_stats_handle;
+    struct stats_handle tx_stats_handle;
 };
 
 static struct vlan_counters vcounters[4096];
@@ -34,24 +34,28 @@ indigo_fwd_vlan_stats_get(uint16_t vlan_vid, indigo_fi_vlan_stats_t *vlan_stats)
 
     AIM_ASSERT(vlan_stats != NULL);
 
-    vlan_stats->rx_bytes = vcounters[vlan_vid].rx_stats.bytes;
-    vlan_stats->rx_packets = vcounters[vlan_vid].rx_stats.packets;
-    vlan_stats->tx_bytes = vcounters[vlan_vid].tx_stats.bytes;
-    vlan_stats->tx_packets = vcounters[vlan_vid].tx_stats.packets;
+    struct stats rx_stats, tx_stats;
+    stats_get(&vcounters[vlan_vid].rx_stats_handle, &rx_stats);
+    stats_get(&vcounters[vlan_vid].tx_stats_handle, &tx_stats);
+
+    vlan_stats->rx_bytes = rx_stats.bytes;
+    vlan_stats->rx_packets = rx_stats.packets;
+    vlan_stats->tx_bytes = tx_stats.bytes;
+    vlan_stats->tx_packets = tx_stats.packets;
 }
 
-struct ind_ovs_flow_stats *
+struct stats_handle *
 ind_ovs_rx_vlan_stats_select(uint16_t vlan_vid)
 {
     AIM_ASSERT(vlan_vid > 0 && vlan_vid < 4096);
 
-    return &vcounters[vlan_vid].rx_stats;
+    return &vcounters[vlan_vid].rx_stats_handle;
 }
 
-struct ind_ovs_flow_stats *
+struct stats_handle *
 ind_ovs_tx_vlan_stats_select(uint16_t vlan_vid)
 {
     AIM_ASSERT(vlan_vid > 0 && vlan_vid < 4096);
 
-    return &vcounters[vlan_vid].tx_stats;
+    return &vcounters[vlan_vid].tx_stats_handle;
 }

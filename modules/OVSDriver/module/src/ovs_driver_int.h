@@ -37,6 +37,7 @@
 #include "pipeline/pipeline.h"
 #include "tcam/tcam.h"
 #include "BigHash/bighash.h"
+#include <stats/stats.h>
 
 #define IND_OVS_MAX_PORTS 1024
 
@@ -130,20 +131,20 @@ struct ind_ovs_port {
 struct ind_ovs_kflow {
     struct list_links global_links; /* (global) kflows */
     struct list_links bucket_links; /* (global) kflow_buckets[] */
-    struct ind_ovs_flow_stats stats; /* periodically synchronized with the kernel */
+    struct stats stats; /* periodically synchronized with the kernel */
     uint16_t in_port;
-    uint16_t num_stats_ptrs; /* size of stats_ptrs array */
+    uint16_t num_stats_handles; /* size of stats_handles array */
     uint16_t actions_len; /* length of actions blob */
     uint64_t last_used; /* monotonic time in ms */
     void *actions; /* payload of actions nlattr */
-    struct ind_ovs_flow_stats **stats_ptrs;
+    struct stats_handle *stats_handles;
     struct nlattr key[0];
 };
 
 /* An OpenFlow group bucket */
 struct ind_ovs_group_bucket {
     struct xbuf actions;
-    struct ind_ovs_flow_stats stats;
+    struct stats_handle stats_handle;
 };
 
 /* An OpenFlow group */
