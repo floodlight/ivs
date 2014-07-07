@@ -35,12 +35,6 @@ static pthread_rwlock_t ind_ovs_fwd_rwlock;
 
 static aim_ratelimiter_t ind_ovs_pktin_limiter;
 
-/**
- * Stats for packet in
- */
-uint64_t ind_fwd_packet_in_packets;
-uint64_t ind_fwd_packet_in_bytes;
-
 indigo_error_t
 indigo_fwd_forwarding_features_get(of_features_reply_t *features)
 {
@@ -148,9 +142,6 @@ ind_fwd_pkt_in(of_port_no_t in_port,
         of_packet_in_delete(of_packet_in);
         return INDIGO_ERROR_UNKNOWN;
     }
-
-    ++ind_fwd_packet_in_packets;
-    ind_fwd_packet_in_bytes += len;
 
     return indigo_core_packet_in(of_packet_in);
 }
