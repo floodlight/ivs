@@ -32,6 +32,7 @@ action_context_init(struct action_context *ctx,
                     const struct ind_ovs_parsed_key *key,
                     struct nl_msg *msg)
 {
+    assert(ctx != NULL);
     memcpy(&ctx->current_key, key, sizeof(*key));
     ctx->modified_attrs = 0;
     ctx->msg = msg;
