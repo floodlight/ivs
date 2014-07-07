@@ -27,35 +27,17 @@
 #include <stdbool.h>
 #include <indigo/indigo.h>
 #include <xbuf/xbuf.h>
+#include <action/action.h>
 
-struct pipeline_result;
 struct ind_ovs_parsed_key;
-
-/*
- * Result of the forwarding pipeline (ind_ovs_pipeline_process)
- *
- * See pipeline_result_{init,reset,cleanup}.
- */
-struct pipeline_result {
-    /*
-     * List of IVS actions.
-     */
-    struct xbuf actions;
-
-    /*
-     * This xbuf contains an array of pointers to struct ind_ovs_flow_stats.
-     *
-     * These stats objects may belong to flows or tables (and in the future
-     * meters or groups). For example, every table a packet matched in will
-     * have its matched_stats field added here.
-     */
-    struct xbuf stats;
-};
 
 struct pipeline_ops {
     void (*init)(const char *name);
     void (*finish)(void);
-    indigo_error_t (*process)(struct ind_ovs_parsed_key *key, struct pipeline_result *result);
+    indigo_error_t (*process)(
+        struct ind_ovs_parsed_key *key,
+        struct xbuf *stats,
+        struct action_context *actx);
 };
 
 /*
@@ -94,15 +76,16 @@ void pipeline_list(of_desc_str_t **ret_pipelines, int *num_pipelines);
 /*
  * Send a packet through the pipeline.
  *
- * 'result' should be initialized with pipeline_result_init.
+ * 'stats' should be an initialized, empty xbuf. It will be be filled with
+ * pointers to struct ind_ovs_flow_stats. These stats objects may belong to
+ * flows or tables (and in the future meters or groups). For example, every
+ * table a packet matched in will have its matched_stats field added here.
+ *
+ * 'actx' should be an initialized action_context.
  */
 indigo_error_t
 pipeline_process(struct ind_ovs_parsed_key *key,
-                 struct pipeline_result *result);
-
-/* Operations on a struct pipeline_result */
-void pipeline_result_init(struct pipeline_result *result);
-void pipeline_result_reset(struct pipeline_result *result);
-void pipeline_result_cleanup(struct pipeline_result *result);
+                 struct xbuf *stats,
+                 struct action_context *actx);
 
 #endif

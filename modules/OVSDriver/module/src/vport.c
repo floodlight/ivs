@@ -80,6 +80,17 @@ ind_ovs_port_lookup_by_name(const char *ifname)
     return NULL;
 }
 
+uint32_t
+ind_ovs_port_lookup_netlink(of_port_no_t port_no)
+{
+    struct ind_ovs_port *port = ind_ovs_port_lookup(port_no);
+    if (port == NULL) {
+        return 0;
+    }
+
+    return nl_socket_get_local_port(port->notify_socket);
+}
+
 /* TODO populate more fields of the port desc */
 indigo_error_t indigo_port_features_get(
     of_features_reply_t *features)

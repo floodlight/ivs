@@ -26,7 +26,7 @@
 
 static struct list_head ind_ovs_kflows;
 static struct list_head ind_ovs_kflow_buckets[NUM_KFLOW_BUCKETS];
-static struct pipeline_result ind_ovs_kflow_pipeline_result;
+static struct xbuf ind_ovs_kflow_stats_xbuf;
 
 static inline uint32_t
 key_hash(const struct nlattr *key)
@@ -73,22 +73,25 @@ ind_ovs_kflow_add(const struct nlattr *key)
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key((struct nlattr *)key, &pkey);
 
-    struct pipeline_result *result = &ind_ovs_kflow_pipeline_result;
-    pipeline_result_reset(result);
-
-    indigo_error_t err = pipeline_process(&pkey, result);
-    if (err < 0) {
-        /* Flow was deleted after the BH request was queued. */
-        return err;
-    }
-
     struct ind_ovs_kflow *kflow = aim_malloc(sizeof(*kflow) + key->nla_len);
+
+    struct xbuf *stats = &ind_ovs_kflow_stats_xbuf;
+    xbuf_reset(stats);
 
     struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_NEW);
     nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(key), nla_data(key));
-
     struct nlattr *actions = nla_nest_start(msg, OVS_FLOW_ATTR_ACTIONS);
-    ind_ovs_translate_actions(&pkey, &result->actions, msg);
+
+    struct action_context actx;
+    action_context_init(&actx, &pkey, msg);
+
+    indigo_error_t err = pipeline_process(&pkey, stats, &actx);
+    if (err < 0) {
+        aim_free(kflow);
+        ind_ovs_nlmsg_freelist_free(msg);
+        return err;
+    }
+
     ind_ovs_nla_nest_end(msg, actions);
 
     /* Copy actions before ind_ovs_transact() frees msg */
@@ -109,8 +112,8 @@ ind_ovs_kflow_add(const struct nlattr *key)
 
     memcpy(kflow->key, key, key->nla_len);
 
-    struct ind_ovs_flow_stats **stats_ptrs = xbuf_data(&result->stats);
-    int num_stats_ptrs = xbuf_length(&result->stats) / sizeof(void *);
+    struct ind_ovs_flow_stats **stats_ptrs = xbuf_data(stats);
+    int num_stats_ptrs = xbuf_length(stats) / sizeof(void *);
 
     kflow->num_stats_ptrs = num_stats_ptrs;
     kflow->stats_ptrs = aim_memdup(stats_ptrs, num_stats_ptrs * sizeof(*stats_ptrs));
@@ -218,17 +221,27 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key(kflow->key, &pkey);
 
-    struct pipeline_result *result = &ind_ovs_kflow_pipeline_result;
-    pipeline_result_reset(result);
+    struct xbuf *stats = &ind_ovs_kflow_stats_xbuf;
+    xbuf_reset(stats);
 
-    indigo_error_t err = pipeline_process(&pkey, result);
+    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_SET);
+    nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(kflow->key), nla_data(kflow->key));
+    struct nlattr *actions = nla_nest_start(msg, OVS_FLOW_ATTR_ACTIONS);
+
+    struct action_context actx;
+    action_context_init(&actx, &pkey, msg);
+
+    indigo_error_t err = pipeline_process(&pkey, stats, &actx);
     if (err < 0) {
         ind_ovs_kflow_delete(kflow);
+        ind_ovs_nlmsg_freelist_free(msg);
         return;
     }
 
-    struct ind_ovs_flow_stats **stats_ptrs = xbuf_data(&result->stats);
-    int num_stats_ptrs = xbuf_length(&result->stats) / sizeof(void *);
+    ind_ovs_nla_nest_end(msg, actions);
+
+    struct ind_ovs_flow_stats **stats_ptrs = xbuf_data(stats);
+    int num_stats_ptrs = xbuf_length(stats) / sizeof(void *);
     size_t stats_ptrs_len = num_stats_ptrs * sizeof(*stats_ptrs);
     if (num_stats_ptrs != kflow->num_stats_ptrs ||
             memcmp(stats_ptrs, kflow->stats_ptrs, stats_ptrs_len)) {
@@ -240,14 +253,6 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
         }
         memcpy(kflow->stats_ptrs, stats_ptrs, stats_ptrs_len);
     }
-
-    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_SET);
-
-    nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(kflow->key), nla_data(kflow->key));
-
-    struct nlattr *actions = nla_nest_start(msg, OVS_FLOW_ATTR_ACTIONS);
-    ind_ovs_translate_actions(&pkey, &result->actions, msg);
-    ind_ovs_nla_nest_end(msg, actions);
 
     if (nla_len(actions) != kflow->actions_len ||
             memcmp(nla_data(actions), kflow->actions, nla_len(actions))) {
@@ -328,5 +333,5 @@ ind_ovs_kflow_module_init(void)
         list_init(&ind_ovs_kflow_buckets[i]);
     }
 
-    pipeline_result_init(&ind_ovs_kflow_pipeline_result);
+    xbuf_init(&ind_ovs_kflow_stats_xbuf);
 }

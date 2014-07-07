@@ -22,13 +22,13 @@
 #include <arpa/inet.h>
 
 #include <ivs/ivs.h>
-#include <ivs/actions.h>
 #include <loci/loci.h>
 #include <OVSDriver/ovsdriver.h>
 #include <tcam/tcam.h>
 #include <indigo/indigo.h>
 #include <indigo/of_state_manager.h>
 #include "cfr.h"
+#include "action.h"
 
 #define AIM_LOG_MODULE_NAME pipeline_standard
 #include <AIM/aim_log.h>
@@ -111,7 +111,8 @@ pipeline_standard_finish(void)
 
 indigo_error_t
 pipeline_standard_process(struct ind_ovs_parsed_key *key,
-                          struct pipeline_result *result)
+                          struct xbuf *stats,
+                          struct action_context *actx)
 {
     struct pipeline_standard_cfr cfr;
     pipeline_standard_key_to_cfr(key, &cfr);
@@ -130,24 +131,23 @@ pipeline_standard_process(struct ind_ovs_parsed_key *key,
         if (tcam_entry == NULL) {
             if (openflow_version < OF_VERSION_1_3) {
                 uint64_t userdata = IVS_PKTIN_USERDATA(OF_PACKET_IN_REASON_NO_MATCH, 0);
-                xbuf_append_attr(&result->actions, IND_OVS_ACTION_CONTROLLER, &userdata, sizeof(userdata));
+                action_controller(actx, userdata);
             }
-            xbuf_append_ptr(&result->stats, &flowtable->missed_stats);
+            xbuf_append_ptr(stats, &flowtable->missed_stats);
             break;
         }
 
         struct flowtable_entry *entry = container_of(tcam_entry, tcam_entry, struct flowtable_entry);
 
         if (entry->table_miss) {
-            xbuf_append_ptr(&result->stats, &flowtable->missed_stats);
+            xbuf_append_ptr(stats, &flowtable->missed_stats);
         } else {
-            xbuf_append_ptr(&result->stats, &flowtable->matched_stats);
+            xbuf_append_ptr(stats, &flowtable->matched_stats);
         }
 
-        xbuf_append_ptr(&result->stats, &entry->stats);
+        xbuf_append_ptr(stats, &entry->stats);
 
-        xbuf_append(&result->actions, xbuf_data(&entry->value.apply_actions),
-                    xbuf_length(&entry->value.apply_actions));
+        pipeline_standard_translate_actions(actx, &entry->value.apply_actions);
 
         table_id = entry->value.next_table_id;
 
