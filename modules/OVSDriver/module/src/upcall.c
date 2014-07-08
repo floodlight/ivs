@@ -227,7 +227,7 @@ ind_ovs_handle_one_upcall(struct ind_ovs_upcall_thread *thread,
     }
 
     /* Will be ACTION in the case of OFPP_TABLE */
-    assert(gnlh->cmd == OVS_PACKET_CMD_MISS || gnlh->cmd == OVS_PACKET_CMD_ACTION);
+    AIM_ASSERT(gnlh->cmd == OVS_PACKET_CMD_MISS || gnlh->cmd == OVS_PACKET_CMD_ACTION);
 
     ind_ovs_handle_packet_miss(thread, port, msg, attrs);
 }
