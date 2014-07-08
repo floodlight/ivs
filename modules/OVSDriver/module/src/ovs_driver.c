@@ -187,6 +187,8 @@ ind_ovs_init(const char *datapath_name)
         return INDIGO_ERROR_NOT_FOUND;
     }
 
+    ind_ovs_fwd_init();
+    ind_ovs_pktin_init();
     ind_ovs_upcall_init();
     ind_ovs_bh_init();
     ind_ovs_multicast_init();
@@ -209,11 +211,6 @@ ind_ovs_init(const char *datapath_name)
     }
 
     ind_ovs_dpid_set(datapath_name);
-
-    if ((ret = ind_ovs_fwd_init()) != 0) {
-        LOG_ERROR("failed to initialize forwarding");
-        return ret;
-    }
 
     return 0;
 }
