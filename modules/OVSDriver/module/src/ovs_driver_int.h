@@ -117,6 +117,7 @@ struct ind_ovs_port {
     pthread_mutex_t quiesce_lock;
     pthread_cond_t quiesce_cvar;
     struct ind_ovs_upcall_thread *upcall_thread;
+    struct ind_ovs_port_counters pcounters;
 };
 
 /*
