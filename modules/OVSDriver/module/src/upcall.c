@@ -86,8 +86,6 @@ struct ind_ovs_upcall_thread {
 static void ind_ovs_handle_port_upcalls(struct ind_ovs_upcall_thread *thread, struct ind_ovs_port *port);
 static void ind_ovs_handle_one_upcall(struct ind_ovs_upcall_thread *thread, struct ind_ovs_port *port, struct nl_msg *msg);
 static void ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread, struct ind_ovs_port *port, struct nl_msg *msg, struct nlattr **attrs);
-static void ind_ovs_handle_packet_action(struct ind_ovs_upcall_thread *thread, struct ind_ovs_port *port, struct nl_msg *msg, struct nlattr **attrs);
-static void ind_ovs_upcall_request_pktin(uint32_t port_no, struct ind_ovs_port *port, struct nlattr *packet, struct nlattr *key, uint8_t reason, uint64_t metadata);
 static bool ind_ovs_upcall_seen_key(struct ind_ovs_upcall_thread *thread, struct nlattr *key);
 static void ind_ovs_upcall_rearm(struct ind_ovs_port *port);
 
@@ -228,11 +226,10 @@ ind_ovs_handle_one_upcall(struct ind_ovs_upcall_thread *thread,
         abort();
     }
 
-    if (gnlh->cmd == OVS_PACKET_CMD_MISS || !attrs[OVS_PACKET_ATTR_USERDATA]) {
-        ind_ovs_handle_packet_miss(thread, port, msg, attrs);
-    } else {
-        ind_ovs_handle_packet_action(thread, port, msg, attrs);
-    }
+    /* Will be ACTION in the case of OFPP_TABLE */
+    assert(gnlh->cmd == OVS_PACKET_CMD_MISS || gnlh->cmd == OVS_PACKET_CMD_ACTION);
+
+    ind_ovs_handle_packet_miss(thread, port, msg, attrs);
 }
 
 static void
@@ -294,40 +291,6 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     if (!ind_ovs_disable_kflows && ind_ovs_upcall_seen_key(thread, key)) {
         /* Create a kflow with the given key and actions. */
         ind_ovs_bh_request_kflow(key);
-    }
-}
-
-static void
-ind_ovs_handle_packet_action(struct ind_ovs_upcall_thread *thread,
-                             struct ind_ovs_port *port,
-                             struct nl_msg *msg, struct nlattr **attrs)
-{
-    struct nlattr *key = attrs[OVS_PACKET_ATTR_KEY];
-    struct nlattr *packet = attrs[OVS_PACKET_ATTR_PACKET];
-    struct nlattr *userdata_nla = attrs[OVS_PACKET_ATTR_USERDATA];
-    assert(key && packet && userdata_nla);
-
-    struct ind_ovs_parsed_key pkey;
-    ind_ovs_parse_key(key, &pkey);
-
-    uint64_t userdata = nla_get_u64(userdata_nla);
-
-    /* Send packet-in to controller */
-    ind_ovs_upcall_request_pktin(pkey.in_port, port, packet, key,
-                                 IVS_PKTIN_REASON(userdata),
-                                 IVS_PKTIN_METADATA(userdata));
-}
-
-static void
-ind_ovs_upcall_request_pktin(uint32_t port_no, struct ind_ovs_port *port,
-                             struct nlattr *packet, struct nlattr *key, uint8_t reason, uint64_t metadata)
-{
-    if (ind_ovs_benchmark_mode || aim_ratelimiter_limit(&port->pktin_limiter, monotonic_us()) == 0) {
-        ind_ovs_bh_request_pktin(port_no, packet, key, reason, metadata);
-    } else {
-        if (aim_ratelimiter_limit(&port->upcall_log_limiter, monotonic_us()) == 0) {
-            LOG_WARN("rate limiting packet-ins from port %s", port->ifname);
-        }
     }
 }
 

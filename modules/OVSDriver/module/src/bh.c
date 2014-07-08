@@ -33,7 +33,6 @@
 
 enum ind_ovs_bh_request_type {
     IND_OVS_BH_REQUEST_KFLOW,
-    IND_OVS_BH_REQUEST_PKTIN,
 };
 
 struct ind_ovs_bh_request {
@@ -74,24 +73,6 @@ ind_ovs_bh_request_kflow(struct nlattr *key)
     req->type = IND_OVS_BH_REQUEST_KFLOW;
     req->len = key_size;
     memcpy(req->attr_head, key, key_size);
-
-    ind_ovs_bh_enqueue(req);
-}
-
-void
-ind_ovs_bh_request_pktin(uint32_t in_port, struct nlattr *packet, struct nlattr *key, uint8_t reason, uint64_t metadata)
-{
-    int packet_size = nla_total_size(nla_len(packet));
-    int key_size = nla_total_size(nla_len(key));
-    struct ind_ovs_bh_request *req = aim_malloc(sizeof(*req) + packet_size + key_size);
-
-    req->type = IND_OVS_BH_REQUEST_PKTIN;
-    req->len = packet_size + key_size;
-    req->in_port = in_port;
-    req->reason = reason;
-    req->metadata = metadata;
-    memcpy(req->attr_head, packet, packet_size);
-    memcpy(((void *)(req->attr_head)) + packet_size, key, key_size);
 
     ind_ovs_bh_enqueue(req);
 }
@@ -148,16 +129,6 @@ ind_ovs_bh_run()
             if (ind_ovs_kflow_add(key) < 0) {
                 LOG_ERROR("Failed to insert kernel flow");
             }
-        } else if (req->type == IND_OVS_BH_REQUEST_PKTIN) {
-            struct nlattr *packet = attrs[OVS_PACKET_ATTR_PACKET];
-            assert(packet);
-            struct nlattr *key = attrs[OVS_PACKET_ATTR_KEY];
-            assert(key);
-
-            struct ind_ovs_parsed_key pkey;
-            ind_ovs_parse_key(key, &pkey);
-
-            ind_ovs_pktin(req->in_port, nla_data(packet), nla_len(packet), req->reason, req->metadata, &pkey);
         } else {
             abort();
         }

@@ -110,6 +110,7 @@ struct ind_ovs_port {
     unsigned admin_down : 1;
     uint32_t num_kflows; /* Number of kflows with this in_port */
     struct nl_sock *notify_socket; /* Netlink socket for upcalls */
+    struct nl_sock *pktin_socket; /* Netlink socket for packet-ins */
     aim_ratelimiter_t upcall_log_limiter;
     aim_ratelimiter_t pktin_limiter;
     /* See ind_ovs_upcall_quiesce */
@@ -218,7 +219,8 @@ struct ind_ovs_group *ind_ovs_group_lookup(uint32_t id);
 
 /* Interface of the pktin submodule */
 void ind_ovs_pktin_init(void);
-indigo_error_t ind_ovs_pktin(of_port_no_t of_port_num, uint8_t *data, unsigned int len, uint8_t reason, uint64_t metadata, struct ind_ovs_parsed_key *pkey);
+void ind_ovs_pktin_register(struct ind_ovs_port *port);
+void ind_ovs_pktin_unregister(struct ind_ovs_port *port);
 
 /* Log Netlink attributes in human readable form */
 void ind_ovs_dump_nested(const struct nlattr *nla, void (*cb)(const struct nlattr *attr));
