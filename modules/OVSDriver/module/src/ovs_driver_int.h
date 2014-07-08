@@ -163,9 +163,8 @@ void ind_ovs_parse_key(struct nlattr *key, struct ind_ovs_parsed_key *pkey);
 void ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey, of_version_t version, of_match_t *match);
 
 /* Internal interfaces to the forwarding module */
-indigo_error_t ind_ovs_fwd_init(void);
+void ind_ovs_fwd_init(void);
 void ind_ovs_fwd_finish(void);
-indigo_error_t ind_fwd_pkt_in(of_port_no_t of_port_num, uint8_t *data, unsigned int len, uint8_t reason, uint64_t metadata, struct ind_ovs_parsed_key *pkey);
 
 /*
  * Synchronization of the flow table between the main thread and upcall
@@ -216,6 +215,10 @@ void ind_ovs_multicast_init(void);
 /* Interface of the group submodule */
 void ind_ovs_group_module_init(void);
 struct ind_ovs_group *ind_ovs_group_lookup(uint32_t id);
+
+/* Interface of the pktin submodule */
+void ind_ovs_pktin_init(void);
+indigo_error_t ind_ovs_pktin(of_port_no_t of_port_num, uint8_t *data, unsigned int len, uint8_t reason, uint64_t metadata, struct ind_ovs_parsed_key *pkey);
 
 /* Log Netlink attributes in human readable form */
 void ind_ovs_dump_nested(const struct nlattr *nla, void (*cb)(const struct nlattr *attr));
