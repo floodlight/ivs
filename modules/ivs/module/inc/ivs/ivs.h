@@ -141,5 +141,6 @@ struct ind_ovs_flow_stats * ind_ovs_rx_multicast_port_stats_select(of_port_no_t 
 struct ind_ovs_flow_stats * ind_ovs_tx_unicast_port_stats_select(of_port_no_t port_no);
 struct ind_ovs_flow_stats * ind_ovs_tx_broadcast_port_stats_select(of_port_no_t port_no);
 struct ind_ovs_flow_stats * ind_ovs_tx_multicast_port_stats_select(of_port_no_t port_no);
+uint32_t ind_ovs_port_lookup_netlink(of_port_no_t port_no);
 
 #endif

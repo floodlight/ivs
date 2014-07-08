@@ -34,7 +34,6 @@
 #include "AIM/aim_utils.h"
 #include "xbuf/xbuf.h"
 #include "ivs/ivs.h"
-#include "ivs/actions.h"
 #include "pipeline/pipeline.h"
 #include "tcam/tcam.h"
 #include "BigHash/bighash.h"
@@ -168,12 +167,6 @@ struct ind_ovs_group {
 
 /* Translate an OVS key into a flat struct */
 void ind_ovs_parse_key(struct nlattr *key, struct ind_ovs_parsed_key *pkey);
-
-/* Translate OpenFlow actions into IVS actions */
-indigo_error_t ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf, bool table_miss);
-
-/* Translate IVS actions into OVS actions */
-void ind_ovs_translate_actions(const struct ind_ovs_parsed_key *pkey, struct xbuf *actions, struct nl_msg *msg);
 
 /* Translate an OVS key into an OpenFlow match object */
 void ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey, of_version_t version, of_match_t *match);
