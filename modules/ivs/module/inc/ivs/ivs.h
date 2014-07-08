@@ -61,6 +61,15 @@ struct ind_ovs_flow_stats {
     uint64_t bytes;
 };
 
+struct ind_ovs_port_counters {
+    struct ind_ovs_flow_stats rx_unicast_stats;
+    struct ind_ovs_flow_stats tx_unicast_stats;
+    struct ind_ovs_flow_stats rx_broadcast_stats;
+    struct ind_ovs_flow_stats tx_broadcast_stats;
+    struct ind_ovs_flow_stats rx_multicast_stats;
+    struct ind_ovs_flow_stats tx_multicast_stats;
+};
+
 /*
  * X-macro representation of the OVS key (nlattr type, key field, type).
  */
@@ -135,12 +144,7 @@ extern uint32_t ind_ovs_salt;
 indigo_error_t ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf, bool table_miss);
 struct ind_ovs_flow_stats * ind_ovs_rx_vlan_stats_select(uint16_t vlan_vid);
 struct ind_ovs_flow_stats * ind_ovs_tx_vlan_stats_select(uint16_t vlan_vid);
-struct ind_ovs_flow_stats * ind_ovs_rx_unicast_port_stats_select(of_port_no_t port_no);
-struct ind_ovs_flow_stats * ind_ovs_rx_broadcast_port_stats_select(of_port_no_t port_no);
-struct ind_ovs_flow_stats * ind_ovs_rx_multicast_port_stats_select(of_port_no_t port_no);
-struct ind_ovs_flow_stats * ind_ovs_tx_unicast_port_stats_select(of_port_no_t port_no);
-struct ind_ovs_flow_stats * ind_ovs_tx_broadcast_port_stats_select(of_port_no_t port_no);
-struct ind_ovs_flow_stats * ind_ovs_tx_multicast_port_stats_select(of_port_no_t port_no);
+struct ind_ovs_port_counters * ind_ovs_port_stats_select(of_port_no_t port_no);
 uint32_t ind_ovs_port_lookup_netlink(of_port_no_t port_no);
 
 #endif

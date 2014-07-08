@@ -44,7 +44,7 @@ static void port_desc_set(of_port_desc_t *of_port_desc, of_port_no_t of_port_num
 
 aim_ratelimiter_t nl_cache_refill_limiter;
 
-static struct ind_ovs_flow_stats dummy_stats;
+static struct ind_ovs_port_counters dummy_stats;
 
 static void
 ind_ovs_update_link_stats()
@@ -818,68 +818,13 @@ ind_ovs_port_finish(void)
         nl_socket_free(route_cache_sock);
 }
 
-struct ind_ovs_flow_stats *
-ind_ovs_rx_unicast_port_stats_select(of_port_no_t port_no)
+struct ind_ovs_port_counters *
+ind_ovs_port_stats_select(of_port_no_t port_no)
 {
     struct ind_ovs_port *port = ind_ovs_port_lookup(port_no);
     if (port == NULL) {
         return &dummy_stats;
     }
 
-    return &port->pcounters.rx_unicast_stats;
-}
-
-struct ind_ovs_flow_stats *
-ind_ovs_rx_broadcast_port_stats_select(of_port_no_t port_no)
-{
-    struct ind_ovs_port *port = ind_ovs_port_lookup(port_no);
-    if (port == NULL) {
-        return &dummy_stats;
-    }
-
-    return &port->pcounters.rx_broadcast_stats;
-}
-
-struct ind_ovs_flow_stats *
-ind_ovs_rx_multicast_port_stats_select(of_port_no_t port_no)
-{
-    struct ind_ovs_port *port = ind_ovs_port_lookup(port_no);
-    if (port == NULL) {
-        return &dummy_stats;
-    }
-
-    return &port->pcounters.rx_multicast_stats;
-}
-
-struct ind_ovs_flow_stats *
-ind_ovs_tx_unicast_port_stats_select(of_port_no_t port_no)
-{
-    struct ind_ovs_port *port = ind_ovs_port_lookup(port_no);
-    if (port == NULL) {
-        return &dummy_stats;
-    }
-
-    return &port->pcounters.tx_unicast_stats;
-}
-
-struct ind_ovs_flow_stats *
-ind_ovs_tx_broadcast_port_stats_select(of_port_no_t port_no)
-{
-    struct ind_ovs_port *port = ind_ovs_port_lookup(port_no);
-    if (port == NULL) {
-        return &dummy_stats;
-    }
-
-    return &port->pcounters.tx_broadcast_stats;
-}
-
-struct ind_ovs_flow_stats *
-ind_ovs_tx_multicast_port_stats_select(of_port_no_t port_no)
-{
-    struct ind_ovs_port *port = ind_ovs_port_lookup(port_no);
-    if (port == NULL) {
-        return &dummy_stats;
-    }
-
-    return &port->pcounters.tx_multicast_stats;
+    return &port->pcounters;
 }
