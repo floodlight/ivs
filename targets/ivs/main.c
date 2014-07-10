@@ -72,7 +72,7 @@ ivs_loci_logger(loci_log_level_t level,
                 const char *fname, const char *file, int line,
                 const char *format, ...);
 
-static const char *program_version = "ivs 0.4";
+static const char *program_version = "ivs 0.5";
 
 static ind_soc_config_t soc_cfg;
 static ind_cxn_config_t cxn_cfg;
