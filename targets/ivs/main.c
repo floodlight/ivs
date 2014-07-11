@@ -543,7 +543,8 @@ aim_main(int argc, char* argv[])
     of_desc_str_t mfr_desc = "Big Switch Networks";
     ind_core_mfr_desc_set(mfr_desc);
 
-    of_desc_str_t sw_desc = "Indigo 2";
+    of_desc_str_t sw_desc = "";
+    snprintf(sw_desc, sizeof(sw_desc), "%s", program_version);
     ind_core_sw_desc_set(sw_desc);
 
     of_desc_str_t hw_desc = "";
