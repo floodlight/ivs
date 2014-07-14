@@ -223,6 +223,9 @@ void ind_ovs_pktin_init(void);
 void ind_ovs_pktin_register(struct ind_ovs_port *port);
 void ind_ovs_pktin_unregister(struct ind_ovs_port *port);
 
+/* Interface of the VLAN stats submodule */
+void ind_ovs_vlan_stats_init(void);
+
 /* Log Netlink attributes in human readable form */
 void ind_ovs_dump_nested(const struct nlattr *nla, void (*cb)(const struct nlattr *attr));
 void ind_ovs_dump_dp_attr(const struct nlattr *nla);

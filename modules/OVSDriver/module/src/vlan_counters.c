@@ -28,6 +28,16 @@ struct vlan_counters {
 static struct vlan_counters vcounters[4096];
 
 void
+ind_ovs_vlan_stats_init(void)
+{
+    int i;
+    for (i = 0; i < 4096; i++) {
+        stats_alloc(&vcounters[i].rx_stats_handle);
+        stats_alloc(&vcounters[i].tx_stats_handle);
+    }
+}
+
+void
 indigo_fwd_vlan_stats_get(uint16_t vlan_vid, indigo_fi_vlan_stats_t *vlan_stats)
 {
     if (vlan_vid < 1 || vlan_vid > 4095) return;
