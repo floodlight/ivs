@@ -48,8 +48,7 @@ translate_buckets(of_list_bucket_t *of_buckets,
         struct ind_ovs_group_bucket *bucket =
             xbuf_reserve(&buckets_xbuf, sizeof(*bucket));
         xbuf_init(&bucket->actions);
-        bucket->stats.packets = 0;
-        bucket->stats.bytes = 0;
+        stats_alloc(&bucket->stats_handle);
         num_buckets++;
 
         of_list_action_t of_actions;
@@ -78,6 +77,7 @@ free_buckets(struct ind_ovs_group_bucket *buckets, uint16_t num_buckets)
     int i;
     for (i = 0; i < num_buckets; i++) {
         xbuf_cleanup(&buckets[i].actions);
+        stats_free(&buckets[i].stats_handle);
     }
     aim_free(buckets);
 }
@@ -182,13 +182,14 @@ indigo_fwd_group_stats_get(uint32_t id, of_group_stats_entry_t *entry)
         of_bucket_counter_init(&bucket_counter, entry->version, -1, 1);
         (void) of_list_bucket_counter_append_bind(&bucket_counters, &bucket_counter);
 
-        struct ind_ovs_flow_stats bucket_stats = group->buckets[i].stats;
+        struct stats stats;
+        stats_get(&group->buckets[i].stats_handle, &stats);
 
-        of_bucket_counter_packet_count_set(&bucket_counter, bucket_stats.packets);
-        of_bucket_counter_byte_count_set(&bucket_counter, bucket_stats.bytes);
+        of_bucket_counter_packet_count_set(&bucket_counter, stats.packets);
+        of_bucket_counter_byte_count_set(&bucket_counter, stats.bytes);
 
-        total_packets += bucket_stats.packets;
-        total_bytes += bucket_stats.bytes;
+        total_packets += stats.packets;
+        total_bytes += stats.bytes;
     }
 
     of_group_stats_entry_packet_count_set(entry, total_packets);

@@ -81,6 +81,9 @@ struct ind_ovs_upcall_thread {
      */
     uint8_t bloom_filter[BLOOM_BUCKETS/8];
     uint16_t bloom_filter_count;
+
+    /* Used to increment stats */
+    struct stats_writer *stats_writer;
 };
 
 static void ind_ovs_handle_port_upcalls(struct ind_ovs_upcall_thread *thread, struct ind_ovs_port *port);
@@ -261,13 +264,12 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
 
     ind_ovs_nla_nest_end(msg, actions);
 
-    struct ind_ovs_flow_stats **stats_ptrs = xbuf_data(&thread->stats);
-    int num_stats_ptrs = xbuf_length(&thread->stats) / sizeof(void *);
+    struct stats_handle *stats_handles = xbuf_data(&thread->stats);
+    int num_stats_handles = xbuf_length(&thread->stats) / sizeof(struct stats_handle);
     int i;
-    for (i = 0; i < num_stats_ptrs; i++) {
-        struct ind_ovs_flow_stats *stats = stats_ptrs[i];
-        __sync_fetch_and_add(&stats->packets, 1);
-        __sync_fetch_and_add(&stats->bytes, nla_len(packet));
+    for (i = 0; i < num_stats_handles; i++) {
+        stats_inc(thread->stats_writer, &stats_handles[i],
+                  1, nla_len(packet));
     }
 
     /* Reuse the incoming message for the packet execute */
@@ -446,6 +448,8 @@ ind_ovs_upcall_init(void)
             thread->msgvec[j].msg_hdr.msg_iovlen = 1;
         }
 
+        thread->stats_writer = stats_writer_create();
+
         if (pthread_create(&thread->pthread, NULL,
                         ind_ovs_upcall_thread_main, thread) < 0) {
             LOG_ERROR("failed to start upcall thread");
@@ -480,6 +484,7 @@ ind_ovs_upcall_finish(void)
         for (j = 0; j < NUM_UPCALL_BUFFERS; j++) {
             nlmsg_free(thread->msgs[j]);
         }
+        stats_writer_destroy(thread->stats_writer);
         aim_free(thread);
         ind_ovs_upcall_threads[i] = NULL;
     }

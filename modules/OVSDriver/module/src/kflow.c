@@ -27,6 +27,7 @@
 static struct list_head ind_ovs_kflows;
 static struct list_head ind_ovs_kflow_buckets[NUM_KFLOW_BUCKETS];
 static struct xbuf ind_ovs_kflow_stats_xbuf;
+static struct stats_writer *ind_ovs_kflow_stats_writer;
 
 static inline uint32_t
 key_hash(const struct nlattr *key)
@@ -112,11 +113,11 @@ ind_ovs_kflow_add(const struct nlattr *key)
 
     memcpy(kflow->key, key, key->nla_len);
 
-    struct ind_ovs_flow_stats **stats_ptrs = xbuf_data(stats);
-    int num_stats_ptrs = xbuf_length(stats) / sizeof(void *);
+    struct stats_handle *stats_handles = xbuf_data(stats);
+    int num_stats_handles = xbuf_length(stats) / sizeof(*stats_handles);
 
-    kflow->num_stats_ptrs = num_stats_ptrs;
-    kflow->stats_ptrs = aim_memdup(stats_ptrs, num_stats_ptrs * sizeof(*stats_ptrs));
+    kflow->num_stats_handles = num_stats_handles;
+    kflow->stats_handles = aim_memdup(stats_handles, num_stats_handles * sizeof(*stats_handles));
 
     list_push(&ind_ovs_kflows, &kflow->global_links);
     list_push(bucket, &kflow->bucket_links);
@@ -155,10 +156,10 @@ ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow)
 
         if (packet_diff > 0 || byte_diff > 0) {
             int i;
-            for (i = 0; i < kflow->num_stats_ptrs; i++) {
-                struct ind_ovs_flow_stats *stats_ptr = kflow->stats_ptrs[i];
-                __sync_fetch_and_add(&stats_ptr->packets, packet_diff);
-                __sync_fetch_and_add(&stats_ptr->bytes, byte_diff);
+            for (i = 0; i < kflow->num_stats_handles; i++) {
+                stats_inc(ind_ovs_kflow_stats_writer,
+                          &kflow->stats_handles[i],
+                          packet_diff, byte_diff);
             }
 
             kflow->stats.packets = stats->n_packets;
@@ -207,7 +208,7 @@ ind_ovs_kflow_delete(struct ind_ovs_kflow *kflow)
     list_remove(&kflow->global_links);
     list_remove(&kflow->bucket_links);
     aim_free(kflow->actions);
-    aim_free(kflow->stats_ptrs);
+    aim_free(kflow->stats_handles);
     aim_free(kflow);
 }
 
@@ -240,18 +241,18 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
 
     ind_ovs_nla_nest_end(msg, actions);
 
-    struct ind_ovs_flow_stats **stats_ptrs = xbuf_data(stats);
-    int num_stats_ptrs = xbuf_length(stats) / sizeof(void *);
-    size_t stats_ptrs_len = num_stats_ptrs * sizeof(*stats_ptrs);
-    if (num_stats_ptrs != kflow->num_stats_ptrs ||
-            memcmp(stats_ptrs, kflow->stats_ptrs, stats_ptrs_len)) {
-        /* Synchronize stats to previous OpenFlow flow */
+    struct stats_handle *stats_handles = xbuf_data(stats);
+    int num_stats_handles = xbuf_length(stats) / sizeof(*stats_handles);
+    size_t stats_handles_len = num_stats_handles * sizeof(*stats_handles);
+    if (num_stats_handles != kflow->num_stats_handles ||
+            memcmp(stats_handles, kflow->stats_handles, stats_handles_len)) {
+        /* Synchronize stats to previous OpenFlow flows */
         ind_ovs_kflow_sync_stats(kflow);
-        if (num_stats_ptrs != kflow->num_stats_ptrs) {
-            kflow->num_stats_ptrs = num_stats_ptrs;
-            kflow->stats_ptrs = aim_realloc(kflow->stats_ptrs, stats_ptrs_len);
+        if (num_stats_handles != kflow->num_stats_handles) {
+            kflow->num_stats_handles = num_stats_handles;
+            kflow->stats_handles = aim_realloc(kflow->stats_handles, stats_handles_len);
         }
-        memcpy(kflow->stats_ptrs, stats_ptrs, stats_ptrs_len);
+        memcpy(kflow->stats_handles, stats_handles, stats_handles_len);
     }
 
     if (nla_len(actions) != kflow->actions_len ||
@@ -334,4 +335,6 @@ ind_ovs_kflow_module_init(void)
     }
 
     xbuf_init(&ind_ovs_kflow_stats_xbuf);
+
+    ind_ovs_kflow_stats_writer = stats_writer_create();
 }
