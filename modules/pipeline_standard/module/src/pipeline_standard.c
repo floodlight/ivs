@@ -257,7 +257,7 @@ parse_value(of_flow_add_t *flow_mod, struct flowtable_value *value,
         if ((err = ind_ovs_translate_openflow_actions(&openflow_actions,
                                                       &value->apply_actions,
                                                       table_miss)) < 0) {
-            return err;
+            goto error;
         }
     } else {
         int rv;
@@ -276,7 +276,7 @@ parse_value(of_flow_add_t *flow_mod, struct flowtable_value *value,
                 if ((err = ind_ovs_translate_openflow_actions(&openflow_actions,
                                                               &value->apply_actions,
                                                               table_miss)) < 0) {
-                    return err;
+                    goto error;
                 }
                 break;
             case OF_INSTRUCTION_WRITE_ACTIONS:
@@ -285,7 +285,7 @@ parse_value(of_flow_add_t *flow_mod, struct flowtable_value *value,
                 if ((err = ind_ovs_translate_openflow_actions(&openflow_actions,
                                                               &value->write_actions,
                                                               table_miss)) < 0) {
-                    return err;
+                    goto error;
                 }
                 break;
             case OF_INSTRUCTION_CLEAR_ACTIONS:
@@ -296,14 +296,16 @@ parse_value(of_flow_add_t *flow_mod, struct flowtable_value *value,
                 if (value->next_table_id <= table_id ||
                         value->next_table_id >= NUM_TABLES) {
                     AIM_LOG_WARN("invalid goto next_table_id %u", value->next_table_id);
-                    return INDIGO_ERROR_RANGE;
+                    err = INDIGO_ERROR_RANGE;
+                    goto error;
                 }
                 break;
             case OF_INSTRUCTION_METER:
                 of_instruction_meter_meter_id_get(&inst.meter, &value->meter_id);
                 break;
             default:
-                return INDIGO_ERROR_COMPAT;
+                err = INDIGO_ERROR_COMPAT;
+                goto error;
             }
         }
     }
@@ -312,6 +314,11 @@ parse_value(of_flow_add_t *flow_mod, struct flowtable_value *value,
     xbuf_compact(&value->write_actions);
 
     return INDIGO_ERROR_NONE;
+
+error:
+    xbuf_cleanup(&value->apply_actions);
+    xbuf_cleanup(&value->write_actions);
+    return err;
 }
 
 static bool
