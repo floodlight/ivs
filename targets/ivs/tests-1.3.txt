@@ -1,0 +1,29 @@
+standard
+
+# Extensions we support
+bsn_controller_connections
+bsn_flow_checksum
+bsn_gentable
+
+# Async message configuration is not supported
+^basic.AsyncConfigGet
+
+# Groups are not supported
+^basic.GroupFeaturesStats
+^groups.GroupAddAllWeight
+^groups.GroupAddExisting
+^groups.GroupAddIndirectBuckets
+^groups.GroupAddIndirectWeight
+^groups.GroupAddInvalidAction
+^groups.GroupAddSelectNoWeight
+^groups.GroupDescStats
+^groups.GroupFlowSelect
+^groups.GroupModifyLoop
+^groups.SelectFwdEmpty
+^groups.SelectFwdSingle
+^groups.SelectFwdSpread
+
+# Meters are not supported
+^basic.MeterConfigStats
+^basic.MeterFeaturesStats
+^basic.MeterStats
