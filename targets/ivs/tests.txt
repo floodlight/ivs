@@ -2,10 +2,22 @@ standard
 
 # Extensions we support
 nicira_role
-bsn_ipmask
+nicira_dec_ttl
 
 # Indigo respects priority of exact match flows
 ^flow_matches.ExactMatchPrio
 
 # OVS kernel module bug
 ^pktact.DirectLlcPackets
+
+# IVS doesn't support OFPP_FLOOD and OFPP_ALL
+^pktact.AllPlusIngress
+^pktact.Flood
+^pktact.FloodPlusIngress
+^pktact.FloodMinusPort
+^pktact.All
+^actions.ForwardAll
+^actions.ForwardFlood
+
+# IVS doesn't support OFPPC_NO_FWD
+^message_types.PortModFwd
