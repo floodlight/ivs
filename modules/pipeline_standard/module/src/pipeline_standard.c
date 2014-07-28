@@ -29,6 +29,7 @@
 #include <indigo/of_state_manager.h>
 #include "cfr.h"
 #include "action.h"
+#include "group.h"
 
 #define AIM_LOG_MODULE_NAME pipeline_standard
 #include <AIM/aim_log.h>
@@ -97,6 +98,10 @@ pipeline_standard_init(const char *name)
         stats_alloc(&flowtable->missed_stats_handle);
         flowtables[i] = flowtable;
     }
+
+    if (openflow_version == OF_VERSION_1_3) {
+        pipeline_standard_group_register();
+    }
 }
 
 static void
@@ -109,6 +114,10 @@ pipeline_standard_finish(void)
         stats_free(&flowtables[i]->matched_stats_handle);
         stats_free(&flowtables[i]->missed_stats_handle);
         aim_free(flowtables[i]);
+    }
+
+    if (openflow_version == OF_VERSION_1_3) {
+        pipeline_standard_group_unregister();
     }
 }
 
