@@ -163,7 +163,7 @@ pipeline_standard_process(struct ind_ovs_parsed_key *key,
         pipeline_add_stats(stats, &entry->stats_handle);
 
         pipeline_standard_translate_actions(actx, &entry->value.apply_actions,
-                                            hash);
+                                            hash, stats);
 
         table_id = entry->value.next_table_id;
 

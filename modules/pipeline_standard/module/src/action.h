@@ -72,6 +72,6 @@ void pipeline_standard_cleanup_actions(struct xbuf *actions);
 /* Translate IVS actions into OVS actions */
 void pipeline_standard_translate_actions(
     struct action_context *ctx, struct xbuf *actions,
-    uint32_t hash);
+    uint32_t hash, struct xbuf *stats);
 
 #endif

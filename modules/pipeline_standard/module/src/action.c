@@ -28,18 +28,20 @@
 #include <linux/if_ether.h>
 #include <action/action.h>
 #include <indigo/of_state_manager.h>
+#include <pipeline/pipeline.h>
 #include "group.h"
 
 #define AIM_LOG_MODULE_NAME pipeline_standard
 #include <AIM/aim_log.h>
 
-static void process_group(struct action_context *ctx, struct group *group, uint32_t hash);
+static void process_group(struct action_context *ctx, struct group *group, uint32_t hash, struct xbuf *stats);
 
 void
 pipeline_standard_translate_actions(
     struct action_context *ctx,
     struct xbuf *xbuf,
-    uint32_t hash)
+    uint32_t hash,
+    struct xbuf *stats)
 {
     struct nlattr *attr;
     XBUF_FOREACH(xbuf_data(xbuf), xbuf_length(xbuf), attr) {
@@ -160,7 +162,7 @@ pipeline_standard_translate_actions(
         /* Group action */
         case IND_OVS_ACTION_GROUP: {
             struct group *group = *XBUF_PAYLOAD(attr, struct group *);
-            process_group(ctx, group, hash);
+            process_group(ctx, group, hash, stats);
             break;
         }
 
@@ -171,15 +173,19 @@ pipeline_standard_translate_actions(
 }
 
 static void
-process_group_bucket(struct action_context *ctx, struct group_bucket *bucket, uint32_t hash)
+process_group_bucket(
+    struct action_context *ctx, struct group_bucket *bucket,
+    uint32_t hash, struct xbuf *stats)
 {
-    pipeline_standard_translate_actions(ctx, &bucket->actions, hash);
-    /* TODO update stats */
+    pipeline_standard_translate_actions(ctx, &bucket->actions, hash, stats);
+    pipeline_add_stats(stats, &bucket->stats_handle);
 }
 
 /* TODO handle watch_port, watch_group */
 static void
-process_group(struct action_context *ctx, struct group *group, uint32_t hash)
+process_group(
+    struct action_context *ctx, struct group *group,
+    uint32_t hash, struct xbuf *stats)
 {
     if (group->value.num_buckets == 0) {
         return;
@@ -187,17 +193,17 @@ process_group(struct action_context *ctx, struct group *group, uint32_t hash)
 
     if (group->type == OF_GROUP_TYPE_SELECT) {
         struct group_bucket *bucket = &group->value.buckets[hash % group->value.num_buckets];
-        process_group_bucket(ctx, bucket, hash);
+        process_group_bucket(ctx, bucket, hash, stats);
     } else if (group->type == OF_GROUP_TYPE_INDIRECT) {
-        process_group_bucket(ctx, &group->value.buckets[0], hash);
+        process_group_bucket(ctx, &group->value.buckets[0], hash, stats);
     } else if (group->type == OF_GROUP_TYPE_ALL) {
         /* TODO reset ctx after each bucket */
         int i;
         for (i = 0; i < group->value.num_buckets; i++) {
-            process_group_bucket(ctx, &group->value.buckets[i], hash);
+            process_group_bucket(ctx, &group->value.buckets[i], hash, stats);
         }
     } else if (group->type == OF_GROUP_TYPE_FF) {
-        process_group_bucket(ctx, &group->value.buckets[0], hash);
+        process_group_bucket(ctx, &group->value.buckets[0], hash, stats);
     }
 }
 
