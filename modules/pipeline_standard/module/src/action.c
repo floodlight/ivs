@@ -33,12 +33,13 @@
 #define AIM_LOG_MODULE_NAME pipeline_standard
 #include <AIM/aim_log.h>
 
-static void process_group(struct action_context *ctx, struct group *group);
+static void process_group(struct action_context *ctx, struct group *group, uint32_t hash);
 
 void
 pipeline_standard_translate_actions(
     struct action_context *ctx,
-    struct xbuf *xbuf)
+    struct xbuf *xbuf,
+    uint32_t hash)
 {
     struct nlattr *attr;
     XBUF_FOREACH(xbuf_data(xbuf), xbuf_length(xbuf), attr) {
@@ -157,9 +158,11 @@ pipeline_standard_translate_actions(
             break;
 
         /* Group action */
-        case IND_OVS_ACTION_GROUP:
-            process_group(ctx, *XBUF_PAYLOAD(attr, struct group *));
+        case IND_OVS_ACTION_GROUP: {
+            struct group *group = *XBUF_PAYLOAD(attr, struct group *);
+            process_group(ctx, group, hash);
             break;
+        }
 
         default:
             break;
@@ -168,34 +171,33 @@ pipeline_standard_translate_actions(
 }
 
 static void
-process_group_bucket(struct action_context *ctx, struct group_bucket *bucket)
+process_group_bucket(struct action_context *ctx, struct group_bucket *bucket, uint32_t hash)
 {
-    pipeline_standard_translate_actions(ctx, &bucket->actions);
+    pipeline_standard_translate_actions(ctx, &bucket->actions, hash);
     /* TODO update stats */
 }
 
 /* TODO handle watch_port, watch_group */
 static void
-process_group(struct action_context *ctx, struct group *group)
+process_group(struct action_context *ctx, struct group *group, uint32_t hash)
 {
     if (group->value.num_buckets == 0) {
         return;
     }
 
     if (group->type == OF_GROUP_TYPE_SELECT) {
-        uint32_t hash = 0; /* TODO */
         struct group_bucket *bucket = &group->value.buckets[hash % group->value.num_buckets];
-        process_group_bucket(ctx, bucket);
+        process_group_bucket(ctx, bucket, hash);
     } else if (group->type == OF_GROUP_TYPE_INDIRECT) {
-        process_group_bucket(ctx, &group->value.buckets[0]);
+        process_group_bucket(ctx, &group->value.buckets[0], hash);
     } else if (group->type == OF_GROUP_TYPE_ALL) {
         /* TODO reset ctx after each bucket */
         int i;
         for (i = 0; i < group->value.num_buckets; i++) {
-            process_group_bucket(ctx, &group->value.buckets[i]);
+            process_group_bucket(ctx, &group->value.buckets[i], hash);
         }
     } else if (group->type == OF_GROUP_TYPE_FF) {
-        process_group_bucket(ctx, &group->value.buckets[0]);
+        process_group_bucket(ctx, &group->value.buckets[0], hash);
     }
 }
 

@@ -70,6 +70,8 @@ indigo_error_t pipeline_standard_translate_openflow_actions(of_list_action_t *ac
 void pipeline_standard_cleanup_actions(struct xbuf *actions);
 
 /* Translate IVS actions into OVS actions */
-void pipeline_standard_translate_actions(struct action_context *ctx, struct xbuf *actions);
+void pipeline_standard_translate_actions(
+    struct action_context *ctx, struct xbuf *actions,
+    uint32_t hash);
 
 #endif

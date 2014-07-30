@@ -27,6 +27,7 @@
 #include <tcam/tcam.h>
 #include <indigo/indigo.h>
 #include <indigo/of_state_manager.h>
+#include <murmur/murmur.h>
 #include "cfr.h"
 #include "action.h"
 #include "group.h"
@@ -129,6 +130,8 @@ pipeline_standard_process(struct ind_ovs_parsed_key *key,
     struct pipeline_standard_cfr cfr;
     pipeline_standard_key_to_cfr(key, &cfr);
 
+    uint32_t hash = murmur_hash(&cfr, sizeof(cfr), 0);
+
     uint8_t table_id = 0;
     if (flowtables[table_id] == NULL) {
         AIM_LOG_VERBOSE("table 0 missing, dropping packet");
@@ -159,7 +162,8 @@ pipeline_standard_process(struct ind_ovs_parsed_key *key,
 
         pipeline_add_stats(stats, &entry->stats_handle);
 
-        pipeline_standard_translate_actions(actx, &entry->value.apply_actions);
+        pipeline_standard_translate_actions(actx, &entry->value.apply_actions,
+                                            hash);
 
         table_id = entry->value.next_table_id;
 
