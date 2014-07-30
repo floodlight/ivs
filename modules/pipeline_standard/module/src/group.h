@@ -22,6 +22,7 @@
 
 struct group_bucket {
     struct xbuf actions;
+    struct stats_handle stats_handle;
 };
 
 struct group_value {

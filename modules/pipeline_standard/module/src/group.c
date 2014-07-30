@@ -60,6 +60,7 @@ parse_group_value(int group_type, of_list_bucket_t *of_buckets, struct group_val
         struct group_bucket *bucket =
             xbuf_reserve(&buckets_xbuf, sizeof(*bucket));
         xbuf_init(&bucket->actions);
+        stats_alloc(&bucket->stats_handle);
         num_buckets++;
 
         of_list_action_t of_actions;
@@ -91,6 +92,7 @@ cleanup_group_value(struct group_value *value)
     for (i = 0; i < value->num_buckets; i++) {
         struct group_bucket *bucket = &value->buckets[i];
         xbuf_cleanup(&bucket->actions);
+        stats_free(&bucket->stats_handle);
     }
     aim_free(value->buckets);
 }
@@ -155,6 +157,30 @@ group_stats_get(
     void *table_priv, void *entry_priv,
     of_group_stats_entry_t *stats)
 {
+    uint64_t total_packets = 0, total_bytes = 0;
+    struct group *group = entry_priv;
+
+    of_list_bucket_counter_t bucket_counters;
+    of_group_stats_entry_bucket_stats_bind(stats, &bucket_counters);
+
+    int i;
+    for (i = 0; i < group->value.num_buckets; i++) {
+        of_bucket_counter_t bucket_counter;
+        of_bucket_counter_init(&bucket_counter, stats->version, -1, 1);
+        (void) of_list_bucket_counter_append_bind(&bucket_counters, &bucket_counter);
+
+        struct stats stats;
+        stats_get(&group->value.buckets[i].stats_handle, &stats);
+
+        of_bucket_counter_packet_count_set(&bucket_counter, stats.packets);
+        of_bucket_counter_byte_count_set(&bucket_counter, stats.bytes);
+
+        total_packets += stats.packets;
+        total_bytes += stats.bytes;
+    }
+
+    of_group_stats_entry_packet_count_set(stats, total_packets);
+    of_group_stats_entry_byte_count_set(stats, total_bytes);
     return INDIGO_ERROR_NONE;
 }
 
