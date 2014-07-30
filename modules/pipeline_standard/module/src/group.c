@@ -91,7 +91,7 @@ cleanup_group_value(struct group_value *value)
     int i;
     for (i = 0; i < value->num_buckets; i++) {
         struct group_bucket *bucket = &value->buckets[i];
-        xbuf_cleanup(&bucket->actions);
+        pipeline_standard_cleanup_actions(&bucket->actions);
         stats_free(&bucket->stats_handle);
     }
     aim_free(value->buckets);

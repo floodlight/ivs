@@ -27,9 +27,13 @@
 #include <byteswap.h>
 #include <linux/if_ether.h>
 #include <action/action.h>
+#include <indigo/of_state_manager.h>
+#include "group.h"
 
 #define AIM_LOG_MODULE_NAME pipeline_standard
 #include <AIM/aim_log.h>
+
+static void process_group(struct action_context *ctx, struct group *group);
 
 void
 pipeline_standard_translate_actions(
@@ -152,9 +156,46 @@ pipeline_standard_translate_actions(
             action_set_udp_src(ctx, *XBUF_PAYLOAD(attr, uint16_t));
             break;
 
+        /* Group action */
+        case IND_OVS_ACTION_GROUP:
+            process_group(ctx, *XBUF_PAYLOAD(attr, struct group *));
+            break;
+
         default:
             break;
         }
+    }
+}
+
+static void
+process_group_bucket(struct action_context *ctx, struct group_bucket *bucket)
+{
+    pipeline_standard_translate_actions(ctx, &bucket->actions);
+    /* TODO update stats */
+}
+
+/* TODO handle watch_port, watch_group */
+static void
+process_group(struct action_context *ctx, struct group *group)
+{
+    if (group->value.num_buckets == 0) {
+        return;
+    }
+
+    if (group->type == OF_GROUP_TYPE_SELECT) {
+        uint32_t hash = 0; /* TODO */
+        struct group_bucket *bucket = &group->value.buckets[hash % group->value.num_buckets];
+        process_group_bucket(ctx, bucket);
+    } else if (group->type == OF_GROUP_TYPE_INDIRECT) {
+        process_group_bucket(ctx, &group->value.buckets[0]);
+    } else if (group->type == OF_GROUP_TYPE_ALL) {
+        /* TODO reset ctx after each bucket */
+        int i;
+        for (i = 0; i < group->value.num_buckets; i++) {
+            process_group_bucket(ctx, &group->value.buckets[i]);
+        }
+    } else if (group->type == OF_GROUP_TYPE_FF) {
+        process_group_bucket(ctx, &group->value.buckets[0]);
     }
 }
 
@@ -417,6 +458,17 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
             xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_NW_TTL, &ttl, sizeof(ttl));
             break;
         }
+        case OF_ACTION_GROUP: {
+            uint32_t group_id;
+            of_action_group_group_id_get(&act.group, &group_id);
+            struct group *group = indigo_core_group_acquire(group_id);
+            if (group == NULL) {
+                AIM_LOG_ERROR("nonexistent group %u", group_id);
+                return INDIGO_ERROR_COMPAT;
+            }
+            xbuf_append_attr(xbuf, IND_OVS_ACTION_GROUP, &group, sizeof(group));
+            break;
+        }
         default:
             AIM_LOG_ERROR("unsupported action %s", of_object_id_str[act.header.object_id]);
             return INDIGO_ERROR_COMPAT;
@@ -424,4 +476,22 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
     }
 
     return INDIGO_ERROR_NONE;
+}
+
+void
+pipeline_standard_cleanup_actions(struct xbuf *actions)
+{
+    struct nlattr *attr;
+    XBUF_FOREACH(xbuf_data(actions), xbuf_length(actions), attr) {
+        switch (attr->nla_type) {
+        case IND_OVS_ACTION_GROUP: {
+            struct group *group = *XBUF_PAYLOAD(attr, struct group *);
+            indigo_core_group_release(group->id);
+            break;
+        }
+        default:
+            break;
+        }
+    }
+    xbuf_cleanup(actions);
 }

@@ -325,8 +325,8 @@ parse_value(of_flow_add_t *flow_mod, struct flowtable_value *value,
     return INDIGO_ERROR_NONE;
 
 error:
-    xbuf_cleanup(&value->apply_actions);
-    xbuf_cleanup(&value->write_actions);
+    pipeline_standard_cleanup_actions(&value->apply_actions);
+    pipeline_standard_cleanup_actions(&value->write_actions);
     return err;
 }
 
@@ -402,8 +402,8 @@ flowtable_entry_modify(
     }
 
     ind_ovs_fwd_write_lock();
-    xbuf_cleanup(&entry->value.apply_actions);
-    xbuf_cleanup(&entry->value.write_actions);
+    pipeline_standard_cleanup_actions(&entry->value.apply_actions);
+    pipeline_standard_cleanup_actions(&entry->value.write_actions);
     entry->value = value;
     ind_ovs_fwd_write_unlock();
 
@@ -430,8 +430,8 @@ flowtable_entry_delete(
     flow_stats->packets = stats.packets;
     flow_stats->bytes = stats.bytes;
 
-    xbuf_cleanup(&entry->value.apply_actions);
-    xbuf_cleanup(&entry->value.write_actions);
+    pipeline_standard_cleanup_actions(&entry->value.apply_actions);
+    pipeline_standard_cleanup_actions(&entry->value.write_actions);
     stats_free(&entry->stats_handle);
     aim_free(entry);
     return INDIGO_ERROR_NONE;
