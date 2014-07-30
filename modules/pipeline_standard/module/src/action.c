@@ -219,7 +219,7 @@ process_group(
  * The actions are written to 'xbuf'.
  */
 indigo_error_t
-ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf, bool table_miss)
+pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf, bool table_miss)
 {
     of_action_t act;
     int rv;

@@ -267,9 +267,8 @@ parse_value(of_flow_add_t *flow_mod, struct flowtable_value *value,
 
     if (flow_mod->version == OF_VERSION_1_0) {
         of_flow_modify_actions_bind(flow_mod, &openflow_actions);
-        if ((err = ind_ovs_translate_openflow_actions(&openflow_actions,
-                                                      &value->apply_actions,
-                                                      table_miss)) < 0) {
+        if ((err = pipeline_standard_translate_openflow_actions(
+                &openflow_actions, &value->apply_actions, table_miss)) < 0) {
             goto error;
         }
     } else {
@@ -286,18 +285,16 @@ parse_value(of_flow_add_t *flow_mod, struct flowtable_value *value,
             case OF_INSTRUCTION_APPLY_ACTIONS:
                 of_instruction_apply_actions_actions_bind(&inst.apply_actions,
                                                           &openflow_actions);
-                if ((err = ind_ovs_translate_openflow_actions(&openflow_actions,
-                                                              &value->apply_actions,
-                                                              table_miss)) < 0) {
+                if ((err = pipeline_standard_translate_openflow_actions(
+                        &openflow_actions, &value->apply_actions, table_miss)) < 0) {
                     goto error;
                 }
                 break;
             case OF_INSTRUCTION_WRITE_ACTIONS:
                 of_instruction_write_actions_actions_bind(&inst.write_actions,
                                                           &openflow_actions);
-                if ((err = ind_ovs_translate_openflow_actions(&openflow_actions,
-                                                              &value->write_actions,
-                                                              table_miss)) < 0) {
+                if ((err = pipeline_standard_translate_openflow_actions(
+                        &openflow_actions, &value->write_actions, table_miss)) < 0) {
                     goto error;
                 }
                 break;

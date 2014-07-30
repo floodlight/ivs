@@ -85,7 +85,7 @@ parse_group_value(int group_type, of_list_bucket_t *of_buckets, struct group_val
         of_list_action_t of_actions;
         of_bucket_actions_bind(&of_bucket, &of_actions);
 
-        err = ind_ovs_translate_openflow_actions(
+        err = pipeline_standard_translate_openflow_actions(
             &of_actions, &bucket->actions, false);
         if (err < 0) {
             goto error;
