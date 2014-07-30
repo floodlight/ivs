@@ -63,16 +63,32 @@ parse_group_value(int group_type, of_list_bucket_t *of_buckets, struct group_val
         stats_alloc(&bucket->stats_handle);
         num_buckets++;
 
+        uint16_t weight;
+        of_bucket_weight_get(&of_bucket, &weight);
+
+        if (weight > 0 && group_type != OF_GROUP_TYPE_SELECT) {
+            AIM_LOG_ERROR("Invalid group bucket weight");
+            err = INDIGO_ERROR_COMPAT;
+            goto error;
+        } else if (weight == 0 && group_type == OF_GROUP_TYPE_SELECT) {
+            AIM_LOG_ERROR("Invalid group bucket weight");
+            err = INDIGO_ERROR_COMPAT;
+            goto error;
+        }
+
+        if (group_type == OF_GROUP_TYPE_INDIRECT && num_buckets > 1) {
+            AIM_LOG_ERROR("Too many buckets for an indirect group");
+            err = INDIGO_ERROR_COMPAT;
+            goto error;
+        }
+
         of_list_action_t of_actions;
         of_bucket_actions_bind(&of_bucket, &of_actions);
 
         err = ind_ovs_translate_openflow_actions(
             &of_actions, &bucket->actions, false);
         if (err < 0) {
-            value->buckets = xbuf_steal(&buckets_xbuf);
-            value->num_buckets = num_buckets;
-            cleanup_group_value(value);
-            return err;
+            goto error;
         }
 
         xbuf_compact(&bucket->actions);
@@ -83,6 +99,12 @@ parse_group_value(int group_type, of_list_bucket_t *of_buckets, struct group_val
     value->buckets = xbuf_steal(&buckets_xbuf);
     value->num_buckets = num_buckets;
     return INDIGO_ERROR_NONE;
+
+error:
+    value->buckets = xbuf_steal(&buckets_xbuf);
+    value->num_buckets = num_buckets;
+    cleanup_group_value(value);
+    return err;
 }
 
 static void

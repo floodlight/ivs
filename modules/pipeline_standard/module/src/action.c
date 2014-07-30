@@ -239,6 +239,9 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
                 case OF_PORT_DEST_ALL:
                     AIM_LOG_ERROR("unsupported output port OFPP_ALL");
                     return INDIGO_ERROR_COMPAT;
+                case OF_PORT_DEST_WILDCARD:
+                    AIM_LOG_ERROR("unsupported output port OFPP_ANY");
+                    return INDIGO_ERROR_COMPAT;
                 case OF_PORT_DEST_FLOOD:
                     AIM_LOG_ERROR("unsupported output port OFPP_FLOOD");
                     return INDIGO_ERROR_COMPAT;
