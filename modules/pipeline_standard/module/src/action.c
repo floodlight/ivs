@@ -152,6 +152,11 @@ pipeline_standard_translate_actions(
             action_set_udp_src(ctx, *XBUF_PAYLOAD(attr, uint16_t));
             break;
 
+        /* Miscellaneous actions */
+        case IND_OVS_ACTION_SET_PRIORITY:
+            action_set_priority(ctx, *XBUF_PAYLOAD(attr, uint32_t));
+            break;
+
         default:
             break;
         }
@@ -415,6 +420,12 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
             uint8_t ttl;
             of_action_set_nw_ttl_nw_ttl_get(&act.set_nw_ttl, &ttl);
             xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_NW_TTL, &ttl, sizeof(ttl));
+            break;
+        }
+        case OF_ACTION_SET_QUEUE: {
+            uint32_t queue_id;
+            of_action_set_queue_queue_id_get(&act.set_queue, &queue_id);
+            xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_PRIORITY, &queue_id, sizeof(queue_id));
             break;
         }
         default:
