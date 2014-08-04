@@ -452,6 +452,12 @@ translate_openflow_actions(of_list_action_t *actions, struct ind_ovs_parsed_key 
             action_set_ipv6_ttl(&ctx, ttl);
             break;
         }
+        case OF_ACTION_SET_QUEUE: {
+            uint32_t queue_id;
+            of_action_set_queue_queue_id_get(&act.set_queue, &queue_id);
+            action_set_priority(&ctx, queue_id);
+            break;
+        }
         default:
             LOG_ERROR("unsupported action %s", of_object_id_str[act.header.object_id]);
             return INDIGO_ERROR_COMPAT;
