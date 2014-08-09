@@ -60,6 +60,7 @@ enum {
     IND_OVS_ACTION_SET_IPV6_DST,    /* of_ipv6_t */
     IND_OVS_ACTION_SET_IPV6_SRC,    /* of_ipv6_t */
     IND_OVS_ACTION_SET_IPV6_FLABEL, /* uint32_t */
+    IND_OVS_ACTION_SET_PRIORITY, /* uint32_t */
 };
 
 /* Translate OpenFlow actions into IVS actions */

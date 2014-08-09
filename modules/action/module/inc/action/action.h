@@ -95,4 +95,8 @@ void action_set_tcp_dst(struct action_context *ctx, uint16_t tcp_dst);
 void action_set_udp_src(struct action_context *ctx, uint16_t udp_src);
 void action_set_udp_dst(struct action_context *ctx, uint16_t udp_dst);
 
+/* Misc */
+
+void action_set_priority(struct action_context *ctx, uint32_t priority);
+
 #endif

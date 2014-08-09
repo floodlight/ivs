@@ -411,6 +411,8 @@ output_key(struct nlattr *attr)
             VALUE_IPV4((uint8_t *)&x->arp_tip),
             VALUE_MAC(x->arp_sha),
             VALUE_MAC(x->arp_tha));
+
+    key(OVS_KEY_ATTR_PRIORITY, uint32_t, "prio=%u", *x);
 #undef key
 }
 
