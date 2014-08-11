@@ -109,6 +109,7 @@ struct ind_ovs_port {
     unsigned no_packet_in : 1;
     unsigned no_flood : 1;
     unsigned admin_down : 1;
+    unsigned is_uplink : 1;
     uint32_t num_kflows; /* Number of kflows with this in_port */
     struct nl_sock *notify_socket; /* Netlink socket for upcalls */
     struct nl_sock *pktin_socket; /* Netlink socket for packet-ins */
@@ -198,6 +199,11 @@ void ind_ovs_port_added(uint32_t port_no, const char *ifname, of_mac_addr_t mac_
 void ind_ovs_port_deleted(uint32_t port_no);
 struct ind_ovs_port *ind_ovs_port_lookup(of_port_no_t port_no);
 struct ind_ovs_port *ind_ovs_port_lookup_by_name(const char *ifname);
+
+/* Interface of the uplink submodule */
+bool ind_ovs_uplink_check_by_name(const char *name);
+bool ind_ovs_uplink_check(of_port_no_t port_no);
+of_port_no_t ind_ovs_uplink_first(void);
 
 /* Interface of the upcall submodule */
 void ind_ovs_upcall_init(void);

@@ -265,6 +265,8 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname, of_mac_addr_t mac_addr)
         port->ifflags = IFF_UP;
     }
 
+    port->is_uplink = ind_ovs_uplink_check_by_name(port->ifname);
+
     /* Ensure port is fully populated before publishing it. */
     __sync_synchronize();
 
@@ -278,7 +280,7 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname, of_mac_addr_t mac_addr)
 
     ind_ovs_upcall_register(port);
     ind_ovs_pktin_register(port);
-    LOG_INFO("Added port %s", port->ifname);
+    LOG_INFO("Added %s %s", port->is_uplink ? "uplink" : "port", port->ifname);
     ind_ovs_kflow_invalidate_all();
     return;
 
@@ -327,7 +329,7 @@ ind_ovs_port_deleted(uint32_t port_no)
         LOG_ERROR("failed to notify controller of port deletion");
     }
 
-    LOG_INFO("Deleted port %s", port->ifname);
+    LOG_INFO("Deleted %s %s", port->is_uplink ? "uplink" : "port", port->ifname);
 
     ind_ovs_fwd_write_lock();
     nl_socket_free(port->notify_socket);

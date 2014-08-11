@@ -484,7 +484,7 @@ aim_main(int argc, char* argv[])
                 AIM_LOG_FATAL("Failed to add uplink %s", str);
                 return 1;
             }
-            ind_ovs_uplink_add(port_no);
+            ind_ovs_uplink_add(str);
             port_no++;
         }
     }
