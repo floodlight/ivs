@@ -54,6 +54,7 @@ static void help(void)
     fprintf(stderr, "  add-internal-port INTERFACE: add an internal port to the datapath\n");
     fprintf(stderr, "  del-port INTERFACE: delete a port from the datapath\n");
     fprintf(stderr, "  cli ...: run an internal CLI command\n");
+    fprintf(stderr, "  dump-flows: print information about each kernel flow\n");
 }
 
 static void
@@ -349,6 +350,149 @@ cli(int argc, char **argv)
     fclose(f);
 }
 
+#define FORMAT_MAC "%02x:%02x:%02x:%02x:%02x:%02x"
+#define VALUE_MAC(a) (a)[0],(a)[1],(a)[2],(a)[3],(a)[4],(a)[5]
+#define FORMAT_IPV4 "%hhu.%hhu.%hhu.%hhu"
+#define VALUE_IPV4(a) (a)[0],(a)[1],(a)[2],(a)[3]
+
+static void
+output_key(struct nlattr *attr)
+{
+    struct nlattr *key_attrs[OVS_KEY_ATTR_MAX+1];
+    if (nla_parse_nested(key_attrs, OVS_KEY_ATTR_MAX, attr, NULL) < 0) {
+        abort();
+    }
+
+#define key(attr_type, c_type, fmt, ...) \
+    if (key_attrs[attr_type]) { \
+        c_type __attribute__((unused)) *x = nla_data(key_attrs[attr_type]); \
+        printf(fmt " ", ##__VA_ARGS__); \
+    }
+
+    key(OVS_KEY_ATTR_IN_PORT, uint32_t, "port=%u", *x);
+
+    key(OVS_KEY_ATTR_ETHERNET, struct ovs_key_ethernet,
+            "eth src=" FORMAT_MAC " dst=" FORMAT_MAC,
+            VALUE_MAC(x->eth_src), VALUE_MAC(x->eth_dst));
+    key(OVS_KEY_ATTR_VLAN, uint16_t,
+            "vlan=%u pcp=%u",
+            ntohs(*x) & 0xfff, ntohs(*x) >> 13);
+
+    if (key_attrs[OVS_KEY_ATTR_ENCAP]) {
+        output_key(key_attrs[OVS_KEY_ATTR_ENCAP]);
+    } else {
+        key(OVS_KEY_ATTR_ETHERTYPE, uint16_t, "type=%#.4hx", ntohs(*x));
+    }
+
+    key(OVS_KEY_ATTR_IPV4, struct ovs_key_ipv4,
+            "ipv4 src=" FORMAT_IPV4 " dst=" FORMAT_IPV4 " tos=%hhu ttl=%u proto=%u",
+            VALUE_IPV4((uint8_t *)&x->ipv4_src),
+            VALUE_IPV4((uint8_t *)&x->ipv4_dst),
+            x->ipv4_tos,
+            x->ipv4_ttl,
+            x->ipv4_proto);
+
+    key(OVS_KEY_ATTR_TCP, struct ovs_key_tcp,
+            "tcp src=%hu dst=%hu", ntohs(x->tcp_src), ntohs(x->tcp_dst));
+    key(OVS_KEY_ATTR_TCP_FLAGS, uint16_t,
+            "flags=%#x", ntohs(*x));
+    key(OVS_KEY_ATTR_UDP, struct ovs_key_udp,
+            "udp src=%hu dst=%hu", ntohs(x->udp_src), ntohs(x->udp_dst));
+    key(OVS_KEY_ATTR_SCTP, struct ovs_key_sctp,
+            "sctp src=%hu dst=%hu", ntohs(x->sctp_src), ntohs(x->sctp_dst));
+    key(OVS_KEY_ATTR_ICMP, struct ovs_key_icmp,
+            "icmp type=%hhu code=%hhu", x->icmp_type, x->icmp_code);
+    key(OVS_KEY_ATTR_ICMPV6, struct ovs_key_icmpv6,
+            "icmpv6 type=%hhu code=%hhu", x->icmpv6_type, x->icmpv6_code);
+    key(OVS_KEY_ATTR_ARP, struct ovs_key_arp,
+            "arp op=%hu sip="FORMAT_IPV4" tip="FORMAT_IPV4" sha="FORMAT_MAC" tha="FORMAT_MAC,
+            ntohs(x->arp_op),
+            VALUE_IPV4((uint8_t *)&x->arp_sip),
+            VALUE_IPV4((uint8_t *)&x->arp_tip),
+            VALUE_MAC(x->arp_sha),
+            VALUE_MAC(x->arp_tha));
+
+    key(OVS_KEY_ATTR_PRIORITY, uint32_t, "prio=%u", *x);
+#undef key
+}
+
+static void
+output_actions(struct nlattr *parent)
+{
+    struct nlattr *attr;
+    int rem;
+    nla_for_each_nested(attr, parent, rem) {
+        switch (nla_type(attr)) {
+        case OVS_ACTION_ATTR_OUTPUT:
+            printf("output %d", nla_get_u32(attr));
+            break;
+        case OVS_ACTION_ATTR_USERSPACE:
+            printf("pktin");
+            break;
+        case OVS_ACTION_ATTR_POP_VLAN:
+            printf("pop-vlan");
+            break;
+        case OVS_ACTION_ATTR_PUSH_VLAN: {
+            struct ovs_action_push_vlan *x = nla_data(attr);
+            printf("push-vlan { vid=%u pcp=%d }", ntohs(x->vlan_tci) & 0xfff, ntohs(x->vlan_tci) >> 13);
+            break;
+        }
+        case OVS_ACTION_ATTR_SET:
+            printf("set { ");
+            output_key(attr);
+            printf("}");
+            break;
+        default:
+            printf("?");
+            break;
+        }
+        printf(" ");
+    }
+}
+
+static int
+show_kflow__(struct nl_msg *msg, void *arg)
+{
+    struct nlmsghdr *nlh = nlmsg_hdr(msg);
+    struct nlattr *attrs[OVS_FLOW_ATTR_MAX+1];
+    if (genlmsg_parse(nlh, sizeof(struct ovs_header),
+                    attrs, OVS_FLOW_ATTR_MAX,
+                    NULL) < 0) {
+        abort();
+    }
+
+    output_key(attrs[OVS_FLOW_ATTR_KEY]);
+    printf("-> ");
+    output_actions(attrs[OVS_FLOW_ATTR_ACTIONS]);
+    printf("\n");
+
+    return NL_OK;
+}
+
+static void
+dump_flows(const char *datapath)
+{
+    unsigned int dp_ifindex = if_nametoindex(datapath);
+    if (dp_ifindex == 0) {
+        fprintf(stderr, "Failed: no such datapath '%s'\n", datapath);
+        exit(1);
+    }
+
+    struct nl_msg *msg = nlmsg_alloc();
+    struct ovs_header *hdr = genlmsg_put(msg, NL_AUTO_PORT, NL_AUTO_SEQ,
+                                         ovs_flow_family, sizeof(*hdr),
+                                         NLM_F_DUMP, OVS_FLOW_CMD_GET, OVS_FLOW_VERSION);
+    hdr->dp_ifindex = dp_ifindex;
+    if (nl_send_auto(sk2, msg) < 0) {
+        abort();
+    }
+
+    nl_socket_modify_cb(sk2, NL_CB_VALID, NL_CB_CUSTOM, show_kflow__, NULL);
+    nl_recvmsgs_default(sk2);
+
+    nlmsg_free(msg);
+}
+
 static struct nl_sock *
 create_genl_socket(void)
 {
@@ -426,6 +570,12 @@ main(int argc, char *argv[])
         del_dp(datapath_name);
     } else if (!strcmp(cmd, "cli")) {
         cli(argc-1, argv+1);
+    } else if (!strcmp(cmd, "dump-flows")) {
+        if (argc != 1) {
+            fprintf(stderr, "Wrong number of arguments for the %s command (try help)\n", cmd);
+            return 1;
+        }
+        dump_flows(datapath_name);
     } else {
         fprintf(stderr, "Unknown command '%s' (try help)\n", cmd);
         return 1;

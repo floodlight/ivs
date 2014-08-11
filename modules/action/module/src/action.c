@@ -305,6 +305,17 @@ action_set_udp_dst(struct action_context *ctx, uint16_t udp_dst)
     }
 }
 
+/*
+ * Miscellaneous actions
+ */
+
+void
+action_set_priority(struct action_context *ctx, uint32_t priority)
+{
+    ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_PRIORITY);
+    ctx->current_key.priority = priority;
+}
+
 
 /*
  * Write out set-field actions

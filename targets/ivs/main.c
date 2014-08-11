@@ -340,6 +340,7 @@ aim_main(int argc, char* argv[])
     /* Setup logging from command line options */
 
     if (loglevel >= LOGLEVEL_DEFAULT) {
+        aim_log_fid_set_all(AIM_LOG_FLAG_MSG, 1);
         aim_log_fid_set_all(AIM_LOG_FLAG_FATAL, 1);
         aim_log_fid_set_all(AIM_LOG_FLAG_ERROR, 1);
         aim_log_fid_set_all(AIM_LOG_FLAG_WARN, 1);
