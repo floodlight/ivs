@@ -43,7 +43,7 @@ static int transact(struct nl_sock *sk, struct nl_msg *msg);
 static int ovs_datapath_family, ovs_packet_family, ovs_vport_family, ovs_flow_family;
 static struct nl_sock *sk, *sk2;
 
-static const char *datapath_name = "indigo";
+static const char *datapath_name = "ivs";
 
 static void help(void)
 {
