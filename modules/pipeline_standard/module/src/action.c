@@ -27,14 +27,21 @@
 #include <byteswap.h>
 #include <linux/if_ether.h>
 #include <action/action.h>
+#include <indigo/of_state_manager.h>
+#include <pipeline/pipeline.h>
+#include "group.h"
 
 #define AIM_LOG_MODULE_NAME pipeline_standard
 #include <AIM/aim_log.h>
 
+static void process_group(struct action_context *ctx, struct group *group, uint32_t hash, struct xbuf *stats);
+
 void
 pipeline_standard_translate_actions(
     struct action_context *ctx,
-    struct xbuf *xbuf)
+    struct xbuf *xbuf,
+    uint32_t hash,
+    struct xbuf *stats)
 {
     struct nlattr *attr;
     XBUF_FOREACH(xbuf_data(xbuf), xbuf_length(xbuf), attr) {
@@ -152,6 +159,13 @@ pipeline_standard_translate_actions(
             action_set_udp_src(ctx, *XBUF_PAYLOAD(attr, uint16_t));
             break;
 
+        /* Group action */
+        case IND_OVS_ACTION_GROUP: {
+            struct group *group = *XBUF_PAYLOAD(attr, struct group *);
+            process_group(ctx, group, hash, stats);
+            break;
+        }
+
         /* Miscellaneous actions */
         case IND_OVS_ACTION_SET_PRIORITY:
             action_set_priority(ctx, *XBUF_PAYLOAD(attr, uint32_t));
@@ -160,6 +174,41 @@ pipeline_standard_translate_actions(
         default:
             break;
         }
+    }
+}
+
+static void
+process_group_bucket(
+    struct action_context *ctx, struct group_bucket *bucket,
+    uint32_t hash, struct xbuf *stats)
+{
+    pipeline_standard_translate_actions(ctx, &bucket->actions, hash, stats);
+    pipeline_add_stats(stats, &bucket->stats_handle);
+}
+
+/* TODO handle watch_port, watch_group */
+static void
+process_group(
+    struct action_context *ctx, struct group *group,
+    uint32_t hash, struct xbuf *stats)
+{
+    if (group->value.num_buckets == 0) {
+        return;
+    }
+
+    if (group->type == OF_GROUP_TYPE_SELECT) {
+        struct group_bucket *bucket = &group->value.buckets[hash % group->value.num_buckets];
+        process_group_bucket(ctx, bucket, hash, stats);
+    } else if (group->type == OF_GROUP_TYPE_INDIRECT) {
+        process_group_bucket(ctx, &group->value.buckets[0], hash, stats);
+    } else if (group->type == OF_GROUP_TYPE_ALL) {
+        /* TODO reset ctx after each bucket */
+        int i;
+        for (i = 0; i < group->value.num_buckets; i++) {
+            process_group_bucket(ctx, &group->value.buckets[i], hash, stats);
+        }
+    } else if (group->type == OF_GROUP_TYPE_FF) {
+        process_group_bucket(ctx, &group->value.buckets[0], hash, stats);
     }
 }
 
@@ -175,7 +224,7 @@ pipeline_standard_translate_actions(
  * The actions are written to 'xbuf'.
  */
 indigo_error_t
-ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf, bool table_miss)
+pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf, bool table_miss)
 {
     of_action_t act;
     int rv;
@@ -194,13 +243,16 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
                 }
                 case OF_PORT_DEST_ALL:
                     AIM_LOG_ERROR("unsupported output port OFPP_ALL");
-                    return INDIGO_ERROR_COMPAT;
+                    return INDIGO_ERROR_BAD_ACTION;
+                case OF_PORT_DEST_WILDCARD:
+                    AIM_LOG_ERROR("unsupported output port OFPP_ANY");
+                    return INDIGO_ERROR_BAD_ACTION;
                 case OF_PORT_DEST_FLOOD:
                     AIM_LOG_ERROR("unsupported output port OFPP_FLOOD");
-                    return INDIGO_ERROR_COMPAT;
+                    return INDIGO_ERROR_BAD_ACTION;
                 case OF_PORT_DEST_USE_TABLE:
                     AIM_LOG_ERROR("unsupported output port OFPP_TABLE");
-                    return INDIGO_ERROR_COMPAT;
+                    return INDIGO_ERROR_BAD_ACTION;
                 case OF_PORT_DEST_LOCAL:
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_LOCAL, NULL, 0);
                     break;
@@ -209,7 +261,7 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
                     break;
                 case OF_PORT_DEST_NORMAL:
                     AIM_LOG_ERROR("unsupported output port OFPP_NORMAL");
-                    return INDIGO_ERROR_COMPAT;
+                    return INDIGO_ERROR_BAD_ACTION;
                 default: {
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_OUTPUT, &port_no, sizeof(port_no));
                     break;
@@ -264,7 +316,7 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
                     if (ip_dscp > ((uint8_t)IP_DSCP_MASK >> 2)) {
                         AIM_LOG_ERROR("invalid dscp %d in action %s", ip_dscp,
                                 of_object_id_str[act.header.object_id]);
-                        return INDIGO_ERROR_COMPAT;
+                        return INDIGO_ERROR_BAD_ACTION;
                     }
 
                     ip_dscp <<= 2;
@@ -278,7 +330,7 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
                     if (ip_ecn > IP_ECN_MASK) {
                         AIM_LOG_ERROR("invalid ecn %d in action %s", ip_ecn,
                                 of_object_id_str[act.header.object_id]);
-                        return INDIGO_ERROR_COMPAT;
+                        return INDIGO_ERROR_BAD_ACTION;
                     }
 
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IP_ECN, &ip_ecn, sizeof(ip_ecn));
@@ -303,7 +355,7 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
                     if (flabel > IPV6_FLABEL_MASK) {
                         AIM_LOG_ERROR("invalid flabel 0x%04x in action %s", flabel,
                                 of_object_id_str[act.header.object_id]);
-                        return INDIGO_ERROR_COMPAT;
+                        return INDIGO_ERROR_BAD_ACTION;
                     }
 
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IPV6_FLABEL, &flabel, sizeof(flabel));
@@ -335,7 +387,7 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
                 }
                 default:
                     AIM_LOG_ERROR("unsupported set-field oxm %s", of_object_id_str[oxm.header.object_id]);
-                    return INDIGO_ERROR_COMPAT;
+                    return INDIGO_ERROR_BAD_ACTION;
             }
             break;
         }
@@ -405,7 +457,7 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
             if (eth_type != ETH_P_8021Q) {
                 AIM_LOG_ERROR("unsupported eth_type 0x%04x in action %s", eth_type,
                            of_object_id_str[act.header.object_id]);
-                return INDIGO_ERROR_COMPAT;
+                return INDIGO_ERROR_BAD_ACTION;
             }
 
             xbuf_append_attr(xbuf, IND_OVS_ACTION_PUSH_VLAN, &eth_type, sizeof(eth_type));
@@ -428,11 +480,40 @@ ind_ovs_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf,
             xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_PRIORITY, &queue_id, sizeof(queue_id));
             break;
         }
+        case OF_ACTION_GROUP: {
+            uint32_t group_id;
+            of_action_group_group_id_get(&act.group, &group_id);
+            struct group *group = indigo_core_group_acquire(group_id);
+            if (group == NULL) {
+                AIM_LOG_ERROR("nonexistent group %u", group_id);
+                return INDIGO_ERROR_BAD_ACTION;
+            }
+            xbuf_append_attr(xbuf, IND_OVS_ACTION_GROUP, &group, sizeof(group));
+            break;
+        }
         default:
             AIM_LOG_ERROR("unsupported action %s", of_object_id_str[act.header.object_id]);
-            return INDIGO_ERROR_COMPAT;
+            return INDIGO_ERROR_BAD_ACTION;
         }
     }
 
     return INDIGO_ERROR_NONE;
+}
+
+void
+pipeline_standard_cleanup_actions(struct xbuf *actions)
+{
+    struct nlattr *attr;
+    XBUF_FOREACH(xbuf_data(actions), xbuf_length(actions), attr) {
+        switch (attr->nla_type) {
+        case IND_OVS_ACTION_GROUP: {
+            struct group *group = *XBUF_PAYLOAD(attr, struct group *);
+            indigo_core_group_release(group->id);
+            break;
+        }
+        default:
+            break;
+        }
+    }
+    xbuf_cleanup(actions);
 }

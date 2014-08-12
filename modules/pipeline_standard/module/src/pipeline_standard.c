@@ -27,8 +27,10 @@
 #include <tcam/tcam.h>
 #include <indigo/indigo.h>
 #include <indigo/of_state_manager.h>
+#include <murmur/murmur.h>
 #include "cfr.h"
 #include "action.h"
+#include "group.h"
 
 #define AIM_LOG_MODULE_NAME pipeline_standard
 #include <AIM/aim_log.h>
@@ -97,6 +99,10 @@ pipeline_standard_init(const char *name)
         stats_alloc(&flowtable->missed_stats_handle);
         flowtables[i] = flowtable;
     }
+
+    if (openflow_version == OF_VERSION_1_3) {
+        pipeline_standard_group_register();
+    }
 }
 
 static void
@@ -110,6 +116,10 @@ pipeline_standard_finish(void)
         stats_free(&flowtables[i]->missed_stats_handle);
         aim_free(flowtables[i]);
     }
+
+    if (openflow_version == OF_VERSION_1_3) {
+        pipeline_standard_group_unregister();
+    }
 }
 
 indigo_error_t
@@ -119,6 +129,8 @@ pipeline_standard_process(struct ind_ovs_parsed_key *key,
 {
     struct pipeline_standard_cfr cfr;
     pipeline_standard_key_to_cfr(key, &cfr);
+
+    uint32_t hash = murmur_hash(&cfr, sizeof(cfr), 0);
 
     uint8_t table_id = 0;
     if (flowtables[table_id] == NULL) {
@@ -150,7 +162,8 @@ pipeline_standard_process(struct ind_ovs_parsed_key *key,
 
         pipeline_add_stats(stats, &entry->stats_handle);
 
-        pipeline_standard_translate_actions(actx, &entry->value.apply_actions);
+        pipeline_standard_translate_actions(actx, &entry->value.apply_actions,
+                                            hash, stats);
 
         table_id = entry->value.next_table_id;
 
@@ -254,9 +267,8 @@ parse_value(of_flow_add_t *flow_mod, struct flowtable_value *value,
 
     if (flow_mod->version == OF_VERSION_1_0) {
         of_flow_modify_actions_bind(flow_mod, &openflow_actions);
-        if ((err = ind_ovs_translate_openflow_actions(&openflow_actions,
-                                                      &value->apply_actions,
-                                                      table_miss)) < 0) {
+        if ((err = pipeline_standard_translate_openflow_actions(
+                &openflow_actions, &value->apply_actions, table_miss)) < 0) {
             goto error;
         }
     } else {
@@ -273,18 +285,16 @@ parse_value(of_flow_add_t *flow_mod, struct flowtable_value *value,
             case OF_INSTRUCTION_APPLY_ACTIONS:
                 of_instruction_apply_actions_actions_bind(&inst.apply_actions,
                                                           &openflow_actions);
-                if ((err = ind_ovs_translate_openflow_actions(&openflow_actions,
-                                                              &value->apply_actions,
-                                                              table_miss)) < 0) {
+                if ((err = pipeline_standard_translate_openflow_actions(
+                        &openflow_actions, &value->apply_actions, table_miss)) < 0) {
                     goto error;
                 }
                 break;
             case OF_INSTRUCTION_WRITE_ACTIONS:
                 of_instruction_write_actions_actions_bind(&inst.write_actions,
                                                           &openflow_actions);
-                if ((err = ind_ovs_translate_openflow_actions(&openflow_actions,
-                                                              &value->write_actions,
-                                                              table_miss)) < 0) {
+                if ((err = pipeline_standard_translate_openflow_actions(
+                        &openflow_actions, &value->write_actions, table_miss)) < 0) {
                     goto error;
                 }
                 break;
@@ -316,8 +326,8 @@ parse_value(of_flow_add_t *flow_mod, struct flowtable_value *value,
     return INDIGO_ERROR_NONE;
 
 error:
-    xbuf_cleanup(&value->apply_actions);
-    xbuf_cleanup(&value->write_actions);
+    pipeline_standard_cleanup_actions(&value->apply_actions);
+    pipeline_standard_cleanup_actions(&value->write_actions);
     return err;
 }
 
@@ -393,8 +403,8 @@ flowtable_entry_modify(
     }
 
     ind_ovs_fwd_write_lock();
-    xbuf_cleanup(&entry->value.apply_actions);
-    xbuf_cleanup(&entry->value.write_actions);
+    pipeline_standard_cleanup_actions(&entry->value.apply_actions);
+    pipeline_standard_cleanup_actions(&entry->value.write_actions);
     entry->value = value;
     ind_ovs_fwd_write_unlock();
 
@@ -421,8 +431,8 @@ flowtable_entry_delete(
     flow_stats->packets = stats.packets;
     flow_stats->bytes = stats.bytes;
 
-    xbuf_cleanup(&entry->value.apply_actions);
-    xbuf_cleanup(&entry->value.write_actions);
+    pipeline_standard_cleanup_actions(&entry->value.apply_actions);
+    pipeline_standard_cleanup_actions(&entry->value.write_actions);
     stats_free(&entry->stats_handle);
     aim_free(entry);
     return INDIGO_ERROR_NONE;

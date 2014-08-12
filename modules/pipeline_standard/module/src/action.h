@@ -61,12 +61,18 @@ enum {
     IND_OVS_ACTION_SET_IPV6_SRC,    /* of_ipv6_t */
     IND_OVS_ACTION_SET_IPV6_FLABEL, /* uint32_t */
     IND_OVS_ACTION_SET_PRIORITY, /* uint32_t */
+    IND_OVS_ACTION_GROUP, /* struct group * */
 };
 
 /* Translate OpenFlow actions into IVS actions */
 indigo_error_t pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf, bool table_miss);
 
+/* Release resources acquired during OpenFlow action translation */
+void pipeline_standard_cleanup_actions(struct xbuf *actions);
+
 /* Translate IVS actions into OVS actions */
-void pipeline_standard_translate_actions(struct action_context *ctx, struct xbuf *actions);
+void pipeline_standard_translate_actions(
+    struct action_context *ctx, struct xbuf *actions,
+    uint32_t hash, struct xbuf *stats);
 
 #endif
