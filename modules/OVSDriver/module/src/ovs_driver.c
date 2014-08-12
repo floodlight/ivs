@@ -75,6 +75,14 @@ ind_ovs_create_datapath(const char *name)
 
     (void) ind_ovs_set_interface_flags(name, IFF_UP);
 
+    /* Enable IPv6 */
+    char filename[1024];
+    snprintf(filename, sizeof(filename), "/proc/sys/net/ipv6/conf/%s/disable_ipv6", name);
+    if (write_file(filename, "0") < 0) {
+        AIM_LOG_WARN("Failed to enable IPv6 on the local interface");
+        /* Don't fail startup for this */
+    }
+
     return ret;
 }
 

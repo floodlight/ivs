@@ -267,6 +267,7 @@ void ind_ovs_nlmsg_freelist_free(struct nl_msg *msg);
 indigo_error_t ind_ovs_get_interface_flags(const char *ifname, int *flags);
 indigo_error_t ind_ovs_set_interface_flags(const char *ifname, int flags);
 void ind_ovs_get_interface_features(const char *ifname, uint32_t *curr, uint32_t *advertised, uint32_t *supported, uint32_t *peer, int version);
+indigo_error_t write_file(const char *filename, const char *str);
 
 /* Sends msg, frees it, and waits for a reply. */
 int ind_ovs_transact(struct nl_msg *msg);
