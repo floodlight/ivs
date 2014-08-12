@@ -207,6 +207,7 @@ of_port_no_t ind_ovs_uplink_first(void);
 
 /* Interface of the upcall submodule */
 void ind_ovs_upcall_init(void);
+void ind_ovs_upcall_enable(void);
 void ind_ovs_upcall_finish(void);
 void ind_ovs_upcall_register(struct ind_ovs_port *port);
 void ind_ovs_upcall_unregister(struct ind_ovs_port *port);

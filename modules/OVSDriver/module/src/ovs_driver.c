@@ -239,6 +239,12 @@ ind_ovs_finish(void)
     ind_ovs_nlmsg_freelist_finish();
 }
 
+void
+ind_ovs_enable(void)
+{
+    ind_ovs_upcall_enable();
+}
+
 /* Called by AIM's main() before the real main(). */
 void
 __ovsdriver_module_init__(void)

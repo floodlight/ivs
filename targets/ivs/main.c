@@ -618,6 +618,9 @@ aim_main(int argc, char* argv[])
         ivs_cli_init(path);
     }
 
+    /* Start handling upcalls */
+    ind_ovs_enable();
+
     ind_soc_select_and_run(-1);
 
     AIM_LOG_MSG("Stopping %s", program_version);
