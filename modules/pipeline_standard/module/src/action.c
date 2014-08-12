@@ -243,16 +243,16 @@ pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct x
                 }
                 case OF_PORT_DEST_ALL:
                     AIM_LOG_ERROR("unsupported output port OFPP_ALL");
-                    return INDIGO_ERROR_COMPAT;
+                    return INDIGO_ERROR_BAD_ACTION;
                 case OF_PORT_DEST_WILDCARD:
                     AIM_LOG_ERROR("unsupported output port OFPP_ANY");
-                    return INDIGO_ERROR_COMPAT;
+                    return INDIGO_ERROR_BAD_ACTION;
                 case OF_PORT_DEST_FLOOD:
                     AIM_LOG_ERROR("unsupported output port OFPP_FLOOD");
-                    return INDIGO_ERROR_COMPAT;
+                    return INDIGO_ERROR_BAD_ACTION;
                 case OF_PORT_DEST_USE_TABLE:
                     AIM_LOG_ERROR("unsupported output port OFPP_TABLE");
-                    return INDIGO_ERROR_COMPAT;
+                    return INDIGO_ERROR_BAD_ACTION;
                 case OF_PORT_DEST_LOCAL:
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_LOCAL, NULL, 0);
                     break;
@@ -261,7 +261,7 @@ pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct x
                     break;
                 case OF_PORT_DEST_NORMAL:
                     AIM_LOG_ERROR("unsupported output port OFPP_NORMAL");
-                    return INDIGO_ERROR_COMPAT;
+                    return INDIGO_ERROR_BAD_ACTION;
                 default: {
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_OUTPUT, &port_no, sizeof(port_no));
                     break;
@@ -316,7 +316,7 @@ pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct x
                     if (ip_dscp > ((uint8_t)IP_DSCP_MASK >> 2)) {
                         AIM_LOG_ERROR("invalid dscp %d in action %s", ip_dscp,
                                 of_object_id_str[act.header.object_id]);
-                        return INDIGO_ERROR_COMPAT;
+                        return INDIGO_ERROR_BAD_ACTION;
                     }
 
                     ip_dscp <<= 2;
@@ -330,7 +330,7 @@ pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct x
                     if (ip_ecn > IP_ECN_MASK) {
                         AIM_LOG_ERROR("invalid ecn %d in action %s", ip_ecn,
                                 of_object_id_str[act.header.object_id]);
-                        return INDIGO_ERROR_COMPAT;
+                        return INDIGO_ERROR_BAD_ACTION;
                     }
 
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IP_ECN, &ip_ecn, sizeof(ip_ecn));
@@ -355,7 +355,7 @@ pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct x
                     if (flabel > IPV6_FLABEL_MASK) {
                         AIM_LOG_ERROR("invalid flabel 0x%04x in action %s", flabel,
                                 of_object_id_str[act.header.object_id]);
-                        return INDIGO_ERROR_COMPAT;
+                        return INDIGO_ERROR_BAD_ACTION;
                     }
 
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IPV6_FLABEL, &flabel, sizeof(flabel));
@@ -387,7 +387,7 @@ pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct x
                 }
                 default:
                     AIM_LOG_ERROR("unsupported set-field oxm %s", of_object_id_str[oxm.header.object_id]);
-                    return INDIGO_ERROR_COMPAT;
+                    return INDIGO_ERROR_BAD_ACTION;
             }
             break;
         }
@@ -457,7 +457,7 @@ pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct x
             if (eth_type != ETH_P_8021Q) {
                 AIM_LOG_ERROR("unsupported eth_type 0x%04x in action %s", eth_type,
                            of_object_id_str[act.header.object_id]);
-                return INDIGO_ERROR_COMPAT;
+                return INDIGO_ERROR_BAD_ACTION;
             }
 
             xbuf_append_attr(xbuf, IND_OVS_ACTION_PUSH_VLAN, &eth_type, sizeof(eth_type));
@@ -486,14 +486,14 @@ pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct x
             struct group *group = indigo_core_group_acquire(group_id);
             if (group == NULL) {
                 AIM_LOG_ERROR("nonexistent group %u", group_id);
-                return INDIGO_ERROR_COMPAT;
+                return INDIGO_ERROR_BAD_ACTION;
             }
             xbuf_append_attr(xbuf, IND_OVS_ACTION_GROUP, &group, sizeof(group));
             break;
         }
         default:
             AIM_LOG_ERROR("unsupported action %s", of_object_id_str[act.header.object_id]);
-            return INDIGO_ERROR_COMPAT;
+            return INDIGO_ERROR_BAD_ACTION;
         }
     }
 
