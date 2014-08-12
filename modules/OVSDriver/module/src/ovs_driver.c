@@ -66,10 +66,14 @@ ind_ovs_create_datapath(const char *name)
     nla_put_string(msg, OVS_DP_ATTR_NAME, name);
     nla_put_u32(msg, OVS_DP_ATTR_UPCALL_PID, 0);
     ret = ind_ovs_transact(msg);
-    if (ret == 0) {
-        ind_ovs_dp_ifindex = if_nametoindex(name);
-        assert(ind_ovs_dp_ifindex > 0);
+    if (ret != 0) {
+        return ret;
     }
+
+    ind_ovs_dp_ifindex = if_nametoindex(name);
+    assert(ind_ovs_dp_ifindex > 0);
+
+    (void) ind_ovs_set_interface_flags(name, IFF_UP);
 
     return ret;
 }
