@@ -27,7 +27,7 @@ scan-build --status-bugs ./build/precheckin.py
 export BUILD_ID=$(date +'%F.%R%z')-$(git rev-parse -q --short HEAD)
 
 ARCHS="i386 amd64"
-SUITES="oneiric precise"
+SUITES="precise trusty"
 for ARCH in $ARCHS; do
     for SUITE in $SUITES; do
         ARCH=$ARCH SUITE=$SUITE ./build/build-debian-packages.sh
