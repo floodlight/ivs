@@ -25,6 +25,9 @@
 #include <net/if.h>
 #include <linux/sockios.h> /* for SIOCETHTOOL */
 #include <linux/ethtool.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 static indigo_error_t sys2indigoerr(int err);
 
@@ -470,4 +473,23 @@ ind_ovs_get_interface_features(const char *ifname,
     }
 
     /* TODO advertised, supported, peer */
+}
+
+indigo_error_t
+write_file(const char *filename, const char *str)
+{
+    int fd = open(filename, O_WRONLY);
+    if (fd < 0) {
+        AIM_LOG_ERROR("Failed to open file \"%s\": %s", filename, strerror(errno));
+        return INDIGO_ERROR_UNKNOWN;
+    }
+
+    if (write(fd, str, strlen(str)) < 0) {
+        AIM_LOG_ERROR("Failed to write to file \"%s\": %s", filename, strerror(errno));
+        close(fd);
+        return INDIGO_ERROR_UNKNOWN;
+    }
+
+    close(fd);
+    return INDIGO_ERROR_NONE;
 }

@@ -24,5 +24,8 @@ struct xbuf;
 
 indigo_error_t ind_ovs_init(const char *datapath_name);
 void ind_ovs_finish(void);
+void ind_ovs_enable(void);
+
+void ind_ovs_uplink_add(const char *name);
 
 #endif

@@ -450,6 +450,17 @@ ind_ovs_upcall_init(void)
 
         thread->stats_writer = stats_writer_create();
 
+        ind_ovs_upcall_threads[i] = thread;
+    }
+}
+
+void
+ind_ovs_upcall_enable(void)
+{
+    int i;
+    for (i = 0; i < ind_ovs_num_upcall_threads; i++) {
+        struct ind_ovs_upcall_thread *thread = ind_ovs_upcall_threads[i];
+
         if (pthread_create(&thread->pthread, NULL,
                         ind_ovs_upcall_thread_main, thread) < 0) {
             LOG_ERROR("failed to start upcall thread");
@@ -459,8 +470,6 @@ ind_ovs_upcall_init(void)
         char threadname[16];
         snprintf(threadname, sizeof(threadname), "upcall thr %d", i);
         pthread_setname_np(thread->pthread, threadname);
-
-        ind_ovs_upcall_threads[i] = thread;
     }
 }
 

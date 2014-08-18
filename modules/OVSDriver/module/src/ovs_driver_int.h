@@ -109,6 +109,7 @@ struct ind_ovs_port {
     unsigned no_packet_in : 1;
     unsigned no_flood : 1;
     unsigned admin_down : 1;
+    unsigned is_uplink : 1;
     uint32_t num_kflows; /* Number of kflows with this in_port */
     struct nl_sock *notify_socket; /* Netlink socket for upcalls */
     struct nl_sock *pktin_socket; /* Netlink socket for packet-ins */
@@ -199,8 +200,14 @@ void ind_ovs_port_deleted(uint32_t port_no);
 struct ind_ovs_port *ind_ovs_port_lookup(of_port_no_t port_no);
 struct ind_ovs_port *ind_ovs_port_lookup_by_name(const char *ifname);
 
+/* Interface of the uplink submodule */
+bool ind_ovs_uplink_check_by_name(const char *name);
+bool ind_ovs_uplink_check(of_port_no_t port_no);
+of_port_no_t ind_ovs_uplink_first(void);
+
 /* Interface of the upcall submodule */
 void ind_ovs_upcall_init(void);
+void ind_ovs_upcall_enable(void);
 void ind_ovs_upcall_finish(void);
 void ind_ovs_upcall_register(struct ind_ovs_port *port);
 void ind_ovs_upcall_unregister(struct ind_ovs_port *port);
@@ -261,6 +268,7 @@ void ind_ovs_nlmsg_freelist_free(struct nl_msg *msg);
 indigo_error_t ind_ovs_get_interface_flags(const char *ifname, int *flags);
 indigo_error_t ind_ovs_set_interface_flags(const char *ifname, int flags);
 void ind_ovs_get_interface_features(const char *ifname, uint32_t *curr, uint32_t *advertised, uint32_t *supported, uint32_t *peer, int version);
+indigo_error_t write_file(const char *filename, const char *str);
 
 /* Sends msg, frees it, and waits for a reply. */
 int ind_ovs_transact(struct nl_msg *msg);

@@ -66,9 +66,21 @@ ind_ovs_create_datapath(const char *name)
     nla_put_string(msg, OVS_DP_ATTR_NAME, name);
     nla_put_u32(msg, OVS_DP_ATTR_UPCALL_PID, 0);
     ret = ind_ovs_transact(msg);
-    if (ret == 0) {
-        ind_ovs_dp_ifindex = if_nametoindex(name);
-        assert(ind_ovs_dp_ifindex > 0);
+    if (ret != 0) {
+        return ret;
+    }
+
+    ind_ovs_dp_ifindex = if_nametoindex(name);
+    assert(ind_ovs_dp_ifindex > 0);
+
+    (void) ind_ovs_set_interface_flags(name, IFF_UP);
+
+    /* Enable IPv6 */
+    char filename[1024];
+    snprintf(filename, sizeof(filename), "/proc/sys/net/ipv6/conf/%s/disable_ipv6", name);
+    if (write_file(filename, "0") < 0) {
+        AIM_LOG_WARN("Failed to enable IPv6 on the local interface");
+        /* Don't fail startup for this */
     }
 
     return ret;
@@ -224,6 +236,12 @@ ind_ovs_finish(void)
     ind_ovs_upcall_finish();
     (void) ind_ovs_destroy_datapath();
     ind_ovs_nlmsg_freelist_finish();
+}
+
+void
+ind_ovs_enable(void)
+{
+    ind_ovs_upcall_enable();
 }
 
 /* Called by AIM's main() before the real main(). */
