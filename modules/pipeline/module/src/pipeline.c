@@ -124,5 +124,33 @@ pipeline_process(struct ind_ovs_parsed_key *key,
                  struct action_context *actx)
 {
     AIM_TRUE_OR_DIE(current_pipeline != NULL);
-    return current_pipeline->ops->process(key, stats, actx);
+
+    if (ind_ovs_inband_vlan != VLAN_INVALID &&
+            VLAN_VID(ntohs(key->vlan)) == ind_ovs_inband_vlan
+            && ind_ovs_uplink_check(key->in_port)) {
+        AIM_LOG_VERBOSE("Sending in-band management packet from uplink to internal port");
+        action_pop_vlan(actx);
+        action_output(actx, IVS_INBAND_PORT);
+        return INDIGO_ERROR_NONE;
+    } else if (ind_ovs_inband_vlan != VLAN_INVALID &&
+            key->in_port == IVS_INBAND_PORT) {
+        AIM_LOG_VERBOSE("Sending in-band management packet from internal port to uplink");
+        uint32_t port = ind_ovs_uplink_first();
+        if (port != OF_PORT_DEST_NONE) {
+            action_push_vlan(actx);
+            action_set_vlan_vid(actx, ind_ovs_inband_vlan);
+            action_output(actx, port);
+        } else {
+            AIM_LOG_VERBOSE("No available uplink");
+        }
+        return INDIGO_ERROR_NONE;
+    } else {
+        return current_pipeline->ops->process(key, stats, actx);
+    }
+}
+
+void
+__pipeline_module_init__(void)
+{
+    AIM_LOG_STRUCT_REGISTER();
 }

@@ -33,6 +33,7 @@
 
 static int ind_ovs_create_datapath(const char *name);
 static int ind_ovs_destroy_datapath(void);
+static void setup_inband(void);
 
 /* Log module "ovsdriver" */
 AIM_LOG_STRUCT_DEFINE(
@@ -47,6 +48,7 @@ int ovs_datapath_family, ovs_packet_family, ovs_vport_family, ovs_flow_family;
 bool ind_ovs_benchmark_mode = false;
 bool ind_ovs_disable_kflows = false;
 uint32_t ind_ovs_salt;
+uint16_t ind_ovs_inband_vlan = VLAN_INVALID;
 
 static int
 ind_ovs_create_datapath(const char *name)
@@ -73,14 +75,8 @@ ind_ovs_create_datapath(const char *name)
     ind_ovs_dp_ifindex = if_nametoindex(name);
     assert(ind_ovs_dp_ifindex > 0);
 
-    (void) ind_ovs_set_interface_flags(name, IFF_UP);
-
-    /* Enable IPv6 */
-    char filename[1024];
-    snprintf(filename, sizeof(filename), "/proc/sys/net/ipv6/conf/%s/disable_ipv6", name);
-    if (write_file(filename, "0") < 0) {
-        AIM_LOG_WARN("Failed to enable IPv6 on the local interface");
-        /* Don't fail startup for this */
+    if (ind_ovs_inband_vlan != VLAN_INVALID) {
+        setup_inband();
     }
 
     return ret;
@@ -141,6 +137,32 @@ ind_ovs_dpid_set(const char *datapath_name)
     indigo_core_dpid_set(be64toh(dpid));
 
     freeifaddrs(ifaddr);
+}
+
+static void
+setup_inband(void)
+{
+    const char *ifname = "inband";
+
+    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_NEW);
+    nla_put_u32(msg, OVS_VPORT_ATTR_TYPE, OVS_VPORT_TYPE_INTERNAL);
+    nla_put_string(msg, OVS_VPORT_ATTR_NAME, ifname);
+    nla_put_u32(msg, OVS_VPORT_ATTR_PORT_NO, IVS_INBAND_PORT);
+    nla_put_u32(msg, OVS_VPORT_ATTR_UPCALL_PID, 0);
+    indigo_error_t ret = ind_ovs_transact(msg);
+    if (ret != 0) {
+        AIM_DIE("Failed to create %s internal port: %s", ifname, indigo_strerror(ret));
+    }
+
+    (void) ind_ovs_set_interface_flags(ifname, IFF_UP);
+
+    /* Enable IPv6 */
+    char filename[1024];
+    snprintf(filename, sizeof(filename), "/proc/sys/net/ipv6/conf/%s/disable_ipv6", ifname);
+    if (write_file(filename, "0") < 0) {
+        AIM_LOG_WARN("Failed to enable IPv6 on the local interface");
+        /* Don't fail startup for this */
+    }
 }
 
 indigo_error_t

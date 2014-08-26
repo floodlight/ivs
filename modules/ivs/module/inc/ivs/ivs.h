@@ -36,6 +36,7 @@
 #define VLAN_TCI(vid, pcp) ( (((pcp) & 0x7) << 13) | ((vid) & 0xfff) )
 #define VLAN_VID(tci) ((tci) & 0xfff)
 #define VLAN_PCP(tci) ((tci) >> 13)
+#define VLAN_INVALID 4095
 
 /* Same as VLAN_TCI above except the vid includes the CFI bit */
 #define VLAN_TCI_WITH_CFI(vid, pcp) ( (((pcp) & 0x7) << 13) | ((vid) & 0x1fff) )
@@ -57,6 +58,8 @@
 #define IVS_PKTIN_USERDATA(reason, metadata) (reason) | ((uint64_t)(metadata) << 8)
 #define IVS_PKTIN_REASON(userdata) (userdata) & 0xff
 #define IVS_PKTIN_METADATA(userdata) (userdata) >> 8
+
+#define IVS_INBAND_PORT 1000
 
 /*
  * X-macro representation of the OVS key (nlattr type, key field, type).
@@ -144,5 +147,6 @@ uint32_t ind_ovs_port_lookup_netlink(of_port_no_t port_no);
 void ind_ovs_barrier_defer_revalidation(indigo_cxn_id_t cxn_id);
 bool ind_ovs_uplink_check(of_port_no_t port_no);
 of_port_no_t ind_ovs_uplink_first(void);
+extern uint16_t ind_ovs_inband_vlan;
 
 #endif
