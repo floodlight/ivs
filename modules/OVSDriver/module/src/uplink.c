@@ -60,7 +60,7 @@ ind_ovs_uplink_first(void)
     int i;
     for (i = 0; i < IND_OVS_MAX_PORTS; i++) {
         struct ind_ovs_port *port = ind_ovs_ports[i];
-        if (port && port->ifflags & IFF_RUNNING) {
+        if (port && port->is_uplink && port->ifflags & IFF_RUNNING) {
             return i;
         }
     }
