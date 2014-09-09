@@ -37,3 +37,6 @@ clean:
 
 deb:
 	fakeroot make -f debian/rules binary
+
+rpm:
+	rhel/rpm-from-source

@@ -1,0 +1,12 @@
+[Unit]
+Description=Indigo Virtual Switch
+After=syslog.target network.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/sysconfig/ivs
+ExecStart=/usr/sbin/ivs --syslog $DAEMON_ARGS
+Restart=restart-always
+
+[Install]
+WantedBy=multi-user.target
