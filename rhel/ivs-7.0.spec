@@ -20,7 +20,7 @@ Name: ivs
 Summary: Indigo Virtual Switch
 URL: http://www.bigswitch.com/
 Version: 0.5
-Release: 1
+Release: 1%{?dist}
 
 License: EPL-1.0
 Source: ivs.tar.gz
