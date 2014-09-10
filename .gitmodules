@@ -10,9 +10,6 @@
 [submodule "submodules/bigcode"]
 	path = submodules/bigcode
 	url = git://github.com/floodlight/bigcode.git
-[submodule "submodules/switchlight-common"]
-	path = submodules/switchlight-common
-	url = git://github.com/floodlight/switchlight-common
 [submodule "submodules/loxigen-artifacts"]
 	path = submodules/loxigen-artifacts
 	url = git@github.com:floodlight/loxigen-artifacts
