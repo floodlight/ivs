@@ -42,13 +42,7 @@
 #include <signal.h>
 #include <sys/eventfd.h>
 #include <linux/un.h>
-#include <lacpa/lacpa.h>
-#include <lldpa/lldpa.h>
-#include <arpa/arpa.h>
-#include <router_ip_table/router_ip_table.h>
-#include <icmpa/icmpa.h>
 #include <pipeline/pipeline.h>
-#include <dhcpra/dhcpra.h>
 #include <malloc.h>
 
 #define AIM_LOG_MODULE_NAME ivs
@@ -395,36 +389,6 @@ aim_main(int argc, char* argv[])
         return 1;
     }
 
-    if (lacpa_init() < 0) {
-        AIM_LOG_FATAL("Failed to initialize LACP Agent module");
-        return 1;
-    }
-
-    if (lldpa_system_init() < 0) {
-        AIM_LOG_FATAL("Failed to initialize LLDP Agent module");
-        return 1;
-    }
-
-    if (arpa_init() < 0) {
-        AIM_LOG_FATAL("Failed to initialize ARP Agent module");
-        return 1;
-    }
-
-    if (router_ip_table_init() < 0) {
-        AIM_LOG_FATAL("Failed to initialize Router IP table module");
-        return 1;
-    }
-
-    if (icmpa_init() < 0) {
-        AIM_LOG_FATAL("Failed to initialize ICMP Agent module");
-        return 1;
-    }
-
-    if (dhcpra_system_init() < 0) {
-        AIM_LOG_FATAL("Failed to initialize DHCP relay table and agent module");
-        return 1;
-    }
-
     if (pipeline == NULL) {
         if (openflow_version == NULL || !strcmp(openflow_version, "1.0")) {
             pipeline = "standard-1.0";
@@ -632,10 +596,6 @@ aim_main(int argc, char* argv[])
 
     AIM_LOG_MSG("Stopping %s", program_version);
 
-    router_ip_table_finish();
-    arpa_finish();
-    lldpa_system_finish();
-    icmpa_finish();
     ind_core_finish();
     ind_ovs_finish();
     ind_cxn_finish();
