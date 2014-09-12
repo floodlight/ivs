@@ -5,8 +5,10 @@ After=syslog.target network.target
 [Service]
 Type=simple
 EnvironmentFile=-/etc/sysconfig/ivs
+ExecStartPre=/usr/sbin/modprobe -q openvswitch
 ExecStart=/usr/sbin/ivs --syslog $DAEMON_ARGS
-Restart=restart-always
+Restart=always
+RestartSec=1
 
 [Install]
 WantedBy=multi-user.target

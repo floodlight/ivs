@@ -37,8 +37,7 @@ platform][1], which provides a common core for many physical and virtual switche
 [1]: http://www.projectfloodlight.org/indigo/
 
 %prep
-(cd "$RPM_BUILD_DIR" && rm -rf *)
-tar -xvf $RPM_SOURCE_DIR/ivs.tar.gz 
+%setup -q -n ivs
 
 %build
 make
@@ -53,24 +52,25 @@ install -d -m 755 $RPM_BUILD_ROOT/etc/sysconfig
 install -p -D -m 0644 debian/ivs.default \
         $RPM_BUILD_ROOT/etc/sysconfig/ivs
 install -p -D -m 0644 targets/ivs/ivs.8 \
-        $RPM_BUILD_ROOT/usr/share/man/man8/ivs.8.gz
+        $RPM_BUILD_ROOT/usr/share/man/man8/ivs.8
 install -p -D -m 0644 targets/ivs-ctl/ivs-ctl.8 \
-        $RPM_BUILD_ROOT/usr/share/man/man8/ivs-ctl.8.gz
+        $RPM_BUILD_ROOT/usr/share/man/man8/ivs-ctl.8
 
-# Get rid of stuff we don't want to make RPM happy.
-(cd "$RPM_BUILD_ROOT" && rm -f usr/lib/lib*)
+gzip $RPM_BUILD_ROOT/usr/share/man/man8/ivs.8
+gzip $RPM_BUILD_ROOT/usr/share/man/man8/ivs-ctl.8
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %preun
-# Package removal, not upgrade
-systemctl stop ivs.service
-systemctl disable ivs.service
+# Perform these action only on package removal, not upgrade
+if [ $1 = 0 ]; then
+    systemctl stop ivs.service
+    systemctl disable ivs.service
+fi
 
 %post
 # Initial installation
-lsmod | grep -q openvswitch || modprobe openvswitch
 systemctl enable ivs.service
 systemctl start ivs.service
 

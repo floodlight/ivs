@@ -18,8 +18,7 @@ mkdir -p ~/rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 #
 # Create and move the compressed file to the rpm build SOURCES directory
  
-tar -cvf ivs.tar.gz ./
-mv ivs.tar.gz ~/rpmbuild/SOURCES
+tar --transform 's,^\.,ivs,' -cf ~/rpmbuild/SOURCES/ivs.tar.gz .
  
 # Step: 3
 # Build rpm from .spec file depending upon Centos version 
@@ -30,5 +29,6 @@ if ((`cat /etc/redhat-release | cut -d" " -f4 | cut -d "." -f1` == "7")); then
 elif ((`cat /etc/redhat-release | cut -d" " -f3 | cut -d "." -f1` == "6")); then
    echo "System is running centos 6";
 else
-   echo "Centos version not supported"
+   echo "Error: Centos version not supported"
+   exit 1
 fi
