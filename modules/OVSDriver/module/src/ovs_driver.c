@@ -115,7 +115,7 @@ ind_ovs_dpid_set(const char *datapath_name)
             && !(ifa->ifa_flags & IFF_LOOPBACK)) {
             memcpy(mac, &sa->sll_addr, sizeof(mac));
             found = true;
-            LOG_INFO("using MAC from interface %s", ifa->ifa_name);
+            LOG_VERBOSE("using MAC from interface %s", ifa->ifa_name);
             break;
         }
     }
@@ -133,7 +133,6 @@ ind_ovs_dpid_set(const char *datapath_name)
 
     memcpy(&dpid, mac, sizeof(mac));
     dpid |= htobe64(murmur_hash(datapath_name, strlen(datapath_name), 0) & 0xFFFF);
-    LOG_INFO("DPID: %016"PRIx64, be64toh(dpid));
     indigo_core_dpid_set(be64toh(dpid));
 
     freeifaddrs(ifaddr);

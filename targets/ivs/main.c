@@ -399,7 +399,7 @@ aim_main(int argc, char* argv[])
         }
     }
 
-    AIM_LOG_INFO("Initializing forwarding pipeline '%s'", pipeline);
+    AIM_LOG_VERBOSE("Initializing forwarding pipeline '%s'", pipeline);
     indigo_error_t rv = pipeline_set(pipeline);
     if (rv < 0) {
         AIM_LOG_FATAL("Failed to set pipeline: %s", indigo_strerror(rv));
@@ -450,7 +450,7 @@ aim_main(int argc, char* argv[])
         biglist_t *element;
         char *str;
         BIGLIST_FOREACH_DATA(element, uplinks, char *, str) {
-            AIM_LOG_MSG("Adding uplink %s (port %d)", str, port_no);
+            AIM_LOG_VERBOSE("Adding uplink %s (port %d)", str, port_no);
             if (indigo_port_interface_add(str, port_no, NULL)) {
                 AIM_LOG_FATAL("Failed to add uplink %s", str);
                 return 1;
@@ -465,7 +465,7 @@ aim_main(int argc, char* argv[])
         biglist_t *element;
         char *str;
         BIGLIST_FOREACH_DATA(element, interfaces, char *, str) {
-            AIM_LOG_MSG("Adding interface %s (port %d)", str, port_no);
+            AIM_LOG_VERBOSE("Adding interface %s (port %d)", str, port_no);
             if (indigo_port_interface_add(str, port_no, NULL)) {
                 AIM_LOG_FATAL("Failed to add interface %s", str);
                 return 1;
@@ -479,7 +479,7 @@ aim_main(int argc, char* argv[])
         biglist_t *element;
         char *str;
         BIGLIST_FOREACH_DATA(element, controllers, char *, str) {
-            AIM_LOG_MSG("Adding controller %s", str);
+            AIM_LOG_VERBOSE("Adding controller %s", str);
 
             indigo_cxn_protocol_params_t proto;
             if (parse_controller(str, &proto, OF_TCP_PORT) < 0) {
@@ -509,7 +509,7 @@ aim_main(int argc, char* argv[])
         biglist_t *element;
         char *str;
         BIGLIST_FOREACH_DATA(element, listeners, char *, str) {
-            AIM_LOG_MSG("Adding listener %s", str);
+            AIM_LOG_VERBOSE("Adding listener %s", str);
 
             indigo_cxn_protocol_params_t proto;
             if (parse_controller(str, &proto, 6634) < 0) {

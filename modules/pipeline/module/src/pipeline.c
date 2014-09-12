@@ -78,7 +78,6 @@ pipeline_set(const char *name)
     }
 
     if (new_pipeline == current_pipeline) {
-        AIM_LOG_INFO("pipeline shortcut");
         return INDIGO_ERROR_NONE;
     }
 
