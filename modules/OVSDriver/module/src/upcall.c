@@ -300,7 +300,7 @@ static void
 ind_ovs_upcall_assign_thread(struct ind_ovs_port *port)
 {
     static int idx;
-    LOG_INFO("assigning port %s to upcall thread %d", port->ifname, idx);
+    LOG_VERBOSE("assigning port %s to upcall thread %d", port->ifname, idx);
     port->upcall_thread = ind_ovs_upcall_threads[idx++];
     idx = idx % ind_ovs_num_upcall_threads;
 }

@@ -59,7 +59,7 @@ ind_ovs_handle_vport_multicast(struct nlmsghdr *nlh)
                 struct sockaddr_ll *sa = (struct sockaddr_ll *)ifa->ifa_addr;
                 if (sa != NULL && sa->sll_family == AF_PACKET) {
                     memcpy(mac_addr.addr, &sa->sll_addr, OF_MAC_ADDR_BYTES);
-                    LOG_INFO("Using MAC from interface %s", ifa->ifa_name);
+                    LOG_VERBOSE("Using MAC from interface %s", ifa->ifa_name);
                     break;
                 }
             }
