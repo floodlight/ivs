@@ -1,0 +1,15 @@
+[Unit]
+Description=Indigo Virtual Switch
+After=syslog.target network.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/sysconfig/ivs
+ExecStartPre=/usr/sbin/modprobe -q openvswitch
+ExecStart=/usr/sbin/ivs --syslog $DAEMON_ARGS
+Restart=always
+StartLimitInterval=60s
+StartLimitBurst=3
+
+[Install]
+WantedBy=multi-user.target

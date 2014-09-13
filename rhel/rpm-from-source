@@ -1,0 +1,35 @@
+#!/bin/sh
+# How to create an RPM from source with spec file
+ 
+# This is for Redhat versions of linux. 
+#
+# Final RPM can be found at ~/rpmbuild/RPMS/
+ 
+# Pre-requisites:
+# Install rpmbuild - yum install -y rpm-build
+ 
+# Step: 1
+# Create rpmbuild folders in home directory
+ 
+mkdir -p ~/rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+ 
+# Step: 2
+# Create a tar file from the source
+#
+# Create and move the compressed file to the rpm build SOURCES directory
+ 
+tar --transform 's,^\.,ivs,' -cf ~/rpmbuild/SOURCES/ivs.tar.gz .
+ 
+# Step: 3
+# Build rpm from .spec file depending upon Centos version 
+#
+
+if ((`cat /etc/redhat-release | cut -d" " -f4 | cut -d "." -f1` == "7")); then
+   rpmbuild -bb rhel/ivs-7.0.spec	
+elif ((`cat /etc/redhat-release | cut -d" " -f3 | cut -d "." -f1` == "6")); then
+   echo "System is running centos 6";
+   exit 1
+else
+   echo "Error: Centos version not supported"
+   exit 1
+fi
