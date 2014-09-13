@@ -28,6 +28,7 @@ if ((`cat /etc/redhat-release | cut -d" " -f4 | cut -d "." -f1` == "7")); then
    rpmbuild -bb rhel/ivs-7.0.spec	
 elif ((`cat /etc/redhat-release | cut -d" " -f3 | cut -d "." -f1` == "6")); then
    echo "System is running centos 6";
+   exit 1
 else
    echo "Error: Centos version not supported"
    exit 1

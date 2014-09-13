@@ -62,6 +62,12 @@ gzip $RPM_BUILD_ROOT/usr/share/man/man8/ivs-ctl.8
 %clean
 rm -rf $RPM_BUILD_ROOT
 
+%pre
+# Perform these actions only on upgrade, not initial installation
+if [ "$1" = "2" ]; then
+    systemctl stop ivs.service
+fi
+
 %preun
 # Perform these action only on package removal, not upgrade
 if [ $1 = 0 ]; then
@@ -70,7 +76,7 @@ if [ $1 = 0 ]; then
 fi
 
 %post
-# Initial installation
+# Initial installation and upgrade
 systemctl enable ivs.service
 systemctl start ivs.service
 
