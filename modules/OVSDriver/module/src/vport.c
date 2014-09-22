@@ -321,7 +321,7 @@ ind_ovs_port_deleted(uint32_t port_no)
         return;
     }
 
-    ind_ovs_pktin_register(port);
+    ind_ovs_pktin_unregister(port);
     ind_ovs_upcall_quiesce(port);
     ind_ovs_upcall_unregister(port);
 
