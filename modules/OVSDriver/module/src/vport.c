@@ -157,13 +157,15 @@ indigo_error_t indigo_port_interface_add(
     of_port_no_t of_port,
     indigo_port_config_t *config)
 {
-    assert(of_port < IND_OVS_MAX_PORTS);
+    assert(of_port < IND_OVS_MAX_PORTS || of_port == OF_PORT_DEST_NONE);
     assert(strlen(port_name) < 256);
 
     struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_NEW);
     nla_put_u32(msg, OVS_VPORT_ATTR_TYPE, OVS_VPORT_TYPE_NETDEV);
     nla_put_string(msg, OVS_VPORT_ATTR_NAME, port_name);
-    nla_put_u32(msg, OVS_VPORT_ATTR_PORT_NO, of_port);
+    if (of_port != OF_PORT_DEST_NONE) {
+        nla_put_u32(msg, OVS_VPORT_ATTR_PORT_NO, of_port);
+    }
     nla_put_u32(msg, OVS_VPORT_ATTR_UPCALL_PID, 0);
     return ind_ovs_transact(msg);
 }
@@ -321,7 +323,7 @@ ind_ovs_port_deleted(uint32_t port_no)
         return;
     }
 
-    ind_ovs_pktin_register(port);
+    ind_ovs_pktin_unregister(port);
     ind_ovs_upcall_quiesce(port);
     ind_ovs_upcall_unregister(port);
 
