@@ -339,9 +339,7 @@ aim_main(int argc, char* argv[])
 
     loci_logger = ivs_loci_logger;
 
-    core_cfg.expire_flows = 1;
     core_cfg.stats_check_ms = 900;
-    core_cfg.disconnected_mode = INDIGO_CORE_DISCONNECTED_MODE_STICKY;
 
     parse_options(argc, argv);
 
