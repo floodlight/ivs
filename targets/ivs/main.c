@@ -374,7 +374,7 @@ aim_main(int argc, char* argv[])
         .rlim_max = SOCKETMANAGER_CONFIG_MAX_SOCKETS
     };
     if (setrlimit(RLIMIT_NOFILE, &rlim) < 0) {
-        AIM_DIE("Failed to increase RLIMIT_NOFILE");
+        AIM_LOG_WARN("Failed to increase RLIMIT_NOFILE");
     }
 
     /* Initialize all modules */
