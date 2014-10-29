@@ -681,7 +681,11 @@ port_status_notify(uint32_t port_no, unsigned reason)
     }
 
     of_port_status_reason_set(of_port_status, reason);
-    of_port_status_desc_set(of_port_status, of_port_desc);
+    if (LOXI_FAILURE(of_port_status_desc_set(of_port_status, of_port_desc))) {
+        LOG_ERROR("of_port_status_desc_set() failed");
+        result = INDIGO_ERROR_UNKNOWN;
+        goto done;
+    }
     of_port_desc_delete(of_port_desc);
 
     indigo_core_port_status_update(of_port_status);
