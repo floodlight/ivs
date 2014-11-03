@@ -274,16 +274,16 @@ parse_value(of_flow_add_t *flow_mod, struct flowtable_value *value,
     } else {
         int rv;
         of_list_instruction_t insts;
-        of_instruction_t inst;
+        of_object_t inst;
         of_flow_modify_instructions_bind(flow_mod, &insts);
 
         uint8_t table_id;
         of_flow_modify_table_id_get(flow_mod, &table_id);
 
         OF_LIST_INSTRUCTION_ITER(&insts, &inst, rv) {
-            switch (inst.header.object_id) {
+            switch (inst.object_id) {
             case OF_INSTRUCTION_APPLY_ACTIONS:
-                of_instruction_apply_actions_actions_bind(&inst.apply_actions,
+                of_instruction_apply_actions_actions_bind(&inst,
                                                           &openflow_actions);
                 if ((err = pipeline_standard_translate_openflow_actions(
                         &openflow_actions, &value->apply_actions, table_miss)) < 0) {
@@ -291,7 +291,7 @@ parse_value(of_flow_add_t *flow_mod, struct flowtable_value *value,
                 }
                 break;
             case OF_INSTRUCTION_WRITE_ACTIONS:
-                of_instruction_write_actions_actions_bind(&inst.write_actions,
+                of_instruction_write_actions_actions_bind(&inst,
                                                           &openflow_actions);
                 if ((err = pipeline_standard_translate_openflow_actions(
                         &openflow_actions, &value->write_actions, table_miss)) < 0) {
@@ -302,7 +302,7 @@ parse_value(of_flow_add_t *flow_mod, struct flowtable_value *value,
                 value->clear_actions = 1;
                 break;
             case OF_INSTRUCTION_GOTO_TABLE:
-                of_instruction_goto_table_table_id_get(&inst.goto_table, &value->next_table_id);
+                of_instruction_goto_table_table_id_get(&inst, &value->next_table_id);
                 if (value->next_table_id <= table_id ||
                         value->next_table_id >= NUM_TABLES) {
                     AIM_LOG_WARN("invalid goto next_table_id %u", value->next_table_id);
@@ -311,7 +311,7 @@ parse_value(of_flow_add_t *flow_mod, struct flowtable_value *value,
                 }
                 break;
             case OF_INSTRUCTION_METER:
-                of_instruction_meter_meter_id_get(&inst.meter, &value->meter_id);
+                of_instruction_meter_meter_id_get(&inst, &value->meter_id);
                 break;
             default:
                 err = INDIGO_ERROR_COMPAT;
