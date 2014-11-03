@@ -226,13 +226,13 @@ process_group(
 indigo_error_t
 pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct xbuf *xbuf, bool table_miss)
 {
-    of_action_t act;
+    of_object_t act;
     int rv;
     OF_LIST_ACTION_ITER(actions, &act, rv) {
-        switch (act.header.object_id) {
+        switch (act.object_id) {
         case OF_ACTION_OUTPUT: {
             of_port_no_t port_no;
-            of_action_output_port_get(&act.output, &port_no);
+            of_action_output_port_get(&act, &port_no);
             switch (port_no) {
                 case OF_PORT_DEST_CONTROLLER: {
                     uint8_t reason = table_miss ? OF_PACKET_IN_REASON_NO_MATCH :
@@ -270,52 +270,52 @@ pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct x
             break;
         }
         case OF_ACTION_SET_FIELD: {
-            of_oxm_t oxm;
-            of_action_set_field_field_bind(&act.set_field, &oxm.header);
-            switch (oxm.header.object_id) {
+            of_object_t oxm;
+            of_action_set_field_field_bind(&act, &oxm);
+            switch (oxm.object_id) {
                 case OF_OXM_VLAN_VID: {
                     uint16_t vlan_vid;
-                    of_oxm_vlan_vid_value_get(&oxm.vlan_vid, &vlan_vid);
+                    of_oxm_vlan_vid_value_get(&oxm, &vlan_vid);
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_VLAN_VID, &vlan_vid, sizeof(vlan_vid));
                     break;
                 }
                 case OF_OXM_VLAN_PCP: {
                     uint8_t vlan_pcp;
-                    of_oxm_vlan_pcp_value_get(&oxm.vlan_pcp, &vlan_pcp);
+                    of_oxm_vlan_pcp_value_get(&oxm, &vlan_pcp);
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_VLAN_PCP, &vlan_pcp, sizeof(vlan_pcp));
                     break;
                 }
                 case OF_OXM_ETH_SRC: {
                     of_mac_addr_t mac;
-                    of_oxm_eth_src_value_get(&oxm.eth_src, &mac);
+                    of_oxm_eth_src_value_get(&oxm, &mac);
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_ETH_SRC, &mac, sizeof(mac));
                     break;
                 }
                 case OF_OXM_ETH_DST: {
                     of_mac_addr_t mac;
-                    of_oxm_eth_dst_value_get(&oxm.eth_dst, &mac);
+                    of_oxm_eth_dst_value_get(&oxm, &mac);
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_ETH_DST, &mac, sizeof(mac));
                     break;
                 }
                 case OF_OXM_IPV4_SRC: {
                     uint32_t ipv4;
-                    of_oxm_ipv4_src_value_get(&oxm.ipv4_src, &ipv4);
+                    of_oxm_ipv4_src_value_get(&oxm, &ipv4);
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IPV4_SRC, &ipv4, sizeof(ipv4));
                     break;
                 }
                 case OF_OXM_IPV4_DST: {
                     uint32_t ipv4;
-                    of_oxm_ipv4_dst_value_get(&oxm.ipv4_dst, &ipv4);
+                    of_oxm_ipv4_dst_value_get(&oxm, &ipv4);
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IPV4_DST, &ipv4, sizeof(ipv4));
                     break;
                 }
                 case OF_OXM_IP_DSCP: {
                     uint8_t ip_dscp;
-                    of_oxm_ip_dscp_value_get(&oxm.ip_dscp, &ip_dscp);
+                    of_oxm_ip_dscp_value_get(&oxm, &ip_dscp);
 
                     if (ip_dscp > ((uint8_t)IP_DSCP_MASK >> 2)) {
                         AIM_LOG_ERROR("invalid dscp %d in action %s", ip_dscp,
-                                of_object_id_str[act.header.object_id]);
+                                of_object_id_str[act.object_id]);
                         return INDIGO_ERROR_BAD_ACTION;
                     }
 
@@ -325,11 +325,11 @@ pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct x
                 }
                 case OF_OXM_IP_ECN: {
                     uint8_t ip_ecn;
-                    of_oxm_ip_ecn_value_get(&oxm.ip_ecn, &ip_ecn);
+                    of_oxm_ip_ecn_value_get(&oxm, &ip_ecn);
 
                     if (ip_ecn > IP_ECN_MASK) {
                         AIM_LOG_ERROR("invalid ecn %d in action %s", ip_ecn,
-                                of_object_id_str[act.header.object_id]);
+                                of_object_id_str[act.object_id]);
                         return INDIGO_ERROR_BAD_ACTION;
                     }
 
@@ -338,23 +338,23 @@ pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct x
                 }
                 case OF_OXM_IPV6_SRC: {
                     of_ipv6_t ipv6;
-                    of_oxm_ipv6_src_value_get(&oxm.ipv6_src, &ipv6);
+                    of_oxm_ipv6_src_value_get(&oxm, &ipv6);
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IPV6_SRC, &ipv6, sizeof(ipv6));
                     break;
                 }
                 case OF_OXM_IPV6_DST: {
                     of_ipv6_t ipv6;
-                    of_oxm_ipv6_dst_value_get(&oxm.ipv6_dst, &ipv6);
+                    of_oxm_ipv6_dst_value_get(&oxm, &ipv6);
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IPV6_DST, &ipv6, sizeof(ipv6));
                     break;
                 }
                 case OF_OXM_IPV6_FLABEL: {
                     uint32_t flabel;
-                    of_oxm_ipv6_flabel_value_get(&oxm.ipv6_flabel, &flabel);
+                    of_oxm_ipv6_flabel_value_get(&oxm, &flabel);
 
                     if (flabel > IPV6_FLABEL_MASK) {
                         AIM_LOG_ERROR("invalid flabel 0x%04x in action %s", flabel,
-                                of_object_id_str[act.header.object_id]);
+                                of_object_id_str[act.object_id]);
                         return INDIGO_ERROR_BAD_ACTION;
                     }
 
@@ -363,85 +363,85 @@ pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct x
                 }
                 case OF_OXM_TCP_SRC: {
                     uint16_t port;
-                    of_oxm_tcp_src_value_get(&oxm.tcp_src, &port);
+                    of_oxm_tcp_src_value_get(&oxm, &port);
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_TCP_SRC, &port, sizeof(port));
                     break;
                 }
                 case OF_OXM_TCP_DST: {
                     uint16_t port;
-                    of_oxm_tcp_dst_value_get(&oxm.tcp_dst, &port);
+                    of_oxm_tcp_dst_value_get(&oxm, &port);
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_TCP_DST, &port, sizeof(port));
                     break;
                 }
                 case OF_OXM_UDP_SRC: {
                     uint16_t port;
-                    of_oxm_udp_src_value_get(&oxm.udp_src, &port);
+                    of_oxm_udp_src_value_get(&oxm, &port);
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_UDP_SRC, &port, sizeof(port));
                     break;
                 }
                 case OF_OXM_UDP_DST: {
                     uint16_t port;
-                    of_oxm_udp_dst_value_get(&oxm.udp_dst, &port);
+                    of_oxm_udp_dst_value_get(&oxm, &port);
                     xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_UDP_DST, &port, sizeof(port));
                     break;
                 }
                 default:
-                    AIM_LOG_ERROR("unsupported set-field oxm %s", of_object_id_str[oxm.header.object_id]);
+                    AIM_LOG_ERROR("unsupported set-field oxm %s", of_object_id_str[oxm.object_id]);
                     return INDIGO_ERROR_BAD_ACTION;
             }
             break;
         }
         case OF_ACTION_SET_DL_DST: {
             of_mac_addr_t mac;
-            of_action_set_dl_dst_dl_addr_get(&act.set_dl_dst, &mac);
+            of_action_set_dl_dst_dl_addr_get(&act, &mac);
             xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_ETH_DST, &mac, sizeof(mac));
             break;
         }
         case OF_ACTION_SET_DL_SRC: {
             of_mac_addr_t mac;
-            of_action_set_dl_src_dl_addr_get(&act.set_dl_src, &mac);
+            of_action_set_dl_src_dl_addr_get(&act, &mac);
             xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_ETH_SRC, &mac, sizeof(mac));
             break;
         }
         case OF_ACTION_SET_NW_DST: {
             uint32_t ipv4;
-            of_action_set_nw_dst_nw_addr_get(&act.set_nw_dst, &ipv4);
+            of_action_set_nw_dst_nw_addr_get(&act, &ipv4);
             xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IPV4_DST, &ipv4, sizeof(ipv4));
             break;
         }
         case OF_ACTION_SET_NW_SRC: {
             uint32_t ipv4;
-            of_action_set_nw_src_nw_addr_get(&act.set_nw_src, &ipv4);
+            of_action_set_nw_src_nw_addr_get(&act, &ipv4);
             xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IPV4_SRC, &ipv4, sizeof(ipv4));
             break;
         }
         case OF_ACTION_SET_NW_TOS: {
             uint8_t tos;
-            of_action_set_nw_tos_nw_tos_get(&act.set_nw_tos, &tos);
+            of_action_set_nw_tos_nw_tos_get(&act, &tos);
             xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_IP_DSCP, &tos, sizeof(tos));
             break;
         }
         case OF_ACTION_SET_TP_DST: {
             uint16_t port;
-            of_action_set_tp_dst_tp_port_get(&act.set_tp_dst, &port);
+            of_action_set_tp_dst_tp_port_get(&act, &port);
             xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_TP_DST, &port, sizeof(port));
             break;
         }
         case OF_ACTION_SET_TP_SRC: {
             uint16_t port;
-            of_action_set_tp_src_tp_port_get(&act.set_tp_src, &port);
+            of_action_set_tp_src_tp_port_get(&act, &port);
             xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_TP_SRC, &port, sizeof(port));
             break;
         }
         case OF_ACTION_SET_VLAN_VID: {
             uint16_t vlan_vid;
-            of_action_set_vlan_vid_vlan_vid_get(&act.set_vlan_vid, &vlan_vid);
+            of_action_set_vlan_vid_vlan_vid_get(&act, &vlan_vid);
             xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_VLAN_VID, &vlan_vid, sizeof(vlan_vid));
             break;
         }
         case OF_ACTION_SET_VLAN_PCP: {
             uint8_t vlan_pcp;
-            of_action_set_vlan_pcp_vlan_pcp_get(&act.set_vlan_pcp, &vlan_pcp);
+            of_action_set_vlan_pcp_vlan_pcp_get(&act, &vlan_pcp);
             xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_VLAN_PCP, &vlan_pcp, sizeof(vlan_pcp));
             break;
         }
@@ -452,11 +452,11 @@ pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct x
         }
         case OF_ACTION_PUSH_VLAN: {
             uint16_t eth_type;
-            of_action_push_vlan_ethertype_get(&act.push_vlan, &eth_type);
+            of_action_push_vlan_ethertype_get(&act, &eth_type);
 
             if (eth_type != ETH_P_8021Q) {
                 AIM_LOG_ERROR("unsupported eth_type 0x%04x in action %s", eth_type,
-                           of_object_id_str[act.header.object_id]);
+                           of_object_id_str[act.object_id]);
                 return INDIGO_ERROR_BAD_ACTION;
             }
 
@@ -470,19 +470,19 @@ pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct x
         }
         case OF_ACTION_SET_NW_TTL: {
             uint8_t ttl;
-            of_action_set_nw_ttl_nw_ttl_get(&act.set_nw_ttl, &ttl);
+            of_action_set_nw_ttl_nw_ttl_get(&act, &ttl);
             xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_NW_TTL, &ttl, sizeof(ttl));
             break;
         }
         case OF_ACTION_SET_QUEUE: {
             uint32_t queue_id;
-            of_action_set_queue_queue_id_get(&act.set_queue, &queue_id);
+            of_action_set_queue_queue_id_get(&act, &queue_id);
             xbuf_append_attr(xbuf, IND_OVS_ACTION_SET_PRIORITY, &queue_id, sizeof(queue_id));
             break;
         }
         case OF_ACTION_GROUP: {
             uint32_t group_id;
-            of_action_group_group_id_get(&act.group, &group_id);
+            of_action_group_group_id_get(&act, &group_id);
             struct group *group = indigo_core_group_acquire(group_id);
             if (group == NULL) {
                 AIM_LOG_ERROR("nonexistent group %u", group_id);
@@ -492,7 +492,7 @@ pipeline_standard_translate_openflow_actions(of_list_action_t *actions, struct x
             break;
         }
         default:
-            AIM_LOG_ERROR("unsupported action %s", of_object_id_str[act.header.object_id]);
+            AIM_LOG_ERROR("unsupported action %s", of_object_id_str[act.object_id]);
             return INDIGO_ERROR_BAD_ACTION;
         }
     }
