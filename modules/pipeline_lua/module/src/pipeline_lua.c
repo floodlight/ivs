@@ -25,20 +25,37 @@
 #include <OVSDriver/ovsdriver.h>
 #include <indigo/indigo.h>
 #include <indigo/of_state_manager.h>
+#include <lua.h>
+#include <lualib.h>
+#include <lauxlib.h>
+#include <pthread.h>
 
 #define AIM_LOG_MODULE_NAME pipeline_lua
 #include <AIM/aim_log.h>
 
 AIM_LOG_STRUCT_DEFINE(AIM_LOG_OPTIONS_DEFAULT, AIM_LOG_BITS_DEFAULT, NULL, 0);
 
+static void pipeline_lua_finish(void);
+
+static lua_State *lua;
+static pthread_mutex_t lua_lock = PTHREAD_MUTEX_INITIALIZER;
+
 static void
 pipeline_lua_init(const char *name)
 {
+    lua = luaL_newstate();
+    if (lua == NULL) {
+        AIM_DIE("failed to allocate Lua state");
+    }
+
+    luaL_openlibs(lua);
 }
 
 static void
 pipeline_lua_finish(void)
 {
+    lua_close(lua);
+    lua = NULL;
 }
 
 indigo_error_t
@@ -46,6 +63,16 @@ pipeline_lua_process(struct ind_ovs_parsed_key *key,
                      struct xbuf *stats,
                      struct action_context *actx)
 {
+    pthread_mutex_lock(&lua_lock);
+
+    lua_getglobal(lua, "ingress");
+
+    if (lua_pcall(lua, 0, 0, 0) != 0) {
+        AIM_LOG_ERROR("Failed to execute script: %s", lua_tostring(lua, -1));
+    }
+
+    pthread_mutex_unlock(&lua_lock);
+
     return INDIGO_ERROR_NONE;
 }
 
