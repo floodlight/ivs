@@ -30,6 +30,8 @@
 #include <lauxlib.h>
 #include <pthread.h>
 
+#include "pipeline_lua_int.h"
+
 #define AIM_LOG_MODULE_NAME pipeline_lua
 #include <AIM/aim_log.h>
 
@@ -43,6 +45,8 @@ static pthread_mutex_t lua_lock = PTHREAD_MUTEX_INITIALIZER;
 static void
 pipeline_lua_init(const char *name)
 {
+    pipeline_lua_code_gentable_init();
+
     lua = luaL_newstate();
     if (lua == NULL) {
         AIM_DIE("failed to allocate Lua state");
@@ -56,6 +60,8 @@ pipeline_lua_finish(void)
 {
     lua_close(lua);
     lua = NULL;
+
+    pipeline_lua_code_gentable_finish();
 }
 
 indigo_error_t
@@ -81,6 +87,24 @@ static struct pipeline_ops pipeline_lua_ops = {
     .finish = pipeline_lua_finish,
     .process = pipeline_lua_process,
 };
+
+void
+pipeline_lua_load_code(const char *filename, const uint8_t *data, uint32_t size)
+{
+    ind_ovs_fwd_write_lock();
+
+    if (luaL_loadbuffer(lua, (char *)data, size, filename) != 0) {
+        AIM_LOG_ERROR("Failed to load code: %s", lua_tostring(lua, -1));
+        ind_ovs_fwd_write_unlock();
+        return;
+    }
+
+    if (lua_pcall(lua, 0, 0, 0) != 0) {
+        AIM_LOG_ERROR("Failed to execute code %s: %s", filename, lua_tostring(lua, -1));
+    }
+
+    ind_ovs_fwd_write_unlock();
+}
 
 void
 __pipeline_lua_module_init__(void)
