@@ -37,11 +37,18 @@
 
 AIM_LOG_STRUCT_DEFINE(AIM_LOG_OPTIONS_DEFAULT, AIM_LOG_BITS_DEFAULT, NULL, 0);
 
+/* Per-packet information shared with Lua */
+struct context {
+    struct xbuf *stats;
+    struct action_context *actx;
+    struct fields fields;
+};
+
 static void pipeline_lua_finish(void);
 
 static lua_State *lua;
 static pthread_mutex_t lua_lock = PTHREAD_MUTEX_INITIALIZER;
-static struct fields fields;
+static struct context context;
 
 static void
 pipeline_lua_init(const char *name)
@@ -55,9 +62,9 @@ pipeline_lua_init(const char *name)
 
     luaL_openlibs(lua);
 
-    /* Give Lua a pointer to the static fields struct */
-    lua_pushlightuserdata(lua, &fields);
-    lua_setglobal(lua, "_fields");
+    /* Give Lua a pointer to the static context struct */
+    lua_pushlightuserdata(lua, &context);
+    lua_setglobal(lua, "_context");
 
     /* Give Lua the names of all fields */
     lua_newtable(lua);
@@ -86,7 +93,9 @@ pipeline_lua_process(struct ind_ovs_parsed_key *key,
 {
     pthread_mutex_lock(&lua_lock);
 
-    pipeline_lua_fields_from_key(key, &fields);
+    pipeline_lua_fields_from_key(key, &context.fields);
+    context.stats = stats;
+    context.actx = actx;
 
     lua_getglobal(lua, "ingress");
 
