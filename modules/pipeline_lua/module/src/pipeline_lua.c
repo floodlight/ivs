@@ -75,6 +75,9 @@ pipeline_lua_init(const char *name)
         i++;
     }
     lua_setglobal(lua, "field_names");
+
+    lua_pushcfunction(lua, pipeline_lua_table_register);
+    lua_setglobal(lua, "register_table");
 }
 
 static void
