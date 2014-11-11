@@ -49,6 +49,7 @@ static void pipeline_lua_finish(void);
 static lua_State *lua;
 static pthread_mutex_t lua_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct context context;
+static int process_ref;
 
 static void
 pipeline_lua_init(const char *name)
@@ -78,6 +79,24 @@ pipeline_lua_init(const char *name)
 
     lua_pushcfunction(lua, pipeline_lua_table_register);
     lua_setglobal(lua, "register_table");
+
+    /*
+     * We can't save a reference to ingress() because it will change when the
+     * controller uploads new versions of code. Instead, we create a wrapper
+     * function that does the global variable lookup to allow the JIT to
+     * optimize it.
+     */
+    if (luaL_dostring(lua,
+            "function ingress() end\n"
+            "local function process()\n"
+            "ingress()\n"
+            "end\n"
+            "return process\n") != 0) {
+        AIM_DIE("Failed to load built-in Lua code");
+    }
+
+    /* Store a reference to process() so we can efficiently retrieve it */
+    process_ref = luaL_ref(lua, LUA_REGISTRYINDEX);
 }
 
 static void
@@ -100,7 +119,7 @@ pipeline_lua_process(struct ind_ovs_parsed_key *key,
     context.stats = stats;
     context.actx = actx;
 
-    lua_getglobal(lua, "ingress");
+    lua_rawgeti(lua, LUA_REGISTRYINDEX, process_ref);
 
     if (lua_pcall(lua, 0, 0, 0) != 0) {
         AIM_LOG_ERROR("Failed to execute script: %s", lua_tostring(lua, -1));
