@@ -20,6 +20,8 @@
 #include <stats/stats.h>
 #include <AIM/aim.h>
 #include <AIM/aim_list.h>
+#include <sys/mman.h>
+#include <errno.h>
 
 #define AIM_LOG_MODULE_NAME stats
 #include <AIM/aim_log.h>
@@ -113,7 +115,11 @@ struct stats_writer *
 stats_writer_create(void)
 {
     struct stats_writer *stats_writer = aim_zmalloc(sizeof(*stats_writer));
-    stats_writer->stats = aim_malloc(sizeof(struct stats) * MAX_STATS);
+    stats_writer->stats = mmap(NULL, MAX_STATS*sizeof(struct stats),
+                               PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, 0, 0);
+    if (stats_writer->stats == MAP_FAILED) {
+        AIM_DIE("Failed to allocate stats writer: %s", strerror(errno));
+    }
     list_push(&stats_writers, &stats_writer->links);
     return stats_writer;
 }
@@ -122,6 +128,6 @@ void
 stats_writer_destroy(struct stats_writer *stats_writer)
 {
     list_remove(&stats_writer->links);
-    aim_free(stats_writer->stats);
+    munmap(stats_writer->stats, MAX_STATS*sizeof(struct stats));
     aim_free(stats_writer);
 }
