@@ -39,6 +39,7 @@
 #define DEFAULT_NUM_UPCALL_THREADS 4
 #define MAX_UPCALL_THREADS 16
 #define NUM_UPCALL_BUFFERS 64
+#define MAX_KEY_SIZE 4096
 
 #define BLOOM_BUCKETS 65536
 #define BLOOM_CAPACITY 4096
@@ -49,6 +50,15 @@ struct ind_ovs_upcall_thread {
 
     /* Epoll set containing all upcall netlink sockets assigned to this thread */
     int epfd;
+
+    /*
+     * Datagram socket used to send kflow requests to the main thread
+     *
+     * The maximum number of datagrams queued is limited by the sysctl
+     * net.unix.max_dgram_qlen, which defaults to 10.
+     */
+    int kflow_sock_rd;
+    int kflow_sock_wr;
 
     /* Cached here so we don't need to reallocate it every time */
     struct xbuf stats;
@@ -91,6 +101,7 @@ static void ind_ovs_handle_one_upcall(struct ind_ovs_upcall_thread *thread, stru
 static void ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread, struct ind_ovs_port *port, struct nl_msg *msg, struct nlattr **attrs);
 static bool ind_ovs_upcall_seen_key(struct ind_ovs_upcall_thread *thread, struct nlattr *key);
 static void ind_ovs_upcall_rearm(struct ind_ovs_port *port);
+static void ind_ovs_upcall_request_kflow(struct ind_ovs_upcall_thread *thread, struct nlattr *key);
 
 static int ind_ovs_num_upcall_threads;
 static struct ind_ovs_upcall_thread *ind_ovs_upcall_threads[MAX_UPCALL_THREADS];
@@ -292,7 +303,7 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     /* See the comment for ind_ovs_upcall_seen_key. */
     if (!ind_ovs_disable_kflows && ind_ovs_upcall_seen_key(thread, key)) {
         /* Create a kflow with the given key and actions. */
-        ind_ovs_bh_request_kflow(key);
+        ind_ovs_upcall_request_kflow(thread, key);
     }
 }
 
@@ -408,6 +419,56 @@ ind_ovs_upcall_seen_key(struct ind_ovs_upcall_thread *thread,
 #undef BLOOM_SET
 }
 
+static void
+ind_ovs_upcall_request_kflow(struct ind_ovs_upcall_thread *thread,
+                             struct nlattr *key)
+{
+    if (key->nla_len > MAX_KEY_SIZE) {
+        AIM_LOG_WARN("Maximum kflow key size exceeded (is %u)", key->nla_len);
+        return;
+    }
+
+    AIM_LOG_VERBOSE("Requesting kflow");
+
+    int written = write(thread->kflow_sock_wr, key, key->nla_len);
+    if (written < 0) {
+        if (errno == EAGAIN) {
+            AIM_LOG_VERBOSE("kflow socket buffer full");
+        } else {
+            AIM_LOG_ERROR("Failed to write to kflow socket: %s", strerror(errno));
+        }
+    } else if (written != key->nla_len) {
+        AIM_LOG_ERROR("Short write to kflow socket");
+    }
+}
+
+
+static void
+kflow_sock_ready(int fd, void *cookie,
+                 int ready_ready, int write_ready, int error_seen)
+{
+    static char buf[MAX_KEY_SIZE];
+
+    int n = read(fd, buf, sizeof(buf));
+    if (n < 0) {
+        AIM_LOG_ERROR("Error on kflow socket: %s", strerror(errno));
+        return;
+    }
+
+    AIM_ASSERT(n >= NLA_HDRLEN);
+
+    struct nlattr *key = (void *)buf;
+    if (key->nla_len != n) {
+        AIM_LOG_ERROR("kflow socket length mismatch: read %u, attr len %u", n, key->nla_len);
+        return;
+    }
+
+    AIM_LOG_VERBOSE("Received kflow request");
+    if (ind_ovs_kflow_add(key) < 0) {
+        LOG_ERROR("Failed to insert kernel flow");
+    }
+}
+
 void
 ind_ovs_upcall_init(void)
 {
@@ -432,6 +493,17 @@ ind_ovs_upcall_init(void)
         if (thread->epfd < 0) {
             LOG_ERROR("failed to create epoll set: %s", strerror(errno));
             abort();
+        }
+
+        int sockfd[2];
+        if (socketpair(AF_UNIX, SOCK_DGRAM|SOCK_NONBLOCK, 0, sockfd) < 0) {
+            AIM_DIE("Failed to create kflow socket: %s", strerror(errno));
+        }
+        thread->kflow_sock_rd = sockfd[0];
+        thread->kflow_sock_wr = sockfd[1];
+        if (ind_soc_socket_register(thread->kflow_sock_rd, kflow_sock_ready,
+                                    NULL) < 0) {
+            AIM_DIE("Failed to register kflow socket with SocketManager");
         }
 
         xbuf_init(&thread->stats);
@@ -489,6 +561,8 @@ ind_ovs_upcall_finish(void)
         struct ind_ovs_upcall_thread *thread = ind_ovs_upcall_threads[i];
         pthread_join(thread->pthread, NULL);
         close(thread->epfd);
+        close(thread->kflow_sock_rd);
+        close(thread->kflow_sock_wr);
         xbuf_cleanup(&thread->stats);
         for (j = 0; j < NUM_UPCALL_BUFFERS; j++) {
             nlmsg_free(thread->msgs[j]);
