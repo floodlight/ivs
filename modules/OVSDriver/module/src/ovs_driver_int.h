@@ -213,11 +213,6 @@ void ind_ovs_upcall_register(struct ind_ovs_port *port);
 void ind_ovs_upcall_unregister(struct ind_ovs_port *port);
 void ind_ovs_upcall_quiesce(struct ind_ovs_port *port);
 
-/* Interface of the bottom-half submodule */
-void ind_ovs_bh_init();
-void ind_ovs_bh_request_kflow(struct nlattr *key);
-void ind_ovs_bh_request_pktin(uint32_t in_port, struct nlattr *packet, struct nlattr *key, uint8_t reason, uint64_t metadata);
-
 /* Interface of the multicast submodule */
 void ind_ovs_multicast_init(void);
 
