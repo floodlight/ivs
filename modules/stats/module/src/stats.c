@@ -17,12 +17,11 @@
  *
  ****************************************************************/
 
-/*
- * TODO per-thread stats writers
- */
-
 #include <stats/stats.h>
 #include <AIM/aim.h>
+#include <AIM/aim_list.h>
+#include <sys/mman.h>
+#include <errno.h>
 
 #define AIM_LOG_MODULE_NAME stats
 #include <AIM/aim_log.h>
@@ -30,6 +29,7 @@
 #define MAX_STATS 262144
 
 struct stats_writer {
+    list_links_t links;
     struct stats *stats;
 };
 
@@ -42,10 +42,8 @@ AIM_LOG_STRUCT_DEFINE(AIM_LOG_OPTIONS_DEFAULT,
 static uint32_t *free_stack;
 static uint32_t num_free;
 
-/*
- * stats_writer shared among all threads (for now)
- */
-static struct stats_writer *singleton_stats_writer;
+/* List of all stats_writers */
+static list_head_t stats_writers;
 
 void
 __stats_module_init__(void)
@@ -59,8 +57,7 @@ __stats_module_init__(void)
         free_stack[num_free] = MAX_STATS-num_free-1;
     }
 
-    singleton_stats_writer = aim_zmalloc(sizeof(*singleton_stats_writer));
-    singleton_stats_writer->stats = aim_malloc(sizeof(struct stats) * MAX_STATS);
+    list_init(&stats_writers);
 }
 
 void
@@ -68,9 +65,15 @@ stats_alloc(struct stats_handle *handle)
 {
     AIM_TRUE_OR_DIE(num_free > 0);
     handle->slot = free_stack[--num_free];
-    struct stats *stats = &singleton_stats_writer->stats[handle->slot];
-    stats->bytes = 0;
-    stats->packets = 0;
+
+    list_links_t *cur;
+    LIST_FOREACH(&stats_writers, cur) {
+        struct stats_writer *stats_writer = container_of(cur, links, struct stats_writer);
+        struct stats *stats = &stats_writer->stats[handle->slot];
+        stats->bytes = 0;
+        stats->packets = 0;
+    }
+
     AIM_LOG_TRACE("allocated stats slot %u", handle->slot);
 }
 
@@ -88,24 +91,43 @@ stats_inc(const struct stats_writer *stats_writer,
           uint64_t packets, uint64_t bytes)
 {
     struct stats *stats = &stats_writer->stats[handle->slot];
-    __sync_fetch_and_add(&stats->packets, packets);
-    __sync_fetch_and_add(&stats->bytes, bytes);
+    stats->packets += packets;
+    stats->bytes += bytes;
     AIM_LOG_TRACE("increment stats slot %u by %u/%u", handle->slot, (uint32_t)packets, (uint32_t)bytes);
 }
 
 void
 stats_get(const struct stats_handle *handle, struct stats *result)
 {
-    *result = singleton_stats_writer->stats[handle->slot];
+    result->bytes = 0;
+    result->packets = 0;
+
+    list_links_t *cur;
+    LIST_FOREACH(&stats_writers, cur) {
+        struct stats_writer *stats_writer = container_of(cur, links, struct stats_writer);
+        struct stats *stats = &stats_writer->stats[handle->slot];
+        result->bytes += stats->bytes;
+        result->packets += stats->packets;
+    }
 }
 
 struct stats_writer *
 stats_writer_create(void)
 {
-    return singleton_stats_writer;
+    struct stats_writer *stats_writer = aim_zmalloc(sizeof(*stats_writer));
+    stats_writer->stats = mmap(NULL, MAX_STATS*sizeof(struct stats),
+                               PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, 0, 0);
+    if (stats_writer->stats == MAP_FAILED) {
+        AIM_DIE("Failed to allocate stats writer: %s", strerror(errno));
+    }
+    list_push(&stats_writers, &stats_writer->links);
+    return stats_writer;
 }
 
 void
 stats_writer_destroy(struct stats_writer *stats_writer)
 {
+    list_remove(&stats_writer->links);
+    munmap(stats_writer->stats, MAX_STATS*sizeof(struct stats));
+    aim_free(stats_writer);
 }
