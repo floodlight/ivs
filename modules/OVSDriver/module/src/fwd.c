@@ -18,9 +18,6 @@
  ****************************************************************/
 
 #include "ovs_driver_int.h"
-#include <pthread.h>
-
-static pthread_rwlock_t ind_ovs_fwd_rwlock;
 
 indigo_error_t
 indigo_fwd_forwarding_features_get(of_features_reply_t *features)
@@ -67,41 +64,4 @@ indigo_fwd_forwarding_features_get(of_features_reply_t *features)
     }
 
     return (INDIGO_ERROR_NONE);
-}
-
-void
-ind_ovs_fwd_read_lock(void)
-{
-    pthread_rwlock_rdlock(&ind_ovs_fwd_rwlock);
-}
-
-void
-ind_ovs_fwd_read_unlock(void)
-{
-    pthread_rwlock_unlock(&ind_ovs_fwd_rwlock);
-}
-
-void
-ind_ovs_fwd_write_lock(void)
-{
-    pthread_rwlock_wrlock(&ind_ovs_fwd_rwlock);
-}
-
-void
-ind_ovs_fwd_write_unlock(void)
-{
-    pthread_rwlock_unlock(&ind_ovs_fwd_rwlock);
-}
-
-void
-ind_ovs_fwd_init(void)
-{
-    pthread_rwlock_init(&ind_ovs_fwd_rwlock, NULL);
-}
-
-void
-ind_ovs_fwd_finish(void)
-{
-    /* Hold this forever. */
-    ind_ovs_fwd_write_lock();
 }

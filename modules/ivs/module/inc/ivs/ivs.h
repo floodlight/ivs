@@ -137,8 +137,6 @@ struct ind_ovs_port_counters {
  */
 indigo_error_t ind_ovs_group_select(uint32_t id, uint32_t hash, struct xbuf **actions);
 indigo_error_t ind_ovs_group_indirect(uint32_t id, struct xbuf **actions);
-void ind_ovs_fwd_write_lock();
-void ind_ovs_fwd_write_unlock();
 extern uint32_t ind_ovs_salt;
 struct stats_handle *ind_ovs_rx_vlan_stats_select(uint16_t vlan_vid);
 struct stats_handle *ind_ovs_tx_vlan_stats_select(uint16_t vlan_vid);

@@ -331,13 +331,11 @@ ind_ovs_port_deleted(uint32_t port_no)
 
     LOG_INFO("Deleted %s %s", port->is_uplink ? "uplink" : "port", port->ifname);
 
-    ind_ovs_fwd_write_lock();
     nl_socket_free(port->notify_socket);
     nl_socket_free(port->pktin_socket);
     free_port_counters(&port->pcounters);
     aim_free(port);
     ind_ovs_ports[port_no] = NULL;
-    ind_ovs_fwd_write_unlock();
 
     ind_ovs_kflow_invalidate_all();
     ind_ovs_upcall_respawn();

@@ -376,9 +376,7 @@ flowtable_entry_create(
     AIM_LOG_VERBOSE("Mask:");
     pipeline_standard_dump_cfr(&mask);
 
-    ind_ovs_fwd_write_lock();
     tcam_insert(flowtable->tcam, &entry->tcam_entry, &key, &mask, priority);
-    ind_ovs_fwd_write_unlock();
 
     stats_alloc(&entry->stats_handle);
 
@@ -402,11 +400,9 @@ flowtable_entry_modify(
         return rv;
     }
 
-    ind_ovs_fwd_write_lock();
     pipeline_standard_cleanup_actions(&entry->value.apply_actions);
     pipeline_standard_cleanup_actions(&entry->value.write_actions);
     entry->value = value;
-    ind_ovs_fwd_write_unlock();
 
     ind_ovs_barrier_defer_revalidation(cxn_id);
     return INDIGO_ERROR_NONE;
@@ -420,9 +416,7 @@ flowtable_entry_delete(
     struct flowtable *flowtable = table_priv;
     struct flowtable_entry *entry = entry_priv;
 
-    ind_ovs_fwd_write_lock();
     tcam_remove(flowtable->tcam, &entry->tcam_entry);
-    ind_ovs_fwd_write_unlock();
 
     ind_ovs_barrier_defer_revalidation(cxn_id);
 

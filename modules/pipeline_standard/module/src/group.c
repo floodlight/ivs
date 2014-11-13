@@ -155,10 +155,8 @@ group_modify(
         return rv;
     }
 
-    ind_ovs_fwd_write_lock();
     cleanup_group_value(&group->value);
     group->value = value;
-    ind_ovs_fwd_write_unlock();
 
     ind_ovs_barrier_defer_revalidation(cxn_id);
     return INDIGO_ERROR_NONE;

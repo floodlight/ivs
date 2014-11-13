@@ -148,8 +148,6 @@ ind_ovs_handle_port_upcalls(struct ind_ovs_upcall_thread *thread,
 
         thread->tx_queue_len = 0;
 
-        ind_ovs_fwd_read_lock();
-
         int i;
         for (i = 0; i < n; i++) {
             struct nl_msg *msg = thread->msgs[i];
@@ -174,8 +172,6 @@ ind_ovs_handle_port_upcalls(struct ind_ovs_upcall_thread *thread,
 
             ind_ovs_handle_one_upcall(thread, port, msg);
         }
-
-        ind_ovs_fwd_read_unlock();
 
         struct msghdr msghdr = { 0 };
         msghdr.msg_iov = thread->tx_queue;
