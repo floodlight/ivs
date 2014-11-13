@@ -526,6 +526,15 @@ ind_ovs_upcall_thread_init(struct ind_ovs_upcall_thread *thread)
         AIM_DIE("failed to create epoll set: %s", strerror(errno));
     }
 
+    /* Create a bitmap of file descriptors we want to keep */
+    int max_fds = sysconf(_SC_OPEN_MAX);
+    aim_bitmap_t *fds = aim_bitmap_alloc(NULL, max_fds);
+    AIM_BITMAP_SET(fds, STDIN_FILENO);
+    AIM_BITMAP_SET(fds, STDOUT_FILENO);
+    AIM_BITMAP_SET(fds, STDERR_FILENO);
+    AIM_BITMAP_SET(fds, thread->kflow_sock_wr);
+    AIM_BITMAP_SET(fds, thread->epfd);
+
     int i;
     for (i = 0; i < IND_OVS_MAX_PORTS; i++) {
         struct ind_ovs_port *port = ind_ovs_ports[i];
@@ -536,6 +545,16 @@ ind_ovs_upcall_thread_init(struct ind_ovs_upcall_thread *thread)
                         nl_socket_get_fd(port->notify_socket), &evt) < 0) {
                 AIM_DIE("failed to add to epoll set: %s", strerror(errno));
             }
+            AIM_BITMAP_SET(fds, nl_socket_get_fd(port->notify_socket));
         }
     }
+
+    /* Close all other file descriptors */
+    for (i = 0; i < max_fds; i++) {
+        if (!AIM_BITMAP_GET(fds, i)) {
+            close(i);
+        }
+    }
+
+    aim_bitmap_free(fds);
 }
