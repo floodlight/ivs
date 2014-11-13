@@ -47,7 +47,7 @@ DEPENDMODULES := SocketManager OFConnectionManager OFStateManager OVSDriver \
                  stats pipeline_reflect
 
 ifdef USE_LUAJIT
-DEPENDMODULES += luajit
+DEPENDMODULES += luajit pipeline_lua
 GLOBAL_CFLAGS += -DHAVE_LUAJIT=1
 LDFLAGS += -rdynamic
 GLOBAL_LINK_LIBS += -ldl
