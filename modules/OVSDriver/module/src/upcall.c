@@ -36,6 +36,7 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/prctl.h>
 #include "SocketManager/socketmanager.h"
 #include "murmur/murmur.h"
 
@@ -514,6 +515,11 @@ ind_ovs_upcall_thread_init(struct ind_ovs_upcall_thread *thread)
     char threadname[16];
     snprintf(threadname, sizeof(threadname), "ivs upcall %d", thread->index);
     pthread_setname_np(pthread_self(), threadname);
+
+    /* Ask the kernel to send us a SIGKILL if the main process dies */
+    if (prctl(PR_SET_PDEATHSIG, SIGKILL, 0, 0, 0) < 0) {
+        AIM_DIE("prctl(PR_SET_PDEATHSIG) failed: %s", strerror(errno));
+    }
 
     thread->epfd = epoll_create(1);
     if (thread->epfd < 0) {
