@@ -115,10 +115,6 @@ struct ind_ovs_port {
     struct nl_sock *pktin_socket; /* Netlink socket for packet-ins */
     aim_ratelimiter_t upcall_log_limiter;
     aim_ratelimiter_t pktin_limiter;
-    /* See ind_ovs_upcall_quiesce */
-    bool quiescing;
-    pthread_mutex_t quiesce_lock;
-    pthread_cond_t quiesce_cvar;
     struct ind_ovs_upcall_thread *upcall_thread;
     struct ind_ovs_port_counters pcounters;
 };
@@ -211,7 +207,7 @@ void ind_ovs_upcall_enable(void);
 void ind_ovs_upcall_finish(void);
 void ind_ovs_upcall_register(struct ind_ovs_port *port);
 void ind_ovs_upcall_unregister(struct ind_ovs_port *port);
-void ind_ovs_upcall_quiesce(struct ind_ovs_port *port);
+void ind_ovs_upcall_respawn(void);
 
 /* Interface of the multicast submodule */
 void ind_ovs_multicast_init(void);

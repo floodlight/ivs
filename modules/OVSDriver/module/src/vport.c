@@ -222,8 +222,6 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname, of_mac_addr_t mac_addr)
     port->mac_addr = mac_addr;
     aim_ratelimiter_init(&port->upcall_log_limiter, 1000*1000, 5, NULL);
     aim_ratelimiter_init(&port->pktin_limiter, PORT_PKTIN_INTERVAL, PORT_PKTIN_BURST_SIZE, NULL);
-    pthread_mutex_init(&port->quiesce_lock, NULL);
-    pthread_cond_init(&port->quiesce_cvar, NULL);
     alloc_port_counters(&port->pcounters);
 
     port->notify_socket = ind_ovs_create_nlsock();
@@ -284,6 +282,7 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname, of_mac_addr_t mac_addr)
     ind_ovs_pktin_register(port);
     LOG_INFO("Added %s %s", port->is_uplink ? "uplink" : "port", port->ifname);
     ind_ovs_kflow_invalidate_all();
+    ind_ovs_upcall_respawn();
     return;
 
 cleanup_port:
@@ -324,7 +323,6 @@ ind_ovs_port_deleted(uint32_t port_no)
     }
 
     ind_ovs_pktin_unregister(port);
-    ind_ovs_upcall_quiesce(port);
     ind_ovs_upcall_unregister(port);
 
     if (port_status_notify(port_no, OF_PORT_CHANGE_REASON_DELETE) < 0) {
@@ -336,14 +334,13 @@ ind_ovs_port_deleted(uint32_t port_no)
     ind_ovs_fwd_write_lock();
     nl_socket_free(port->notify_socket);
     nl_socket_free(port->pktin_socket);
-    pthread_mutex_destroy(&port->quiesce_lock);
-    pthread_cond_destroy(&port->quiesce_cvar);
     free_port_counters(&port->pcounters);
     aim_free(port);
     ind_ovs_ports[port_no] = NULL;
     ind_ovs_fwd_write_unlock();
 
     ind_ovs_kflow_invalidate_all();
+    ind_ovs_upcall_respawn();
 }
 
 indigo_error_t
@@ -381,6 +378,7 @@ indigo_port_modify(of_port_mod_t *port_mod)
 
     /* TODO change other configuration? */
     ind_ovs_kflow_invalidate_all();
+    ind_ovs_upcall_respawn();
 
     return INDIGO_ERROR_NONE;
 }

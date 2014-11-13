@@ -102,15 +102,6 @@ ind_ovs_fwd_init(void)
 void
 ind_ovs_fwd_finish(void)
 {
-    int i;
-
-    /* Quiesce all ports */
-    for (i = 0; i < IND_OVS_MAX_PORTS; i++) {
-        if (ind_ovs_ports[i] != NULL) {
-            ind_ovs_upcall_quiesce(ind_ovs_ports[i]);
-        }
-    }
-
     /* Hold this forever. */
     ind_ovs_fwd_write_lock();
 }
