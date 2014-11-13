@@ -557,4 +557,8 @@ ind_ovs_upcall_thread_init(struct ind_ovs_upcall_thread *thread)
     }
 
     aim_bitmap_free(fds);
+
+    /* Reset signal handlers */
+    signal(SIGHUP, SIG_DFL);
+    signal(SIGTERM, SIG_DFL);
 }
