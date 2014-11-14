@@ -101,7 +101,7 @@ parse_tlvs(of_list_bsn_tlv_t *tlvs, of_octets_t *data)
 }
 
 static indigo_error_t
-table_add(void *table_priv, of_list_bsn_tlv_t *key_tlvs, of_list_bsn_tlv_t *value_tlvs, void **entry_priv)
+table_add(indigo_cxn_id_t cxn_id, void *table_priv, of_list_bsn_tlv_t *key_tlvs, of_list_bsn_tlv_t *value_tlvs, void **entry_priv)
 {
     indigo_error_t rv;
     struct table *table = table_priv;
@@ -131,11 +131,12 @@ table_add(void *table_priv, of_list_bsn_tlv_t *key_tlvs, of_list_bsn_tlv_t *valu
     }
 
     *entry_priv = NULL;
+    ind_ovs_barrier_defer_revalidation(cxn_id);
     return INDIGO_ERROR_NONE;
 }
 
 static indigo_error_t
-table_modify(void *table_priv, void *entry_priv, of_list_bsn_tlv_t *key_tlvs, of_list_bsn_tlv_t *value_tlvs)
+table_modify(indigo_cxn_id_t cxn_id, void *table_priv, void *entry_priv, of_list_bsn_tlv_t *key_tlvs, of_list_bsn_tlv_t *value_tlvs)
 {
     indigo_error_t rv;
     struct table *table = table_priv;
@@ -164,11 +165,12 @@ table_modify(void *table_priv, void *entry_priv, of_list_bsn_tlv_t *key_tlvs, of
         return INDIGO_ERROR_UNKNOWN;
     }
 
+    ind_ovs_barrier_defer_revalidation(cxn_id);
     return INDIGO_ERROR_NONE;
 }
 
 static indigo_error_t
-table_delete(void *table_priv, void *entry_priv, of_list_bsn_tlv_t *key_tlvs)
+table_delete(indigo_cxn_id_t cxn_id, void *table_priv, void *entry_priv, of_list_bsn_tlv_t *key_tlvs)
 {
     indigo_error_t rv;
     struct table *table = table_priv;
@@ -189,6 +191,7 @@ table_delete(void *table_priv, void *entry_priv, of_list_bsn_tlv_t *key_tlvs)
         return INDIGO_ERROR_UNKNOWN;
     }
 
+    ind_ovs_barrier_defer_revalidation(cxn_id);
     return INDIGO_ERROR_NONE;
 }
 
@@ -199,8 +202,8 @@ table_get_stats(void *table_priv, void *entry_priv, of_list_bsn_tlv_t *key, of_l
 }
 
 static const indigo_core_gentable_ops_t table_ops = {
-    .add = table_add,
-    .modify = table_modify,
-    .del = table_delete,
+    .add2 = table_add,
+    .modify2 = table_modify,
+    .del2 = table_delete,
     .get_stats = table_get_stats,
 };
