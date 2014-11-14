@@ -127,7 +127,7 @@ code_parse_value(of_list_bsn_tlv_t *tlvs, struct code_entry_value *value)
 }
 
 static indigo_error_t
-code_add(void *table_priv, of_list_bsn_tlv_t *key_tlvs, of_list_bsn_tlv_t *value_tlvs, void **entry_priv)
+code_add(indigo_cxn_id_t cxn_id, void *table_priv, of_list_bsn_tlv_t *key_tlvs, of_list_bsn_tlv_t *value_tlvs, void **entry_priv)
 {
     indigo_error_t rv;
     struct code_entry_key key;
@@ -153,11 +153,12 @@ code_add(void *table_priv, of_list_bsn_tlv_t *key_tlvs, of_list_bsn_tlv_t *value
     pipeline_lua_load_code(entry->key.name, entry->value.data, entry->value.size);
 
     *entry_priv = entry;
+    ind_ovs_barrier_defer_revalidation(cxn_id);
     return INDIGO_ERROR_NONE;
 }
 
 static indigo_error_t
-code_modify(void *table_priv, void *entry_priv, of_list_bsn_tlv_t *key_tlvs, of_list_bsn_tlv_t *value_tlvs)
+code_modify(indigo_cxn_id_t cxn_id, void *table_priv, void *entry_priv, of_list_bsn_tlv_t *key_tlvs, of_list_bsn_tlv_t *value_tlvs)
 {
     indigo_error_t rv;
     struct code_entry_value value;
@@ -174,15 +175,17 @@ code_modify(void *table_priv, void *entry_priv, of_list_bsn_tlv_t *key_tlvs, of_
 
     pipeline_lua_load_code(entry->key.name, entry->value.data, entry->value.size);
 
+    ind_ovs_barrier_defer_revalidation(cxn_id);
     return INDIGO_ERROR_NONE;
 }
 
 static indigo_error_t
-code_delete(void *table_priv, void *entry_priv, of_list_bsn_tlv_t *key_tlvs)
+code_delete(indigo_cxn_id_t cxn_id, void *table_priv, void *entry_priv, of_list_bsn_tlv_t *key_tlvs)
 {
     struct code_entry *entry = entry_priv;
     aim_free(entry->value.data);
     aim_free(entry);
+    ind_ovs_barrier_defer_revalidation(cxn_id);
     return INDIGO_ERROR_NONE;
 }
 
@@ -192,8 +195,8 @@ code_get_stats(void *table_priv, void *entry_priv, of_list_bsn_tlv_t *key, of_li
 }
 
 static const indigo_core_gentable_ops_t code_ops = {
-    .add = code_add,
-    .modify = code_modify,
-    .del = code_delete,
+    .add2 = code_add,
+    .modify2 = code_modify,
+    .del2 = code_delete,
     .get_stats = code_get_stats,
 };
