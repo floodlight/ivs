@@ -61,6 +61,10 @@ void action_output_in_port(struct action_context *ctx);
 void action_set_eth_dst(struct action_context *ctx, of_mac_addr_t mac);
 void action_set_eth_src(struct action_context *ctx, of_mac_addr_t mac);
 
+/* Used by the Lua pipeline */
+void action_set_eth_dst_scalar(struct action_context *ctx, uint32_t mac_lo, uint16_t mac_hi);
+void action_set_eth_src_scalar(struct action_context *ctx, uint32_t mac_lo, uint16_t mac_hi);
+
 /* VLAN */
 
 void action_set_vlan_vid(struct action_context *ctx, uint16_t vlan_vid);
