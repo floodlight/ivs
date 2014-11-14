@@ -19,4 +19,13 @@
 
 LIBRARY := pipeline_lua
 $(LIBRARY)_SUBDIR := $(dir $(lastword $(MAKEFILE_LIST)))
+
+$(LIBRARY)_SRCS := $(wildcard $($(LIBRARY)_SUBDIR)/*.c) \
+	           $(wildcard $($(LIBRARY)_SUBDIR)/*.lua)
+
+# Convert base.lua into an object file we can link in
+$(OBJECT_DIR)/$($(LIBRARY)_SUBDIR)/%.o: $($(LIBRARY)_SUBDIR)/%.lua
+	@echo "    Embedding$(CINFO): $(LIBRARY)::$(notdir $<)"
+	$(VERBOSE) cd $(dir $<) && $(LD) -r -b binary -o $(abspath $@) $(notdir $<)
+
 include $(BUILDER)/lib.mk

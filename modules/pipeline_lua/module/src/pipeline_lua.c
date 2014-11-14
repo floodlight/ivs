@@ -46,6 +46,10 @@ struct context {
 
 static void pipeline_lua_finish(void);
 
+/* Built-in Lua code */
+extern const char _binary_base_lua_start[];
+extern const char _binary_base_lua_end[];
+
 static lua_State *lua;
 static struct context context;
 static int process_ref;
@@ -79,22 +83,21 @@ pipeline_lua_init(const char *name)
     lua_pushcfunction(lua, pipeline_lua_table_register);
     lua_setglobal(lua, "register_table");
 
-    /*
-     * We can't save a reference to ingress() because it will change when the
-     * controller uploads new versions of code. Instead, we create a wrapper
-     * function that does the global variable lookup to allow the JIT to
-     * optimize it.
-     */
-    if (luaL_dostring(lua,
-            "function ingress() end\n"
-            "local function process()\n"
-            "ingress()\n"
-            "end\n"
-            "return process\n") != 0) {
-        AIM_DIE("Failed to load built-in Lua code");
+    /* Load base.lua */
+    if (luaL_loadbuffer(lua, _binary_base_lua_start,
+                        _binary_base_lua_end-_binary_base_lua_start,
+                        "base.lua") != 0) {
+        AIM_DIE("Failed to load built-in Lua code: %s", lua_tostring(lua, -1));
+    }
+
+    /* Execute base.lua */
+    if (lua_pcall(lua, 0, 0, 0) != 0) {
+        AIM_DIE("Failed to execute built-in Lua code: %s", lua_tostring(lua, -1));
     }
 
     /* Store a reference to process() so we can efficiently retrieve it */
+    lua_getglobal(lua, "process");
+    AIM_ASSERT(lua_isfunction(lua, -1));
     process_ref = luaL_ref(lua, LUA_REGISTRYINDEX);
 }
 
