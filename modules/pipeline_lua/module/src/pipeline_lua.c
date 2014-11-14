@@ -47,7 +47,6 @@ struct context {
 static void pipeline_lua_finish(void);
 
 static lua_State *lua;
-static pthread_mutex_t lua_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct context context;
 static int process_ref;
 
@@ -113,8 +112,6 @@ pipeline_lua_process(struct ind_ovs_parsed_key *key,
                      struct xbuf *stats,
                      struct action_context *actx)
 {
-    pthread_mutex_lock(&lua_lock);
-
     pipeline_lua_fields_from_key(key, &context.fields);
     context.stats = stats;
     context.actx = actx;
@@ -124,8 +121,6 @@ pipeline_lua_process(struct ind_ovs_parsed_key *key,
     if (lua_pcall(lua, 0, 0, 0) != 0) {
         AIM_LOG_ERROR("Failed to execute script: %s", lua_tostring(lua, -1));
     }
-
-    pthread_mutex_unlock(&lua_lock);
 
     return INDIGO_ERROR_NONE;
 }
@@ -139,19 +134,14 @@ static struct pipeline_ops pipeline_lua_ops = {
 void
 pipeline_lua_load_code(const char *filename, const uint8_t *data, uint32_t size)
 {
-    ind_ovs_fwd_write_lock();
-
     if (luaL_loadbuffer(lua, (char *)data, size, filename) != 0) {
         AIM_LOG_ERROR("Failed to load code: %s", lua_tostring(lua, -1));
-        ind_ovs_fwd_write_unlock();
         return;
     }
 
     if (lua_pcall(lua, 0, 0, 0) != 0) {
         AIM_LOG_ERROR("Failed to execute code %s: %s", filename, lua_tostring(lua, -1));
     }
-
-    ind_ovs_fwd_write_unlock();
 }
 
 void
