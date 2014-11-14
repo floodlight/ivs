@@ -155,6 +155,13 @@ pipeline_lua_load_code(const char *filename, const uint8_t *data, uint32_t size)
     }
 }
 
+/* Called by Lua to log a message */
+void
+pipeline_lua_log(const char *str)
+{
+    AIM_LOG_VERBOSE("%s", str);
+}
+
 void
 __pipeline_lua_module_init__(void)
 {

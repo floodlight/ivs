@@ -1,5 +1,6 @@
 local bit = require("bit")
 local ffi = require("ffi")
+local C = ffi.C
 
 local sandbox = {
     assert=assert,
@@ -73,6 +74,14 @@ end
 
 function sandbox.loadstring(s, name)
     return setfenv(loadstring(s, name), sandbox)
+end
+
+ffi.cdef[[
+void pipeline_lua_log(const char *str);
+]]
+
+function sandbox.log(...)
+    C.pipeline_lua_log(string.format(...))
 end
 
 ---- Context
