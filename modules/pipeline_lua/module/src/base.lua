@@ -74,3 +74,18 @@ end
 function sandbox.loadstring(s, name)
     return setfenv(loadstring(s, name), sandbox)
 end
+
+---- Context
+
+ffi.cdef[[
+struct xbuf;
+struct action_context;
+
+struct context {
+    struct xbuf *stats;
+    struct action_context *actx;
+    /* TODO fields */
+};
+]]
+
+context = ffi.cast(ffi.typeof('struct context *'), _context)
