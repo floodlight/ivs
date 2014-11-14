@@ -46,6 +46,12 @@ struct fields {
 #undef field
 };
 
+struct builtin_lua {
+    const char *name;
+    const char *start;
+    const char *end;
+};
+
 void pipeline_lua_code_gentable_init(void);
 void pipeline_lua_code_gentable_finish(void);
 
@@ -56,5 +62,8 @@ void pipeline_lua_fields_from_key(struct ind_ovs_parsed_key *key, struct fields 
 int pipeline_lua_table_register(lua_State *lua);
 
 extern const char *pipeline_lua_field_names[];
+
+/* Terminated by name == NULL */
+extern const struct builtin_lua pipeline_lua_builtin_lua[];
 
 #endif

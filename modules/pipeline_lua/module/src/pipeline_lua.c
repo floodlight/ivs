@@ -46,10 +46,6 @@ struct context {
 
 static void pipeline_lua_finish(void);
 
-/* Built-in Lua code */
-extern const char _binary_base_lua_start[];
-extern const char _binary_base_lua_end[];
-
 static lua_State *lua;
 static struct context context;
 static int process_ref;
@@ -83,16 +79,24 @@ pipeline_lua_init(const char *name)
     lua_pushcfunction(lua, pipeline_lua_table_register);
     lua_setglobal(lua, "register_table");
 
-    /* Load base.lua */
-    if (luaL_loadbuffer(lua, _binary_base_lua_start,
-                        _binary_base_lua_end-_binary_base_lua_start,
-                        "base.lua") != 0) {
-        AIM_DIE("Failed to load built-in Lua code: %s", lua_tostring(lua, -1));
-    }
+    const struct builtin_lua *builtin_lua;
+    for (builtin_lua = &pipeline_lua_builtin_lua[0];
+            builtin_lua->name; builtin_lua++) {
+        AIM_LOG_VERBOSE("Loading builtin Lua code %s", builtin_lua->name);
 
-    /* Execute base.lua */
-    if (lua_pcall(lua, 0, 0, 0) != 0) {
-        AIM_DIE("Failed to execute built-in Lua code: %s", lua_tostring(lua, -1));
+        /* Parse */
+        if (luaL_loadbuffer(lua, builtin_lua->start,
+                builtin_lua->end-builtin_lua->start,
+                builtin_lua->name) != 0) {
+            AIM_DIE("Failed to load built-in Lua code %s: %s",
+                    builtin_lua->name, lua_tostring(lua, -1));
+        }
+
+        /* Execute */
+        if (lua_pcall(lua, 0, 0, 0) != 0) {
+            AIM_DIE("Failed to execute built-in Lua code %s: %s",
+                    builtin_lua->name, lua_tostring(lua, -1));
+        }
     }
 
     /* Store a reference to process() so we can efficiently retrieve it */
