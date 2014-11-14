@@ -31,10 +31,7 @@ indigo_fwd_pipeline_get(of_desc_str_t pipeline)
 indigo_error_t
 indigo_fwd_pipeline_set(of_desc_str_t pipeline)
 {
-    ind_ovs_fwd_write_lock();
-    indigo_error_t rv = pipeline_set(pipeline);
-    ind_ovs_fwd_write_unlock();
-    return rv;
+    return pipeline_set(pipeline);
 }
 
 void

@@ -18,9 +18,6 @@
  ****************************************************************/
 
 #include "ovs_driver_int.h"
-#include <pthread.h>
-
-static pthread_rwlock_t ind_ovs_fwd_rwlock;
 
 indigo_error_t
 indigo_fwd_forwarding_features_get(of_features_reply_t *features)
@@ -67,50 +64,4 @@ indigo_fwd_forwarding_features_get(of_features_reply_t *features)
     }
 
     return (INDIGO_ERROR_NONE);
-}
-
-void
-ind_ovs_fwd_read_lock(void)
-{
-    pthread_rwlock_rdlock(&ind_ovs_fwd_rwlock);
-}
-
-void
-ind_ovs_fwd_read_unlock(void)
-{
-    pthread_rwlock_unlock(&ind_ovs_fwd_rwlock);
-}
-
-void
-ind_ovs_fwd_write_lock(void)
-{
-    pthread_rwlock_wrlock(&ind_ovs_fwd_rwlock);
-}
-
-void
-ind_ovs_fwd_write_unlock(void)
-{
-    pthread_rwlock_unlock(&ind_ovs_fwd_rwlock);
-}
-
-void
-ind_ovs_fwd_init(void)
-{
-    pthread_rwlock_init(&ind_ovs_fwd_rwlock, NULL);
-}
-
-void
-ind_ovs_fwd_finish(void)
-{
-    int i;
-
-    /* Quiesce all ports */
-    for (i = 0; i < IND_OVS_MAX_PORTS; i++) {
-        if (ind_ovs_ports[i] != NULL) {
-            ind_ovs_upcall_quiesce(ind_ovs_ports[i]);
-        }
-    }
-
-    /* Hold this forever. */
-    ind_ovs_fwd_write_lock();
 }

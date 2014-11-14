@@ -115,10 +115,6 @@ struct ind_ovs_port {
     struct nl_sock *pktin_socket; /* Netlink socket for packet-ins */
     aim_ratelimiter_t upcall_log_limiter;
     aim_ratelimiter_t pktin_limiter;
-    /* See ind_ovs_upcall_quiesce */
-    bool quiescing;
-    pthread_mutex_t quiesce_lock;
-    pthread_cond_t quiesce_cvar;
     struct ind_ovs_upcall_thread *upcall_thread;
     struct ind_ovs_port_counters pcounters;
 };
@@ -165,25 +161,6 @@ void ind_ovs_parse_key(struct nlattr *key, struct ind_ovs_parsed_key *pkey);
 /* Translate an OVS key into an OpenFlow match object */
 void ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey, of_version_t version, of_match_t *match);
 
-/* Internal interfaces to the forwarding module */
-void ind_ovs_fwd_init(void);
-void ind_ovs_fwd_finish(void);
-
-/*
- * Synchronization of the flow table between the main thread and upcall
- * threads. Only the main thread is allowed to mutate the flowtable, and when
- * it does so it must hold the writer lock (private). Upcall threads must hold
- * the reader lock while matching in the flowtable and while referencing the
- * resulting struct ind_ovs_flow.
- *
- * Also protects the ind_ovs_port array, since upcall threads access it
- * while translating actions.
- */
-void ind_ovs_fwd_read_lock();
-void ind_ovs_fwd_read_unlock();
-void ind_ovs_fwd_write_lock();
-void ind_ovs_fwd_write_unlock();
-
 /* Management of the kernel flow table */
 indigo_error_t ind_ovs_kflow_add(const struct nlattr *key);
 void ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow);
@@ -211,7 +188,7 @@ void ind_ovs_upcall_enable(void);
 void ind_ovs_upcall_finish(void);
 void ind_ovs_upcall_register(struct ind_ovs_port *port);
 void ind_ovs_upcall_unregister(struct ind_ovs_port *port);
-void ind_ovs_upcall_quiesce(struct ind_ovs_port *port);
+void ind_ovs_upcall_respawn(void);
 
 /* Interface of the multicast submodule */
 void ind_ovs_multicast_init(void);

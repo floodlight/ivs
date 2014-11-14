@@ -78,6 +78,7 @@ revalidate(void)
     AIM_LOG_TRACE("revalidating all kernel flows");
 
     ind_ovs_kflow_invalidate_all();
+    ind_ovs_upcall_respawn();
 
     int i;
     for (i = 0; i < MAX_BLOCKED_CXNS; i++) {
