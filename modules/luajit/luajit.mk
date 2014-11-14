@@ -25,5 +25,5 @@ LIBRARY_TARGETS += libluajit.a
 
 .PHONY: libluajit.a
 libluajit.a:
-	$(MAKE) -C $(LUAJIT)/src libluajit.a LJCORE_O=ljamalg.o BUILDMODE=static
-	cp $(LUAJIT)/src/libluajit.a $(LIBRARY_DIR)/libluajit.a
+	$(VERBOSE) $(MAKE) -C $(LUAJIT)/src libluajit.a LJCORE_O=ljamalg.o BUILDMODE=static
+	$(VERBOSE) cp $(LUAJIT)/src/libluajit.a $(LIBRARY_DIR)/libluajit.a
