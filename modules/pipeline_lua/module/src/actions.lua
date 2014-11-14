@@ -3,10 +3,6 @@ local C = ffi.C
 local context = context
 
 ffi.cdef[[
-typedef struct of_mac_addr_s {
-   uint8_t addr[6];
-} of_mac_addr_t;
-
 typedef struct of_ipv6_s {
    uint8_t addr[16];
 } of_ipv6_t;
@@ -20,8 +16,8 @@ void action_output_in_port(struct action_context *ctx);
 
 /* Ethernet */
 
-void action_set_eth_dst(struct action_context *ctx, of_mac_addr_t mac);
-void action_set_eth_src(struct action_context *ctx, of_mac_addr_t mac);
+void action_set_eth_dst_scalar(struct action_context *ctx, uint32_t mac_lo, uint16_t mac_hi);
+void action_set_eth_src_scalar(struct action_context *ctx, uint32_t mac_lo, uint16_t mac_hi);
 
 /* VLAN */
 
@@ -78,7 +74,13 @@ for i, action in ipairs(simple_actions) do
     end
 end
 
--- TODO set_eth_dst
--- TODO set_eth_src
+function sandbox.set_eth_dst(mac_lo, mac_hi)
+    C.action_set_eth_dst_scalar(context.actx, mac_lo, mac_hi)
+end
+
+function sandbox.set_eth_src(mac_lo, mac_hi)
+    C.action_set_eth_src_scalar(context.actx, mac_lo, mac_hi)
+end
+
 -- TODO set_ipv6_dst
 -- TODO set_ipv6_src
