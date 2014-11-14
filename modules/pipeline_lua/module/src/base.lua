@@ -53,7 +53,6 @@ local sandbox = {
         clock=os.clock,
     },
 
-    _context=_context,
     field_names=field_names,
     register_table=register_table,
 }
@@ -86,6 +85,18 @@ end
 
 ---- Context
 
+-- Create a struct declaration for the field names given to us by C
+do
+    local lines = {}
+    table.insert(lines, "struct fields {")
+    for i, v in ipairs(field_names) do
+        table.insert(lines, string.format("uint32_t %s;", v))
+    end
+    table.insert(lines, "};")
+    local str = table.concat(lines, "\n")
+    ffi.cdef(str)
+end
+
 ffi.cdef[[
 struct xbuf;
 struct action_context;
@@ -93,8 +104,11 @@ struct action_context;
 struct context {
     struct xbuf *stats;
     struct action_context *actx;
-    /* TODO fields */
+    struct fields fields;
 };
 ]]
 
 context = ffi.cast(ffi.typeof('struct context *'), _context)
+
+-- Create a safe proxy for the raw fields pointer
+sandbox.fields = setmetatable({}, { __index=context.fields, __metatable=true })
