@@ -142,6 +142,10 @@ pipeline_lua_load_code(const char *filename, const uint8_t *data, uint32_t size)
         return;
     }
 
+    /* Set the environment of the new chunk to the sandbox */
+    lua_getglobal(lua, "sandbox");
+    lua_setfenv(lua, -2);
+
     if (lua_pcall(lua, 0, 0, 0) != 0) {
         AIM_LOG_ERROR("Failed to execute code %s: %s", filename, lua_tostring(lua, -1));
     }
