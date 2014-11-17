@@ -79,22 +79,29 @@ pipeline_lua_init(const char *name)
     lua_pushcfunction(lua, pipeline_lua_table_register);
     lua_setglobal(lua, "register_table");
 
-    /*
-     * We can't save a reference to ingress() because it will change when the
-     * controller uploads new versions of code. Instead, we create a wrapper
-     * function that does the global variable lookup to allow the JIT to
-     * optimize it.
-     */
-    if (luaL_dostring(lua,
-            "function ingress() end\n"
-            "local function process()\n"
-            "ingress()\n"
-            "end\n"
-            "return process\n") != 0) {
-        AIM_DIE("Failed to load built-in Lua code");
+    const struct builtin_lua *builtin_lua;
+    for (builtin_lua = &pipeline_lua_builtin_lua[0];
+            builtin_lua->name; builtin_lua++) {
+        AIM_LOG_VERBOSE("Loading builtin Lua code %s", builtin_lua->name);
+
+        /* Parse */
+        if (luaL_loadbuffer(lua, builtin_lua->start,
+                builtin_lua->end-builtin_lua->start,
+                builtin_lua->name) != 0) {
+            AIM_DIE("Failed to load built-in Lua code %s: %s",
+                    builtin_lua->name, lua_tostring(lua, -1));
+        }
+
+        /* Execute */
+        if (lua_pcall(lua, 0, 0, 0) != 0) {
+            AIM_DIE("Failed to execute built-in Lua code %s: %s",
+                    builtin_lua->name, lua_tostring(lua, -1));
+        }
     }
 
     /* Store a reference to process() so we can efficiently retrieve it */
+    lua_getglobal(lua, "process");
+    AIM_ASSERT(lua_isfunction(lua, -1));
     process_ref = luaL_ref(lua, LUA_REGISTRYINDEX);
 }
 
@@ -139,9 +146,20 @@ pipeline_lua_load_code(const char *filename, const uint8_t *data, uint32_t size)
         return;
     }
 
+    /* Set the environment of the new chunk to the sandbox */
+    lua_getglobal(lua, "sandbox");
+    lua_setfenv(lua, -2);
+
     if (lua_pcall(lua, 0, 0, 0) != 0) {
         AIM_LOG_ERROR("Failed to execute code %s: %s", filename, lua_tostring(lua, -1));
     }
+}
+
+/* Called by Lua to log a message */
+void
+pipeline_lua_log(const char *str)
+{
+    AIM_LOG_VERBOSE("%s", str);
 }
 
 void

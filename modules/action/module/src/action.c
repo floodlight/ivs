@@ -99,6 +99,28 @@ action_set_eth_src(struct action_context *ctx, of_mac_addr_t mac)
     }
 }
 
+void
+action_set_eth_dst_scalar(struct action_context *ctx, uint32_t mac_lo, uint16_t mac_hi)
+{
+    if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_ETHERNET)) {
+        ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_ETHERNET);
+        unsigned char *buf = ctx->current_key.ethernet.eth_dst;
+        *(uint32_t *)&buf[2] = htonl(mac_lo);
+        *(uint16_t *)&buf[0] = htons(mac_hi);
+    }
+}
+
+void
+action_set_eth_src_scalar(struct action_context *ctx, uint32_t mac_lo, uint16_t mac_hi)
+{
+    if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_ETHERNET)) {
+        ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_ETHERNET);
+        unsigned char *buf = ctx->current_key.ethernet.eth_src;
+        *(uint32_t *)&buf[2] = htonl(mac_lo);
+        *(uint16_t *)&buf[0] = htons(mac_hi);
+    }
+}
+
 /*
  * VLAN actions
  */
