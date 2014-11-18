@@ -120,7 +120,25 @@ ind_ovs_recv_multicast(struct nl_msg *msg, void *arg)
 static void
 ind_ovs_handle_multicast(void)
 {
-    nl_recvmsgs_default(ind_ovs_multicast_socket);
+    int rv = nl_recvmsgs_default(ind_ovs_multicast_socket);
+    if (rv == -NLE_NOMEM) {
+        /*
+         * The kernel attempted to enqueue a notification but the socket
+         * buffer was full. It's likely that the missed message was a vport
+         * new/del. We need to resynchronize our vports with the kernel.
+         *
+         * TODO handle missed vport deletion
+         */
+        AIM_LOG_WARN("Multicast socket overrun");
+
+        /* Request dump of vports */
+        struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_GET);
+        nlmsg_hdr(msg)->nlmsg_flags |= NLM_F_DUMP;
+        if (nl_send_auto(ind_ovs_multicast_socket, msg) < 0) {
+            AIM_LOG_ERROR("Failed to request vport dump");
+        }
+        ind_ovs_nlmsg_freelist_free(msg);
+    }
 }
 
 void
