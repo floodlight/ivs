@@ -177,6 +177,18 @@ check_for_table_action(of_list_action_t *actions)
     return true;
 }
 
+static void
+flood(struct action_context *ctx, uint32_t in_port)
+{
+    int i;
+    for (i = 0; i < IND_OVS_MAX_PORTS; i++) {
+        struct ind_ovs_port *port = ind_ovs_ports[i];
+        if (port && i != in_port && !port->no_flood) {
+            action_output(ctx, i);
+        }
+    }
+}
+
 static indigo_error_t
 translate_openflow_actions(of_list_action_t *actions, struct ind_ovs_parsed_key *pkey, struct nl_msg *msg)
 {
@@ -201,8 +213,8 @@ translate_openflow_actions(of_list_action_t *actions, struct ind_ovs_parsed_key 
                     LOG_ERROR("unsupported output port OFPP_ALL");
                     return INDIGO_ERROR_COMPAT;
                 case OF_PORT_DEST_FLOOD:
-                    LOG_ERROR("unsupported output port OFPP_FLOOD");
-                    return INDIGO_ERROR_COMPAT;
+                    flood(&ctx, pkey->in_port);
+                    break;
                 case OF_PORT_DEST_USE_TABLE:
                     LOG_ERROR("unsupported output port OFPP_TABLE");
                     return INDIGO_ERROR_COMPAT;
