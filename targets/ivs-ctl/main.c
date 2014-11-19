@@ -464,6 +464,12 @@ show_kflow__(struct nl_msg *msg, void *arg)
     output_key(attrs[OVS_FLOW_ATTR_KEY]);
     printf("-> ");
     output_actions(attrs[OVS_FLOW_ATTR_ACTIONS]);
+
+    if (attrs[OVS_FLOW_ATTR_STATS]) {
+        struct ovs_flow_stats *stats = nla_data(attrs[OVS_FLOW_ATTR_STATS]);
+        printf("(%"PRIu64" pkts, %"PRIu64" bytes)", (uint64_t)stats->n_packets, (uint64_t)stats->n_bytes);
+    }
+
     printf("\n");
 
     return NL_OK;
