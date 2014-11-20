@@ -29,6 +29,7 @@
 #include "ovs_driver_int.h"
 #include <indigo/of_state_manager.h>
 #include <indigo/of_connection_manager.h>
+#include <SocketManager/socketmanager.h>
 #include <unistd.h>
 
 #define MAX_BLOCKED_CXNS 8
@@ -39,9 +40,11 @@ struct blocked_cxn {
 };
 
 static void revalidate(void);
+static void barrier_timer(void *cookie);
 
 /* Map from cxn_id to a barrier blocker */
 static struct blocked_cxn blocked_cxns[MAX_BLOCKED_CXNS];
+static bool barrier_timer_active = false;
 
 void
 ind_ovs_barrier_defer_revalidation(indigo_cxn_id_t cxn_id)
@@ -70,6 +73,12 @@ ind_ovs_barrier_defer_revalidation(indigo_cxn_id_t cxn_id)
     AIM_LOG_TRACE("blocking cxn %d", cxn_id);
     blocked_cxn->cxn_id = cxn_id;
     indigo_cxn_block_barrier(cxn_id, &blocked_cxn->blocker);
+
+    if (!barrier_timer_active) {
+        ind_soc_timer_event_register_with_priority(barrier_timer, NULL, 1000,
+                                                   IND_SOC_LOWEST_PRIORITY);
+        barrier_timer_active = true;
+    }
 }
 
 static void
@@ -88,6 +97,27 @@ revalidate(void)
             blocked_cxns[i].cxn_id = INDIGO_CXN_ID_UNSPECIFIED;
         }
     }
+
+    if (barrier_timer_active) {
+        ind_soc_timer_event_unregister(barrier_timer, NULL);
+        barrier_timer_active = false;
+    }
+}
+
+/*
+ * Some controllers, like the reference implementation, don't send barriers
+ * after flow-mods. For IVS to be usable with these controllers we need
+ * to eventually revalidate the kernel flow table and spawn new upcall
+ * processes. This 1-second timeout isn't ideal for a reactive controller
+ * but it's sufficient for ping. The timeout is relatively long to avoid
+ * unnecessary kflow revalidation when using a proactive controller that
+ * does send barriers.
+ */
+static void
+barrier_timer(void *cookie)
+{
+    AIM_LOG_VERBOSE("Barrier timer fired");
+    revalidate();
 }
 
 static void
