@@ -39,5 +39,5 @@ binwidth=500
 bin(x,width)=width*floor(x/width) + binwidth/2.0
 
 filenames = system("echo upcall-latency*.data")
-plot for [filename in filenames] filename title filename using (bin($1,binwidth)+(binwidth/2)):(1.0) smooth freq with boxes
+plot for [filename in filenames] filename using (bin($1,binwidth)+(binwidth/2)):(1.0) smooth freq with boxes title filename
 pause -1
