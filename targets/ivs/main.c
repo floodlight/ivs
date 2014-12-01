@@ -496,7 +496,7 @@ aim_main(int argc, char* argv[])
             }
 
             indigo_cxn_config_params_t config = {
-                .version = OF_VERSION_1_3,
+                .version = OF_VERSION_1_4,
                 .cxn_priority = 0,
                 .local = 0,
                 .listen = 0,
@@ -526,7 +526,7 @@ aim_main(int argc, char* argv[])
             }
 
             indigo_cxn_config_params_t config = {
-                .version = OF_VERSION_1_3,
+                .version = OF_VERSION_1_4,
                 .cxn_priority = 0,
                 .local = 1,
                 .listen = 1,
