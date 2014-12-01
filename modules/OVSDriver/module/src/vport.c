@@ -436,14 +436,33 @@ port_stats_iterator(struct nl_msg *msg, void *arg)
             rtnl_link_get_stat(link, RTNL_LINK_RX_ERRORS));
         of_port_stats_entry_tx_errors_set(entry,
             rtnl_link_get_stat(link, RTNL_LINK_TX_ERRORS));
-        of_port_stats_entry_rx_frame_err_set(entry,
-            rtnl_link_get_stat(link, RTNL_LINK_RX_FRAME_ERR));
-        of_port_stats_entry_rx_over_err_set(entry,
-            rtnl_link_get_stat(link, RTNL_LINK_RX_OVER_ERR));
-        of_port_stats_entry_rx_crc_err_set(entry,
-            rtnl_link_get_stat(link, RTNL_LINK_RX_CRC_ERR));
-        of_port_stats_entry_collisions_set(entry,
-            rtnl_link_get_stat(link, RTNL_LINK_COLLISIONS));
+        if (entry->version < OF_VERSION_1_4) {
+            of_port_stats_entry_rx_frame_err_set(entry,
+                rtnl_link_get_stat(link, RTNL_LINK_RX_FRAME_ERR));
+            of_port_stats_entry_rx_over_err_set(entry,
+                rtnl_link_get_stat(link, RTNL_LINK_RX_OVER_ERR));
+            of_port_stats_entry_rx_crc_err_set(entry,
+                rtnl_link_get_stat(link, RTNL_LINK_RX_CRC_ERR));
+            of_port_stats_entry_collisions_set(entry,
+                rtnl_link_get_stat(link, RTNL_LINK_COLLISIONS));
+        } else {
+            of_object_t props;
+            of_object_t prop;
+            of_port_stats_entry_properties_bind(entry, &props);
+            of_port_stats_prop_ethernet_init(&prop, props.version, -1, 1);
+            if (of_list_port_stats_prop_append_bind(&props, &prop) < 0) {
+                LOG_ERROR("too many port stats replies");
+                return NL_STOP;
+            }
+            of_port_stats_prop_ethernet_rx_frame_err_set(&prop,
+                rtnl_link_get_stat(link, RTNL_LINK_RX_FRAME_ERR));
+            of_port_stats_prop_ethernet_rx_over_err_set(&prop,
+                rtnl_link_get_stat(link, RTNL_LINK_RX_OVER_ERR));
+            of_port_stats_prop_ethernet_rx_crc_err_set(&prop,
+                rtnl_link_get_stat(link, RTNL_LINK_RX_CRC_ERR));
+            of_port_stats_prop_ethernet_collisions_set(&prop,
+                rtnl_link_get_stat(link, RTNL_LINK_COLLISIONS));
+        }
         rtnl_link_put(link);
     } else {
         /* Use more limited stats from the datapath */
@@ -455,10 +474,12 @@ port_stats_iterator(struct nl_msg *msg, void *arg)
         of_port_stats_entry_tx_dropped_set(entry, port_stats->tx_dropped);
         of_port_stats_entry_rx_errors_set(entry, port_stats->rx_errors);
         of_port_stats_entry_tx_errors_set(entry, port_stats->tx_errors);
-        of_port_stats_entry_rx_frame_err_set(entry, 0);
-        of_port_stats_entry_rx_over_err_set(entry, 0);
-        of_port_stats_entry_rx_crc_err_set(entry, 0);
-        of_port_stats_entry_collisions_set(entry, 0);
+        if (entry->version < OF_VERSION_1_4) {
+            of_port_stats_entry_rx_frame_err_set(entry, 0);
+            of_port_stats_entry_rx_over_err_set(entry, 0);
+            of_port_stats_entry_rx_crc_err_set(entry, 0);
+            of_port_stats_entry_collisions_set(entry, 0);
+        }
     }
 
     return NL_OK;
