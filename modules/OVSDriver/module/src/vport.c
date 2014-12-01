@@ -764,10 +764,25 @@ port_desc_set(of_port_desc_t *of_port_desc, uint32_t port_no)
             &supported, &peer, of_port_desc->version);
     }
 
-    of_port_desc_curr_set(of_port_desc, curr);
-    of_port_desc_advertised_set(of_port_desc, advertised);
-    of_port_desc_supported_set(of_port_desc, supported);
-    of_port_desc_peer_set(of_port_desc, peer);
+    if (of_port_desc->version < OF_VERSION_1_4) {
+        of_port_desc_curr_set(of_port_desc, curr);
+        of_port_desc_advertised_set(of_port_desc, advertised);
+        of_port_desc_supported_set(of_port_desc, supported);
+        of_port_desc_peer_set(of_port_desc, peer);
+    } else {
+        of_object_t props;
+        of_object_t prop;
+        of_port_desc_properties_bind(of_port_desc, &props);
+        of_port_desc_prop_ethernet_init(&prop, props.version, -1, 1);
+        if (of_list_port_desc_prop_append_bind(&props, &prop) < 0) {
+            AIM_DIE("unexpected error appending to port_desc");
+        }
+        of_port_desc_prop_ethernet_curr_set(&prop, curr);
+        of_port_desc_prop_ethernet_advertised_set(&prop, advertised);
+        of_port_desc_prop_ethernet_supported_set(&prop, supported);
+        of_port_desc_prop_ethernet_peer_set(&prop, peer);
+        /* TODO curr_speed, max_speed */
+    }
 }
 
 /*
