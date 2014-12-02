@@ -122,7 +122,7 @@ ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey,
     if (ATTR_BITMAP_TEST(pkey->populated, OVS_KEY_ATTR_VLAN)) {
         fields->vlan_vid = VLAN_VID(ntohs(pkey->vlan));
         fields->vlan_pcp = VLAN_PCP(ntohs(pkey->vlan));
-        if (version == OF_VERSION_1_3) {
+        if (version >= OF_VERSION_1_3) {
             fields->vlan_vid |= VLAN_CFI_BIT;
         }
     } else {
