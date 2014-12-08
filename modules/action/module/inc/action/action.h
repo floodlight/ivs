@@ -55,6 +55,7 @@ void action_controller(struct action_context *ctx, uint64_t userdata);
 void action_output(struct action_context *ctx, uint32_t port_no);
 void action_output_local(struct action_context *ctx);
 void action_output_in_port(struct action_context *ctx);
+void action_sample_to_controller(struct action_context *ctx, uint64_t userdata, uint32_t probability);
 
 /* Ethernet */
 
