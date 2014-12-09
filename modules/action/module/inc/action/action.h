@@ -55,6 +55,7 @@ void action_controller(struct action_context *ctx, uint64_t userdata);
 void action_output(struct action_context *ctx, uint32_t port_no);
 void action_output_local(struct action_context *ctx);
 void action_output_in_port(struct action_context *ctx);
+void action_sample_to_controller(struct action_context *ctx, uint64_t userdata, uint32_t probability);
 
 /* Ethernet */
 
@@ -71,6 +72,8 @@ void action_set_vlan_vid(struct action_context *ctx, uint16_t vlan_vid);
 void action_set_vlan_pcp(struct action_context *ctx, uint8_t vlan_pcp);
 void action_pop_vlan(struct action_context *ctx);
 void action_push_vlan(struct action_context *ctx);
+void action_pop_vlan_raw(struct action_context *ctx);
+void action_push_vlan_raw(struct action_context *ctx, uint16_t vlan_tci);
 
 /* IPv4 */
 

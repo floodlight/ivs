@@ -78,6 +78,33 @@ action_output_in_port(struct action_context *ctx)
 }
 
 /*
+ * Randomly send the packet back to an upcall thread with the given userdata
+ *
+ * The probability is a fraction of UINT32_MAX.
+ */
+void
+action_sample_to_controller(struct action_context *ctx, uint64_t userdata, uint32_t probability)
+{
+    uint32_t netlink_port = ind_ovs_port_lookup_netlink(ctx->current_key.in_port);
+
+    commit_set_field_actions(ctx);
+
+    struct nlattr *sample_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_SAMPLE);
+    nla_put_u32(ctx->msg, OVS_SAMPLE_ATTR_PROBABILITY, probability);
+    {
+        struct nlattr *sample_action_attr = nla_nest_start(ctx->msg, OVS_SAMPLE_ATTR_ACTIONS);
+        {
+            struct nlattr *action_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_USERSPACE);
+            nla_put_u32(ctx->msg, OVS_USERSPACE_ATTR_PID, netlink_port);
+            nla_put_u64(ctx->msg, OVS_USERSPACE_ATTR_USERDATA, userdata);
+            nla_nest_end(ctx->msg, action_attr);
+        }
+        nla_nest_end(ctx->msg, sample_action_attr);
+    }
+    nla_nest_end(ctx->msg, sample_attr);
+}
+
+/*
  * Ethernet actions
  */
 
@@ -170,6 +197,22 @@ action_push_vlan(struct action_context *ctx)
         ATTR_BITMAP_SET(ctx->current_key.populated, OVS_KEY_ATTR_VLAN);
         ctx->current_key.vlan = htons(VLAN_CFI_BIT);
     }
+}
+
+void
+action_pop_vlan_raw(struct action_context *ctx)
+{
+    nla_put_flag(ctx->msg, OVS_ACTION_ATTR_POP_VLAN);
+}
+
+void
+action_push_vlan_raw(struct action_context *ctx, uint16_t vlan_tci)
+{
+    struct ovs_action_push_vlan vlan = {
+        .vlan_tpid = htons(ETH_P_8021Q),
+        .vlan_tci = vlan_tci,
+    };
+    nla_put(ctx->msg, OVS_ACTION_ATTR_PUSH_VLAN, sizeof(vlan), &vlan);
 }
 
 /*
