@@ -72,6 +72,8 @@ void action_set_vlan_vid(struct action_context *ctx, uint16_t vlan_vid);
 void action_set_vlan_pcp(struct action_context *ctx, uint8_t vlan_pcp);
 void action_pop_vlan(struct action_context *ctx);
 void action_push_vlan(struct action_context *ctx);
+void action_pop_vlan_raw(struct action_context *ctx);
+void action_push_vlan_raw(struct action_context *ctx, uint16_t vlan_tci);
 
 /* IPv4 */
 
