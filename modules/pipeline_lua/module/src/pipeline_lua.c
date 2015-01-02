@@ -29,6 +29,7 @@
 #include <lualib.h>
 #include <lauxlib.h>
 #include <pthread.h>
+#include <murmur/murmur.h>
 
 #include "pipeline_lua_int.h"
 
@@ -66,6 +67,9 @@ struct xbuf upload_chunks;
 
 /* Offset of the last chunk in the list */
 uint32_t last_uploaded_chunk_offset;
+
+/* Hash of the currently running code */
+uint32_t checksum;
 
 static void
 pipeline_lua_init(const char *name)
@@ -211,8 +215,21 @@ handle_lua_upload(indigo_cxn_id_t cxn_id, of_object_t *msg)
 static void
 commit_lua_upload(indigo_cxn_id_t cxn_id, of_object_t *msg)
 {
+    uint16_t flags;
+    of_bsn_lua_upload_flags_get(msg, &flags);
+
     // TODO create new VM and clean up old one
-    // TODO skip if code is identical
+
+    /* TODO use stronger hash function */
+    uint32_t new_checksum = murmur_hash(xbuf_data(&upload_chunks),
+                                        xbuf_length(&upload_chunks),
+                                        0);
+    if (!(flags & OFP_BSN_LUA_UPLOAD_FORCE) && checksum == new_checksum) {
+        AIM_LOG_VERBOSE("Skipping Lua commit, checksums match");
+        goto cleanup;
+    }
+
+    checksum = 0;
 
     uint32_t offset = 0;
     while (offset < xbuf_length(&upload_chunks)) {
@@ -239,6 +256,8 @@ commit_lua_upload(indigo_cxn_id_t cxn_id, of_object_t *msg)
             goto cleanup;
         }
     }
+
+    checksum = new_checksum;
 
 cleanup:
     cleanup_lua_upload();
