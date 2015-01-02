@@ -64,6 +64,9 @@ static int process_ref;
 /* List of struct upload_chunk */
 struct xbuf upload_chunks;
 
+/* Offset of the last chunk in the list */
+uint32_t last_uploaded_chunk_offset;
+
 static void
 pipeline_lua_init(const char *name)
 {
@@ -176,9 +179,22 @@ handle_lua_upload(indigo_cxn_id_t cxn_id, of_object_t *msg)
         return;
     }
 
-    /* TODO concatenate consecutive messages with the same filename */
+    /* If the list isn't empty, get a pointer to the last uploaded chunk */
+    struct upload_chunk *prev = NULL;
+    if (xbuf_length(&upload_chunks) > 0) {
+        AIM_ASSERT(last_uploaded_chunk_offset < xbuf_length(&upload_chunks));
+        prev = xbuf_data(&upload_chunks) + last_uploaded_chunk_offset;
+    }
 
-    if (data.bytes > 0) {
+    if (prev && !memcmp(filename, prev->filename, sizeof(filename))) {
+        /* Concatenate consecutive messages with the same filename */
+        prev->size += data.bytes;
+        xbuf_append(&upload_chunks, (char *)data.data, data.bytes);
+
+        AIM_LOG_VERBOSE("Appended to Lua chunk %s, now %u bytes", prev->filename, prev->size);
+    } else if (data.bytes > 0) {
+        last_uploaded_chunk_offset = xbuf_length(&upload_chunks);
+
         struct upload_chunk *chunk = xbuf_reserve(&upload_chunks, sizeof(*chunk) + data.bytes);
         chunk->size = data.bytes;
         memcpy(chunk->filename, filename, sizeof(of_str64_t));
