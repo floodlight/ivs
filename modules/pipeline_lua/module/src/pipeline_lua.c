@@ -57,6 +57,7 @@ static void pipeline_lua_finish(void);
 static indigo_core_listener_result_t message_listener(indigo_cxn_id_t cxn_id, of_object_t *msg);
 static void commit_lua_upload(indigo_cxn_id_t cxn_id, of_object_t *msg);
 static void cleanup_lua_upload(void);
+static void reset_lua(void);
 
 static lua_State *lua;
 static struct context context;
@@ -76,6 +77,16 @@ pipeline_lua_init(const char *name)
 {
     indigo_core_message_listener_register(message_listener);
     xbuf_init(&upload_chunks);
+
+    reset_lua();
+}
+
+static void
+reset_lua(void)
+{
+    if (lua) {
+        lua_close(lua);
+    }
 
     lua = luaL_newstate();
     if (lua == NULL) {
@@ -218,8 +229,6 @@ commit_lua_upload(indigo_cxn_id_t cxn_id, of_object_t *msg)
     uint16_t flags;
     of_bsn_lua_upload_flags_get(msg, &flags);
 
-    // TODO create new VM and clean up old one
-
     /* TODO use stronger hash function */
     uint32_t new_checksum = murmur_hash(xbuf_data(&upload_chunks),
                                         xbuf_length(&upload_chunks),
@@ -230,6 +239,8 @@ commit_lua_upload(indigo_cxn_id_t cxn_id, of_object_t *msg)
     }
 
     checksum = 0;
+
+    reset_lua();
 
     uint32_t offset = 0;
     while (offset < xbuf_length(&upload_chunks)) {
