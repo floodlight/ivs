@@ -44,16 +44,29 @@ struct context {
     struct fields fields;
 };
 
+struct upload_chunk {
+    of_str64_t filename;
+    uint32_t size;
+    char data[];
+};
+
 static void pipeline_lua_finish(void);
+static indigo_core_listener_result_t message_listener(indigo_cxn_id_t cxn_id, of_object_t *msg);
+static void commit_lua_upload(indigo_cxn_id_t cxn_id, of_object_t *msg);
+static void cleanup_lua_upload(void);
 
 static lua_State *lua;
 static struct context context;
 static int process_ref;
 
+/* List of struct upload_chunk */
+struct xbuf upload_chunks;
+
 static void
 pipeline_lua_init(const char *name)
 {
-    pipeline_lua_code_gentable_init();
+    indigo_core_message_listener_register(message_listener);
+    xbuf_init(&upload_chunks);
 
     lua = luaL_newstate();
     if (lua == NULL) {
@@ -111,7 +124,9 @@ pipeline_lua_finish(void)
     lua_close(lua);
     lua = NULL;
 
-    pipeline_lua_code_gentable_finish();
+    indigo_core_message_listener_unregister(message_listener);
+    cleanup_lua_upload();
+    xbuf_cleanup(&upload_chunks);
 }
 
 indigo_error_t
@@ -138,20 +153,89 @@ static struct pipeline_ops pipeline_lua_ops = {
     .process = pipeline_lua_process,
 };
 
-void
-pipeline_lua_load_code(const char *filename, const uint8_t *data, uint32_t size)
+static void
+handle_lua_upload(indigo_cxn_id_t cxn_id, of_object_t *msg)
 {
-    if (luaL_loadbuffer(lua, (char *)data, size, filename) != 0) {
-        AIM_LOG_ERROR("Failed to load code: %s", lua_tostring(lua, -1));
-        return;
+    of_octets_t data;
+    uint16_t flags;
+    of_str64_t filename;
+    of_bsn_lua_upload_data_get(msg, &data);
+    of_bsn_lua_upload_flags_get(msg, &flags);
+    of_bsn_lua_upload_filename_get(msg, &filename);
+
+    /* Ensure filename is null terminated */
+    filename[63] = 0;
+
+    /* TODO limit size */
+    /* TODO concatenate consecutive messages with the same filename */
+
+    if (data.bytes > 0) {
+        struct upload_chunk *chunk = xbuf_reserve(&upload_chunks, sizeof(*chunk) + data.bytes);
+        chunk->size = data.bytes;
+        memcpy(chunk->filename, filename, sizeof(of_str64_t));
+        memcpy(chunk->data, data.data, data.bytes);
+
+        AIM_LOG_VERBOSE("Uploaded Lua chunk %s, %u bytes", chunk->filename, chunk->size);
     }
 
-    /* Set the environment of the new chunk to the sandbox */
-    lua_getglobal(lua, "sandbox");
-    lua_setfenv(lua, -2);
+    if (!(flags & OFP_BSN_LUA_UPLOAD_MORE)) {
+        commit_lua_upload(cxn_id, msg);
+    }
+}
 
-    if (lua_pcall(lua, 0, 0, 0) != 0) {
-        AIM_LOG_ERROR("Failed to execute code %s: %s", filename, lua_tostring(lua, -1));
+static void
+commit_lua_upload(indigo_cxn_id_t cxn_id, of_object_t *msg)
+{
+    // TODO create new VM and clean up old one
+    // TODO skip if code is identical
+
+    uint32_t offset = 0;
+    while (offset < xbuf_length(&upload_chunks)) {
+        struct upload_chunk *chunk = xbuf_data(&upload_chunks) + offset;
+        offset += sizeof(*chunk) + chunk->size;
+
+        AIM_LOG_VERBOSE("Loading Lua chunk %s, %u bytes", chunk->filename, chunk->size);
+
+        if (luaL_loadbuffer(lua, chunk->data, chunk->size, chunk->filename) != 0) {
+            AIM_LOG_ERROR("Failed to load code: %s", lua_tostring(lua, -1));
+            indigo_cxn_send_error_reply(
+                cxn_id, msg, OF_ERROR_TYPE_BAD_REQUEST, OF_REQUEST_FAILED_EPERM);
+            goto cleanup;
+        }
+
+        /* Set the environment of the new chunk to the sandbox */
+        lua_getglobal(lua, "sandbox");
+        lua_setfenv(lua, -2);
+
+        if (lua_pcall(lua, 0, 0, 0) != 0) {
+            AIM_LOG_ERROR("Failed to execute code %s: %s", chunk->filename, lua_tostring(lua, -1));
+            indigo_cxn_send_error_reply(
+                cxn_id, msg, OF_ERROR_TYPE_BAD_REQUEST, OF_REQUEST_FAILED_EPERM);
+            goto cleanup;
+        }
+    }
+
+cleanup:
+    cleanup_lua_upload();
+    return;
+}
+
+static void
+cleanup_lua_upload(void)
+{
+    xbuf_reset(&upload_chunks);
+}
+
+static indigo_core_listener_result_t
+message_listener(indigo_cxn_id_t cxn_id, of_object_t *msg)
+{
+    switch (msg->object_id) {
+    case OF_BSN_LUA_UPLOAD:
+        handle_lua_upload(cxn_id, msg);
+        return INDIGO_CORE_LISTENER_RESULT_DROP;
+
+    default:
+        return INDIGO_CORE_LISTENER_RESULT_PASS;
     }
 }
 

@@ -52,11 +52,6 @@ struct builtin_lua {
     const char *end;
 };
 
-void pipeline_lua_code_gentable_init(void);
-void pipeline_lua_code_gentable_finish(void);
-
-void pipeline_lua_load_code(const char *filename, const uint8_t *data, uint32_t size);
-
 void pipeline_lua_fields_from_key(struct ind_ovs_parsed_key *key, struct fields *fields);
 
 int pipeline_lua_table_register(lua_State *lua);
