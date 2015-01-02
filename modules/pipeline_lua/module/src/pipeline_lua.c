@@ -37,6 +37,8 @@
 
 AIM_LOG_STRUCT_DEFINE(AIM_LOG_OPTIONS_DEFAULT, AIM_LOG_BITS_DEFAULT, NULL, 0);
 
+#define MAX_UPLOAD_SIZE (2*1024*2014)
+
 /* Per-packet information shared with Lua */
 struct context {
     struct xbuf *stats;
@@ -166,7 +168,14 @@ handle_lua_upload(indigo_cxn_id_t cxn_id, of_object_t *msg)
     /* Ensure filename is null terminated */
     filename[63] = 0;
 
-    /* TODO limit size */
+    if (xbuf_length(&upload_chunks) + sizeof(struct upload_chunk) + data.bytes > MAX_UPLOAD_SIZE) {
+        AIM_LOG_ERROR("Attempted to upload more than %u bytes", MAX_UPLOAD_SIZE);
+        indigo_cxn_send_error_reply(
+            cxn_id, msg, OF_ERROR_TYPE_BAD_REQUEST, OF_REQUEST_FAILED_EPERM);
+        cleanup_lua_upload();
+        return;
+    }
+
     /* TODO concatenate consecutive messages with the same filename */
 
     if (data.bytes > 0) {
