@@ -37,6 +37,7 @@
 #include <AIM/aim_log.h>
 
 struct table {
+    list_links_t links;
     lua_State *lua;
     char *name;
     int ref_add;
@@ -46,6 +47,7 @@ struct table {
 };
 
 static const indigo_core_gentable_ops_t table_ops;
+static LIST_DEFINE(tables); /* struct table */
 
 int
 pipeline_lua_table_register(lua_State *lua)
@@ -61,6 +63,7 @@ pipeline_lua_table_register(lua_State *lua)
     table->ref_delete = luaL_ref(lua, LUA_REGISTRYINDEX);
     table->ref_modify = luaL_ref(lua, LUA_REGISTRYINDEX);
     table->ref_add = luaL_ref(lua, LUA_REGISTRYINDEX);
+    list_push(&tables, &table->links);
 
     indigo_core_gentable_register(
         table->name,
@@ -71,6 +74,19 @@ pipeline_lua_table_register(lua_State *lua)
         &table->gentable);
 
     return 0;
+}
+
+void
+pipeline_lua_table_reset(void)
+{
+    list_links_t *cur, *next;
+    LIST_FOREACH_SAFE(&tables, cur, next) {
+        struct table *table = container_of(cur, links, struct table);
+        indigo_core_gentable_unregister(table->gentable);
+        list_remove(&table->links);
+        aim_free(table->name);
+        aim_free(table);
+    }
 }
 
 /* table operations */

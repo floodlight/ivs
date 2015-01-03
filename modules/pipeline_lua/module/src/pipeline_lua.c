@@ -86,6 +86,7 @@ reset_lua(void)
 {
     if (lua) {
         lua_close(lua);
+        pipeline_lua_table_reset();
     }
 
     lua = luaL_newstate();
@@ -142,6 +143,7 @@ static void
 pipeline_lua_finish(void)
 {
     lua_close(lua);
+    pipeline_lua_table_reset();
     lua = NULL;
 
     indigo_core_message_listener_unregister(message_listener);

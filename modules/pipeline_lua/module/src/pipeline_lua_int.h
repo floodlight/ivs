@@ -55,6 +55,7 @@ struct builtin_lua {
 void pipeline_lua_fields_from_key(struct ind_ovs_parsed_key *key, struct fields *fields);
 
 int pipeline_lua_table_register(lua_State *lua);
+void pipeline_lua_table_reset(void);
 
 extern const char *pipeline_lua_field_names[];
 
