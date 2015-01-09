@@ -119,10 +119,13 @@ reset_lua(void)
             builtin_lua->name; builtin_lua++) {
         AIM_LOG_VERBOSE("Loading builtin Lua code %s", builtin_lua->name);
 
+        char name[64];
+        snprintf(name, sizeof(name), "=%s", builtin_lua->name);
+
         /* Parse */
         if (luaL_loadbuffer(lua, builtin_lua->start,
                 builtin_lua->end-builtin_lua->start,
-                builtin_lua->name) != 0) {
+                name) != 0) {
             AIM_DIE("Failed to load built-in Lua code %s: %s",
                     builtin_lua->name, lua_tostring(lua, -1));
         }
@@ -257,7 +260,10 @@ commit_lua_upload(indigo_cxn_id_t cxn_id, of_object_t *msg)
 
         AIM_LOG_VERBOSE("Loading Lua chunk %s, %u bytes", chunk->filename, chunk->size);
 
-        if (luaL_loadbuffer(lua, chunk->data, chunk->size, chunk->filename) != 0) {
+        char name[64];
+        snprintf(name, sizeof(name), "=%s", chunk->filename);
+
+        if (luaL_loadbuffer(lua, chunk->data, chunk->size, name) != 0) {
             AIM_LOG_ERROR("Failed to load code: %s", lua_tostring(lua, -1));
             indigo_cxn_send_error_reply(
                 cxn_id, msg, OF_ERROR_TYPE_BAD_REQUEST, OF_REQUEST_FAILED_EPERM);
