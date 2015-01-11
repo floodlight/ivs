@@ -23,7 +23,8 @@
  * load them into the VM they need to be specified here */
 #define BUILTIN_LUA \
     X(base) \
-    X(actions)
+    X(actions) \
+    X(binary)
 
 #define BUILTIN_LUA_START(name) _binary_ ## name ## _lua_start
 #define BUILTIN_LUA_END(name) _binary_ ## name ## _lua_end

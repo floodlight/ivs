@@ -62,6 +62,7 @@ static void reset_lua(void);
 static lua_State *lua;
 static struct context context;
 static int process_ref;
+static int command_ref;
 
 /* List of struct upload_chunk */
 struct xbuf upload_chunks;
@@ -137,6 +138,11 @@ reset_lua(void)
     lua_getglobal(lua, "process");
     AIM_ASSERT(lua_isfunction(lua, -1));
     process_ref = luaL_ref(lua, LUA_REGISTRYINDEX);
+
+    /* Store a reference to command() so we can efficiently retrieve it */
+    lua_getglobal(lua, "command");
+    AIM_ASSERT(lua_isfunction(lua, -1));
+    command_ref = luaL_ref(lua, LUA_REGISTRYINDEX);
 }
 
 static void
@@ -283,12 +289,57 @@ cleanup_lua_upload(void)
     xbuf_reset(&upload_chunks);
 }
 
+static void
+handle_lua_command_request(indigo_cxn_id_t cxn_id, of_object_t *msg)
+{
+    const int max_reply_size = UINT16_MAX -
+        of_object_fixed_len[msg->version][OF_BSN_LUA_COMMAND_REPLY];
+    uint32_t xid;
+    of_octets_t request_data;
+    of_bsn_lua_command_request_xid_get(msg, &xid);
+    of_bsn_lua_command_request_data_get(msg, &request_data);
+
+    pipeline_lua_allocator_reset();
+    void *request_buf = pipeline_lua_allocator_dup(request_data.data, request_data.bytes);
+    void *reply_buf = pipeline_lua_allocator_alloc(max_reply_size);
+
+    lua_rawgeti(lua, LUA_REGISTRYINDEX, command_ref);
+    lua_pushlightuserdata(lua, request_buf);
+    lua_pushinteger(lua, request_data.bytes);
+    lua_pushlightuserdata(lua, reply_buf);
+    lua_pushinteger(lua, max_reply_size);
+
+    if (lua_pcall(lua, 4, 1, 0) != 0) {
+        AIM_LOG_ERROR("Failed to execute command xid=%#x: %s", xid, lua_tostring(lua, -1));
+        indigo_cxn_send_error_reply(
+            cxn_id, msg, OF_ERROR_TYPE_BAD_REQUEST, OF_REQUEST_FAILED_EPERM);
+        return;
+    }
+
+    int reply_size = lua_tointeger(lua, 0);
+    AIM_TRUE_OR_DIE(reply_size >= 0 && reply_size < max_reply_size);
+    lua_settop(lua, 0);
+
+    of_object_t *reply = of_bsn_lua_command_reply_new(msg->version);
+    of_bsn_lua_command_reply_xid_set(reply, xid);
+    of_octets_t reply_data = { .data = reply_buf, .bytes = reply_size };
+    if (of_bsn_lua_command_reply_data_set(reply, &reply_data) < 0) {
+        AIM_DIE("Unexpectedly failed to set data in of_bsn_lua_command_reply");
+    }
+
+    indigo_cxn_send_controller_message(cxn_id, reply);
+}
+
 static indigo_core_listener_result_t
 message_listener(indigo_cxn_id_t cxn_id, of_object_t *msg)
 {
     switch (msg->object_id) {
     case OF_BSN_LUA_UPLOAD:
         handle_lua_upload(cxn_id, msg);
+        return INDIGO_CORE_LISTENER_RESULT_DROP;
+
+    case OF_BSN_LUA_COMMAND_REQUEST:
+        handle_lua_command_request(cxn_id, msg);
         return INDIGO_CORE_LISTENER_RESULT_DROP;
 
     default:
