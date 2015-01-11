@@ -94,9 +94,11 @@ ffi.cdef[[
 void pipeline_lua_log(const char *str);
 ]]
 
-function sandbox.log(...)
+function log(...)
     C.pipeline_lua_log(string.format(...))
 end
+
+sandbox.log = log
 
 ---- Context
 
