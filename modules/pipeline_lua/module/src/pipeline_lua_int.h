@@ -62,4 +62,8 @@ extern const char *pipeline_lua_field_names[];
 /* Terminated by name == NULL */
 extern const struct builtin_lua pipeline_lua_builtin_lua[];
 
+void *pipeline_lua_allocator_alloc(uint32_t size);
+void *pipeline_lua_allocator_dup(void *src, uint32_t size);
+void pipeline_lua_allocator_reset(void);
+
 #endif
