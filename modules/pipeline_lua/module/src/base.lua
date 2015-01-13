@@ -82,6 +82,17 @@ function process()
     sandbox.ingress()
 end
 
+-- To be overridden by uploaded code
+function sandbox.command(reader, writer) end
+
+-- Entrypoint for command request
+function command(request_data, request_data_length, reply_data, reply_data_length)
+    local reader = Reader.new(request_data, request_data_length)
+    local writer = Writer.new(reply_data, reply_data_length)
+    sandbox.command(reader, writer)
+    return writer.offset()
+end
+
 function sandbox.require(name)
     return sandbox[name]
 end
@@ -94,9 +105,11 @@ ffi.cdef[[
 void pipeline_lua_log(const char *str);
 ]]
 
-function sandbox.log(...)
+function log(...)
     C.pipeline_lua_log(string.format(...))
 end
+
+sandbox.log = log
 
 ---- Context
 
