@@ -46,7 +46,7 @@ DEPENDMODULES := SocketManager OFConnectionManager OFStateManager OVSDriver \
                  AIM murmur cjson OS uCli debug_counter timer_wheel bloom_filter BigRing minimatch action \
                  stats pipeline_reflect
 
-ifdef USE_LUAJIT
+ifndef NO_LUAJIT
 DEPENDMODULES += luajit pipeline_lua
 GLOBAL_CFLAGS += -DHAVE_LUAJIT=1
 LDFLAGS += -rdynamic
