@@ -38,7 +38,6 @@ local sandbox = {
     xpcall=xpcall,
 
     bit=bit,
-    ffi=ffi, -- UNSAFE
 
     string={
         byte=string.byte,
@@ -69,6 +68,9 @@ local sandbox = {
     },
 
     field_names=field_names,
+
+    -- hashtable added by hashtable.lua
+    -- murmur added by murmur.lua
 }
 
 _G.sandbox = sandbox -- global for C to use
