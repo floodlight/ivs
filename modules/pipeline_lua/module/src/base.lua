@@ -69,7 +69,6 @@ local sandbox = {
     },
 
     field_names=field_names,
-    register_table=register_table,
 }
 
 _G.sandbox = sandbox -- global for C to use
@@ -140,3 +139,37 @@ context = ffi.cast(ffi.typeof('struct context *'), _context)
 
 -- Create a safe proxy for the raw fields pointer
 sandbox.fields = setmetatable({}, { __index=context.fields, __metatable=true })
+
+-- Wrap the unsafe register_table API exported by C (which uses raw pointers)
+-- with a safe version that wraps the pointers in Readers.
+--
+-- The 'ops' argument should be a table with 'add', 'modify', and 'delete'
+-- functions. Each of these functions is passed Readers for the key and
+-- (except for delete) the value. If the optional 'parse_key' and 'parse_value'
+-- functions are defined, they are called to transform the corresponding Reader
+-- before calling the operation. This is often used to parse the binary stream
+-- into a table.
+function sandbox.register_table(name, ops)
+    local new_reader = Reader.new
+    local parse_key = ops.parse_key or function(x) return x end
+    local parse_value = ops.parse_value or function(x) return x end
+    local add = ops.add
+    local modify = ops.modify
+    local delete = ops.delete
+
+    local function op_add(key_data, key_len, value_data, value_len)
+        add(parse_key(new_reader(key_data, key_len)),
+            parse_value(new_reader(value_data, value_len)))
+    end
+
+    local function op_modify(key_data, key_len, value_data, value_len)
+        modify(parse_key(new_reader(key_data, key_len)),
+               parse_value(new_reader(value_data, value_len)))
+    end
+
+    local function op_delete(key_data, key_len)
+        delete(parse_key(new_reader(key_data, key_len)))
+    end
+
+    register_table(name, op_add, op_modify, op_delete)
+end
