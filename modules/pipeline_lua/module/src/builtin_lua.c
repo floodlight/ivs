@@ -24,7 +24,7 @@
 #define BUILTIN_LUA \
     X(base) \
     X(actions) \
-    X(binary) \
+    X(xdr) \
     X(murmur) \
     X(hashtable)
 
