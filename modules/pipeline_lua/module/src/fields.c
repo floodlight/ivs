@@ -36,10 +36,17 @@ pipeline_lua_fields_from_key(struct ind_ovs_parsed_key *key,
 
     fields->in_port = key->in_port;
 
-    fields->eth_dst_lo = ntohl(*(uint32_t *)&key->ethernet.eth_dst[2]);
-    fields->eth_dst_hi = ntohs(*(uint16_t *)&key->ethernet.eth_dst[0]);
-    fields->eth_src_lo = ntohl(*(uint32_t *)&key->ethernet.eth_src[2]);
-    fields->eth_src_hi = ntohs(*(uint16_t *)&key->ethernet.eth_src[0]);
+    {
+        uint8_t *m = key->ethernet.eth_dst;
+        fields->eth_dst_lo = (m[2] << 24) | (m[3] << 16) | (m[4] << 8) | m[5];
+        fields->eth_dst_hi = (m[0] << 8) | m[1];
+    }
+
+    {
+        uint8_t *m = key->ethernet.eth_src;
+        fields->eth_src_lo = (m[2] << 24) | (m[3] << 16) | (m[4] << 8) | m[5];
+        fields->eth_src_hi = (m[0] << 8) | m[1];
+    }
 
     if (ATTR_BITMAP_TEST(key->populated, OVS_KEY_ATTR_ETHERTYPE)) {
         fields->eth_type = ntohs(key->ethertype);
