@@ -45,6 +45,11 @@ if [ -d ".git" ]; then
     done
 fi
 
+if ! which pkg-config &> /dev/null; then
+    echo "Installing pkg-config"
+    $APT_GET install pkg-config
+fi
+
 if ! which pcap-config &> /dev/null; then
     echo "Installing libpcap-dev"
     $APT_GET install libpcap-dev
