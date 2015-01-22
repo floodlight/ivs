@@ -15,11 +15,9 @@
 
 local bit = require("bit")
 local ffi = require("ffi")
-local rshift = bit.rshift
+local band, bnot = bit.band, bit.bnot
 local ntohl = ffi.abi("le") and bit.bswap or function(x) return x end
-local ntohs = ffi.abi("le") and function(x) return rshift(ntohl(x), 16) end or function(x) return x end
 local P8 = ffi.typeof("uint8_t *")
-local P16 = ffi.typeof("uint16_t *")
 local P32 = ffi.typeof("uint32_t *")
 
 -- buf is a lightuserdata
@@ -35,22 +33,7 @@ Reader.new = function(buf, len, offset)
         assert(offset + n <= len)
     end
 
-    self.u8 = function()
-        check_length(1)
-        local ret = buf[offset]
-        offset = offset + 1
-        return ret
-    end
-
-    self.u16 = function()
-        check_length(2)
-        local ptr = ffi.cast(P16, buf+offset)
-        local ret = ntohs(ptr[0])
-        offset = offset + 2
-        return ret
-    end
-
-    self.u32 = function()
+    self.int = function()
         check_length(4)
         local ptr = ffi.cast(P32, buf+offset)
         local ret = ntohl(ptr[0])
@@ -58,31 +41,30 @@ Reader.new = function(buf, len, offset)
         return ret
     end
 
-    self.blob = function(n)
-        check_length(n)
+    self.uint = function()
+        local x = self.int()
+        -- Converted signed to unsigned
+        if x < 0 then
+            return 0x100000000 + x
+        else
+            return x
+        end
+    end
+
+    self.bool = function()
+        return self.uint() ~= 0
+    end
+
+    self.fstring = function(n)
+        local padded = band(n + 3, bnot(3))
+        check_length(padded)
         local ret = ffi.string(buf+offset, n)
-        offset = offset + n
+        offset = offset + padded
         return ret
     end
 
-    self.skip = function(n)
-        assert(offset + n <= len)
-        offset = offset + n
-    end
-
-    self.is_empty = function()
-        return offset == len
-    end
-
-    self.slice = function(n)
-        assert(offset + n <= len)
-        r = Reader.new(buf, n, offset)
-        offset = offset + n
-        return r
-    end
-
-    self.offset = function()
-        return offset
+    self.string = function()
+        return self.fstring(self.uint())
     end
 
     return self
@@ -98,31 +80,31 @@ Writer.new = function(buf, len)
         assert(offset + n <= len)
     end
 
-    self.u8 = function(x)
-        check_length(1)
-        buf[offset] = x
-        offset = offset + 1
-    end
-
-    self.u16 = function(x)
-        check_length(2)
-        local ptr = ffi.cast(P16, buf+offset)
-        ptr[0] = ntohs(x)
-        offset = offset + 2
-    end
-
-    self.u32 = function(x)
+    self.uint = function(x)
         check_length(4)
         local ptr = ffi.cast(P32, buf+offset)
         ptr[0] = ntohl(x)
         offset = offset + 4
     end
 
-    self.blob = function(x)
+    self.int = self.uint
+
+    self.bool = function(x)
+        self.uint(x and 1 or 0)
+    end
+
+    self.fstring = function(x)
         local n = x:len()
-        check_length(n)
+        local padded = band(n + 3, bnot(3))
+        check_length(padded)
         ffi.copy(buf+offset, x, n)
-        offset = offset + n
+        ffi.fill(buf+offset+n, padded-n)
+        offset = offset + padded
+    end
+
+    self.string = function(x)
+        self.uint(x:len())
+        self.fstring(x)
     end
 
     self.offset = function()

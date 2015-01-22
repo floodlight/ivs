@@ -136,10 +136,14 @@ table_add(indigo_cxn_id_t cxn_id, void *table_priv, of_list_bsn_tlv_t *key_tlvs,
         return rv;
     }
 
+    pipeline_lua_allocator_reset();
+    void *key_buf = pipeline_lua_allocator_dup(key.data, key.bytes);
+    void *value_buf = pipeline_lua_allocator_dup(value.data, value.bytes);
+
     lua_rawgeti(table->lua, LUA_REGISTRYINDEX, table->ref_add);
-    lua_pushlightuserdata(table->lua, key.data);
+    lua_pushlightuserdata(table->lua, key_buf);
     lua_pushinteger(table->lua, key.bytes);
-    lua_pushlightuserdata(table->lua, value.data);
+    lua_pushlightuserdata(table->lua, value_buf);
     lua_pushinteger(table->lua, value.bytes);
     if (lua_pcall(table->lua, 4, 0, 0) != 0) {
         AIM_LOG_ERROR("Failed to execute table %s add: %s", table->name, lua_tostring(table->lua, -1));
@@ -171,10 +175,14 @@ table_modify(indigo_cxn_id_t cxn_id, void *table_priv, void *entry_priv, of_list
         return rv;
     }
 
+    pipeline_lua_allocator_reset();
+    void *key_buf = pipeline_lua_allocator_dup(key.data, key.bytes);
+    void *value_buf = pipeline_lua_allocator_dup(value.data, value.bytes);
+
     lua_rawgeti(table->lua, LUA_REGISTRYINDEX, table->ref_modify);
-    lua_pushlightuserdata(table->lua, key.data);
+    lua_pushlightuserdata(table->lua, key_buf);
     lua_pushinteger(table->lua, key.bytes);
-    lua_pushlightuserdata(table->lua, value.data);
+    lua_pushlightuserdata(table->lua, value_buf);
     lua_pushinteger(table->lua, value.bytes);
     if (lua_pcall(table->lua, 4, 0, 0) != 0) {
         AIM_LOG_ERROR("Failed to execute table %s modify: %s", table->name, lua_tostring(table->lua, -1));
@@ -199,8 +207,11 @@ table_delete(indigo_cxn_id_t cxn_id, void *table_priv, void *entry_priv, of_list
         return rv;
     }
 
+    pipeline_lua_allocator_reset();
+    void *key_buf = pipeline_lua_allocator_dup(key.data, key.bytes);
+
     lua_rawgeti(table->lua, LUA_REGISTRYINDEX, table->ref_delete);
-    lua_pushlightuserdata(table->lua, key.data);
+    lua_pushlightuserdata(table->lua, key_buf);
     lua_pushinteger(table->lua, key.bytes);
     if (lua_pcall(table->lua, 2, 0, 0) != 0) {
         AIM_LOG_ERROR("Failed to execute table %s delete: %s", table->name, lua_tostring(table->lua, -1));

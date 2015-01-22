@@ -24,7 +24,9 @@
 #define BUILTIN_LUA \
     X(base) \
     X(actions) \
-    X(binary)
+    X(xdr) \
+    X(murmur) \
+    X(hashtable)
 
 #define BUILTIN_LUA_START(name) _binary_ ## name ## _lua_start
 #define BUILTIN_LUA_END(name) _binary_ ## name ## _lua_end
