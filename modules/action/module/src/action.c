@@ -213,7 +213,7 @@ action_push_vlan_raw(struct action_context *ctx, uint16_t vlan_tci)
 
     struct ovs_action_push_vlan vlan = {
         .vlan_tpid = htons(ETH_P_8021Q),
-        .vlan_tci = vlan_tci,
+        .vlan_tci = htons(vlan_tci),
     };
     nla_put(ctx->msg, OVS_ACTION_ATTR_PUSH_VLAN, sizeof(vlan), &vlan);
 }
