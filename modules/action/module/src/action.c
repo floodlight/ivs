@@ -202,12 +202,15 @@ action_push_vlan(struct action_context *ctx)
 void
 action_pop_vlan_raw(struct action_context *ctx)
 {
+    commit_set_field_actions(ctx);
     nla_put_flag(ctx->msg, OVS_ACTION_ATTR_POP_VLAN);
 }
 
 void
 action_push_vlan_raw(struct action_context *ctx, uint16_t vlan_tci)
 {
+    commit_set_field_actions(ctx);
+
     struct ovs_action_push_vlan vlan = {
         .vlan_tpid = htons(ETH_P_8021Q),
         .vlan_tci = vlan_tci,
