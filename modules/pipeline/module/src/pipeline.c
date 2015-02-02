@@ -156,9 +156,7 @@ pipeline_process(struct ind_ovs_parsed_key *key,
 void
 pipeline_inband_queue_priority_set(int priority)
 {
-    if (priority >= 0) {
-        queue_priority_inband = priority;
-    }
+    queue_priority_inband = priority;
 }
 
 void
