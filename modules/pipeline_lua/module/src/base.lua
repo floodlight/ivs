@@ -186,7 +186,12 @@ sandbox.fields = setmetatable({}, { __index=context.fields, __metatable=true })
 -- functions are defined, they are called to transform the corresponding Reader
 -- before calling the operation. This is often used to parse the binary stream
 -- into a table.
+local MAX_TABLES = 32
+local num_tables = 0
 function sandbox.register_table(name, ops)
+    assert(num_tables < MAX_TABLES)
+    num_tables = num_tables + 1
+
     local new_reader = Reader.new
     local parse_key = ops.parse_key or function(x) return x end
     local parse_value = ops.parse_value or function(x) return x end
