@@ -40,6 +40,8 @@ static struct pipeline pipelines[MAX_PIPELINES];
 
 static struct pipeline *current_pipeline;
 
+int queue_priority_inband = -1;
+
 void
 pipeline_register(const char *name, const struct pipeline_ops *ops)
 {
@@ -138,6 +140,9 @@ pipeline_process(struct ind_ovs_parsed_key *key,
         if (port != OF_PORT_DEST_NONE) {
             action_push_vlan(actx);
             action_set_vlan_vid(actx, ind_ovs_inband_vlan);
+            if (queue_priority_inband != -1) {
+                action_set_priority(actx, queue_priority_inband);
+            }
             action_output(actx, port);
         } else {
             AIM_LOG_VERBOSE("No available uplink");

@@ -30,6 +30,8 @@
 #include <action/action.h>
 #include <stats/stats.h>
 
+extern int queue_priority_inband;
+
 struct ind_ovs_parsed_key;
 
 struct pipeline_ops {
