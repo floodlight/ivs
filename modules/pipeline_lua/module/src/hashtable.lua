@@ -16,13 +16,14 @@
 local ffi = require("ffi")
 local bit = require("bit")
 local band, bor = bit.band, bit.bor
+local ipairs = ipairs
 
 local function make_hash_function(fields)
     local lines = {}
     table.insert(lines, "local murmur_round, murmur_finish = murmur.round, murmur.finish")
     table.insert(lines, "local tobit, band = bit.tobit, bit.band")
     table.insert(lines, "return function (obj)")
-    table.insert(lines, "h = 0")
+    table.insert(lines, "local h = 0")
     for i, v in ipairs(fields) do
         table.insert(lines, string.format("h = murmur_round(h, obj.%s)", v))
     end
@@ -53,6 +54,7 @@ local function make_lookup_function(fields, lookup_int)
     local lines = {}
     table.insert(lines, "local lookup_int = ...")
     table.insert(lines, "local key = {}")
+    table.insert(lines, "local select, type = select, type")
     table.insert(lines, "return function (self, ...)")
     table.insert(lines, "local first = select(1, ...)")
     table.insert(lines, "if type(first) == \"table\" then")
