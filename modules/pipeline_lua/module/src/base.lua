@@ -193,6 +193,14 @@ function sandbox.register_table(name, ops)
     local modify = ops.modify
     local delete = ops.delete
 
+    -- If no modify function was given fall back to delete+add. This is likely
+    -- less efficient and doesn't maintain stats, but for many tables this is
+    -- acceptable.
+    modify = modify or function(k, v)
+        delete(k)
+        add(k, v)
+    end
+
     local function op_add(key_data, key_len, value_data, value_len)
         add(parse_key(new_reader(key_data, key_len)),
             parse_value(new_reader(value_data, value_len)))
