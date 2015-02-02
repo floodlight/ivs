@@ -105,6 +105,8 @@ local sandbox = {
     -- murmur added by murmur.lua
 }
 
+sandbox._G = sandbox
+
 _G.sandbox = sandbox -- global for C to use
 
 -- To be overridden by uploaded code
