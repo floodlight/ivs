@@ -30,8 +30,6 @@
 #include <action/action.h>
 #include <stats/stats.h>
 
-extern int queue_priority_inband;
-
 struct ind_ovs_parsed_key;
 
 struct pipeline_ops {
@@ -102,5 +100,10 @@ pipeline_add_stats(struct xbuf *stats, struct stats_handle *stats_handle)
 {
     xbuf_append(stats, stats_handle, sizeof(*stats_handle));
 }
+
+/*
+ * Set the queue priority for inband control packets.
+ */
+void pipeline_inband_queue_priority_set(int priority);
 
 #endif

@@ -40,7 +40,7 @@ static struct pipeline pipelines[MAX_PIPELINES];
 
 static struct pipeline *current_pipeline;
 
-int queue_priority_inband = -1;
+static int queue_priority_inband = -1;
 
 void
 pipeline_register(const char *name, const struct pipeline_ops *ops)
@@ -150,6 +150,14 @@ pipeline_process(struct ind_ovs_parsed_key *key,
         return INDIGO_ERROR_NONE;
     } else {
         return current_pipeline->ops->process(key, stats, actx);
+    }
+}
+
+void
+pipeline_inband_queue_priority_set(int priority)
+{
+    if (priority >= 0) {
+        queue_priority_inband = priority;
     }
 }
 
