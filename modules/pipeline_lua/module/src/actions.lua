@@ -85,15 +85,18 @@ local simple_actions = {
 
 for i, action in ipairs(simple_actions) do
     sandbox[action] = function (...)
+        assert(context.valid)
         C["action_" .. action](context.actx, ...)
     end
 end
 
 function sandbox.set_eth_dst(mac_lo, mac_hi)
+    assert(context.valid)
     C.action_set_eth_dst_scalar(context.actx, mac_lo, mac_hi)
 end
 
 function sandbox.set_eth_src(mac_lo, mac_hi)
+    assert(context.valid)
     C.action_set_eth_src_scalar(context.actx, mac_lo, mac_hi)
 end
 

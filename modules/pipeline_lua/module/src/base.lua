@@ -165,6 +165,7 @@ struct xbuf;
 struct action_context;
 
 struct context {
+    bool valid;
     struct xbuf *stats;
     struct action_context *actx;
     struct fields fields;
