@@ -16,7 +16,6 @@
 local ffi = require("ffi")
 local bit = require("bit")
 local band, bor = bit.band, bit.bor
-local ipairs = ipairs
 
 local function make_hash_function(fields)
     local lines = {}
@@ -47,6 +46,19 @@ local function make_compare_function(fields)
     table.insert(lines, "end")
     local str = table.concat(lines, "\n")
     local chunk = loadstring(str, "compare")
+    return chunk()
+end
+
+local function make_copy_function(fields)
+    local lines = {}
+    table.insert(lines, "return function (dst, src)")
+    for i, v in ipairs(fields) do
+        table.insert(lines, string.format("assert(src.%s, 'field %s is nil')", v, v, v))
+        table.insert(lines, string.format("dst.%s = src.%s", v, v))
+    end
+    table.insert(lines, "end")
+    local str = table.concat(lines, "\n")
+    local chunk = loadstring(str, "copy")
     return chunk()
 end
 
@@ -112,6 +124,8 @@ end
 local function create(key_fields, value_fields)
     local hash_key = make_hash_function(key_fields)
     local compare_key = make_compare_function(key_fields)
+    local copy_key = make_copy_function(key_fields)
+    local copy_value = make_copy_function(value_fields)
 
     local Entry = ffi.typeof([[
     struct {
@@ -130,24 +144,6 @@ local function create(key_fields, value_fields)
     local count = 0
     local entries = ffi.new(Entries, size)
     local mask = size - 1
-
-    local function copy_key(dst, src)
-        for i, v in ipairs(key_fields) do
-            if src[v] == nil then
-                error("Key field " .. v .. " is nil")
-            end
-            dst[v] = src[v]
-        end
-    end
-
-    local function copy_value(dst, src)
-        for i, v in ipairs(value_fields) do
-            if src[v] == nil then
-                error("Value field " .. v .. " is nil")
-            end
-            dst[v] = src[v]
-        end
-    end
 
     local function index(h, dist)
         return (band(h + dist, mask))
