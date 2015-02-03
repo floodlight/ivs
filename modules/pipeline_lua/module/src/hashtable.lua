@@ -30,7 +30,7 @@ local function make_hash_function(fields)
     table.insert(lines, "h = murmur_finish(h)")
     table.insert(lines, "h = band(h, 0x7fffffff)")
     table.insert(lines, "if h == 0 then h = 1 end")
-    table.insert(lines, "return tobit(h)")
+    table.insert(lines, "return (tobit(h))")
     table.insert(lines, "end")
     local str = table.concat(lines, "\n")
     local chunk = loadstring(str, "hash")
@@ -140,12 +140,12 @@ local function create(key_fields, value_fields)
     end
 
     local function index(h, dist)
-        return band(h + dist, mask)
+        return (band(h + dist, mask))
     end
 
     local function distance(idx, h)
         local start_idx = index(h, 0);
-        return band(idx + size - start_idx, mask);
+        return (band(idx + size - start_idx, mask))
     end
 
     local function insert_internal(key, value, h)
