@@ -80,6 +80,16 @@ local load_factor = 0.8
 local DELETED = 0x80000000
 local EMPTY = 0
 
+-- The lookup method returns a cdata object pointing into the entries array.
+-- If the hashtable were to grow and free the old entries array then the
+-- cdata (held by a malicious script) would point into freed memory. The
+-- script could then cause a crash or even arbitrary code execution.
+-- We fix this by never freeing old entries arrays. Because we grow the
+-- hashtable by powers of 2 and never shrink it, this wastes a little less
+-- than the memory used by the current entries array. It will be freed when
+-- new Lua code is uploaded, since that destroys the VM.
+local freed_entries = {}
+
 local function make_struct(fields)
     local lines = {}
     table.insert(lines, "struct {")
@@ -191,6 +201,7 @@ local function create(key_fields, value_fields)
         size = size * 2
         mask = size - 1
         local old_entries = entries
+        table.insert(freed_entries, old_entries)
         entries = Entries(size)
         for i = 0, old_size-1 do
             local old_entry = old_entries[i]
