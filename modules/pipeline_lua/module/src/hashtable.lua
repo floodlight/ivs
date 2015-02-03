@@ -213,7 +213,7 @@ local function create(key_fields, value_fields)
             local idx = index(h, dist)
             local entry = entries[idx]
             if entry.hash == h and compare_key(key, entry.key) then
-                return entry
+                return entry.value
             elseif entry.hash == EMPTY or
                     distance(idx, entry.hash) < dist then
                 break
