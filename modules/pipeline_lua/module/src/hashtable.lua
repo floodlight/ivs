@@ -123,12 +123,18 @@ local function create(key_fields, value_fields)
 
     local function copy_key(dst, src)
         for i, v in ipairs(key_fields) do
+            if src[v] == nil then
+                error("Key field " .. v .. " is nil")
+            end
             dst[v] = src[v]
         end
     end
 
     local function copy_value(dst, src)
         for i, v in ipairs(value_fields) do
+            if src[v] == nil then
+                error("Value field " .. v .. " is nil")
+            end
             dst[v] = src[v]
         end
     end
