@@ -14,29 +14,29 @@
 -- License.
 
 local bit = require("bit")
-local bxor, rshift, rol = bit.bxor, bit.rshift, bit.rol
+local bxor, rshift, rol, tobit = bit.bxor, bit.rshift, bit.rol, bit.tobit
 
 local function mul(x1, x2)
-    return x1 * x2
+    return (tobit(x1*(x2+0LL)))
 end
 
 local function round(state, data)
-    data = mul(data, 0xcc9e2d51)
+    data = mul(data, -862048943)
     data = rol(data, 15)
     data = mul(data, 0x1b873593)
 
     state = bxor(state, data)
     state = rol(state, 13)
-    state = mul(state, 5) + 0xe6546b64
+    state = mul(state, 5) - 430675100
 
     return state
 end
 
 local function finish(h)
     h = bxor(h, rshift(h, 16))
-    h = mul(h, 0x85ebca6b)
+    h = mul(h, -2048144789)
     h = bxor(h, rshift(h, 13))
-    h = mul(h, 0xc2b2ae35)
+    h = mul(h, -1028477387)
     h = bxor(h, rshift(h, 16))
     return h
 end
