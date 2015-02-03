@@ -212,9 +212,17 @@ local function create(key_fields, value_fields)
         count = count + 1
     end
 
-    local function lookup_int(key)
-        local h = hash_key(key)
+    local function lookup_int_fast(key, h, dist)
+        local idx = index(h, dist)
+        local entry = entries[idx]
+        if entry.hash == h and compare_key(key, entry.key) then
+            return entry.value
+        else
+            return nil
+        end
+    end
 
+    local function lookup_int_slow(key, h)
         for dist = 0, size - 1 do
             local idx = index(h, dist)
             local entry = entries[idx]
@@ -225,8 +233,18 @@ local function create(key_fields, value_fields)
                 break
             end
         end
+    end
 
-        return nil
+    local function lookup_int(key)
+        local h = hash_key(key)
+
+        return
+            lookup_int_fast(key, h, 0) or
+            lookup_int_fast(key, h, 1) or
+            lookup_int_fast(key, h, 2) or
+            lookup_int_fast(key, h, 3) or
+            lookup_int_fast(key, h, 4) or
+            lookup_int_slow(key, h)
     end
 
     methods.lookup = make_lookup_function(key_fields, lookup_int)
