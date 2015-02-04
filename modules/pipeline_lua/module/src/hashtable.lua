@@ -32,7 +32,7 @@ local function make_hash_function(fields)
     table.insert(lines, "return (tobit(h))")
     table.insert(lines, "end")
     local str = table.concat(lines, "\n")
-    local chunk = loadstring(str, "hash")
+    local chunk = loadstring(str, "=hash")
     return chunk()
 end
 
@@ -45,7 +45,7 @@ local function make_compare_function(fields)
     table.insert(lines, "return true")
     table.insert(lines, "end")
     local str = table.concat(lines, "\n")
-    local chunk = loadstring(str, "compare")
+    local chunk = loadstring(str, "=compare")
     return chunk()
 end
 
@@ -58,7 +58,7 @@ local function make_copy_function(fields)
     end
     table.insert(lines, "end")
     local str = table.concat(lines, "\n")
-    local chunk = loadstring(str, "copy")
+    local chunk = loadstring(str, "=copy")
     return chunk()
 end
 
@@ -81,7 +81,7 @@ local function make_lookup_function(fields, lookup_int)
     table.insert(lines, "return lookup_int(key)")
     table.insert(lines, "end")
     local str = table.concat(lines, "\n")
-    local chunk = loadstring(str, "lookup")
+    local chunk = loadstring(str, "=lookup")
     return chunk(lookup_int)
 end
 
