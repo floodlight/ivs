@@ -105,6 +105,8 @@ local sandbox = {
     -- murmur added by murmur.lua
 }
 
+sandbox._G = sandbox
+
 _G.sandbox = sandbox -- global for C to use
 
 -- To be overridden by uploaded code
@@ -163,6 +165,7 @@ struct xbuf;
 struct action_context;
 
 struct context {
+    bool valid;
     struct xbuf *stats;
     struct action_context *actx;
     struct fields fields;
@@ -183,13 +186,26 @@ sandbox.fields = setmetatable({}, { __index=context.fields, __metatable=true })
 -- functions are defined, they are called to transform the corresponding Reader
 -- before calling the operation. This is often used to parse the binary stream
 -- into a table.
+local MAX_TABLES = 32
+local num_tables = 0
 function sandbox.register_table(name, ops)
+    assert(num_tables < MAX_TABLES)
+    num_tables = num_tables + 1
+
     local new_reader = Reader.new
     local parse_key = ops.parse_key or function(x) return x end
     local parse_value = ops.parse_value or function(x) return x end
     local add = ops.add
     local modify = ops.modify
     local delete = ops.delete
+
+    -- If no modify function was given fall back to delete+add. This is likely
+    -- less efficient and doesn't maintain stats, but for many tables this is
+    -- acceptable.
+    modify = modify or function(k, v)
+        delete(k)
+        add(k, v)
+    end
 
     local function op_add(key_data, key_len, value_data, value_len)
         add(parse_key(new_reader(key_data, key_len)),

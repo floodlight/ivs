@@ -42,6 +42,7 @@ AIM_LOG_STRUCT_DEFINE(AIM_LOG_OPTIONS_DEFAULT, AIM_LOG_BITS_DEFAULT, NULL, 0);
 
 /* Per-packet information shared with Lua */
 struct context {
+    bool valid;
     struct xbuf *stats;
     struct action_context *actx;
     struct fields fields;
@@ -98,6 +99,7 @@ reset_lua(void)
     luaL_openlibs(lua);
 
     /* Give Lua a pointer to the static context struct */
+    context.valid = false;
     lua_pushlightuserdata(lua, &context);
     lua_setglobal(lua, "_context");
 
@@ -168,12 +170,15 @@ pipeline_lua_process(struct ind_ovs_parsed_key *key,
     pipeline_lua_fields_from_key(key, &context.fields);
     context.stats = stats;
     context.actx = actx;
+    context.valid = true;
 
     lua_rawgeti(lua, LUA_REGISTRYINDEX, process_ref);
 
     if (lua_pcall(lua, 0, 0, 0) != 0) {
         AIM_LOG_ERROR("Failed to execute script: %s", lua_tostring(lua, -1));
     }
+
+    context.valid = false;
 
     return INDIGO_ERROR_NONE;
 }
