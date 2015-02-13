@@ -21,7 +21,7 @@
 #include <action/action.h>
 #include <errno.h>
 
-static bool check_for_table_action(of_list_action_t *actions);
+static bool check_for_table_action(of_list_action_t *actions, uint32_t *queue_id);
 static indigo_error_t translate_openflow_actions(of_list_action_t *actions, struct ind_ovs_parsed_key *key, struct nl_msg *msg);
 
 indigo_error_t
@@ -31,12 +31,13 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
     of_list_action_t of_list_action[1];
     of_octets_t      of_octets[1];
     indigo_error_t   rv;
+    uint32_t         queue_id = 0;
 
     of_packet_out_in_port_get(of_packet_out, &of_port_num);
     of_packet_out_data_get(of_packet_out, of_octets);
     of_packet_out_actions_bind(of_packet_out, of_list_action);
 
-    bool use_table = check_for_table_action(of_list_action);
+    bool use_table = check_for_table_action(of_list_action, &queue_id);
 
     int netlink_pid;
     if (use_table) {
@@ -71,6 +72,9 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
     } else {
         /* Can't have an empty key. */
         nla_put_u32(msg, OVS_KEY_ATTR_PRIORITY, 0);
+    }
+    if (use_table && queue_id) {
+        nla_put_u32(msg, OVS_KEY_ATTR_PRIORITY, queue_id);
     }
     nla_nest_end(msg, key);
 
@@ -150,31 +154,34 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
     return INDIGO_ERROR_NONE;
 }
 
-/* Check for a single output to OFPP_TABLE */
+/* Check for a output to OFPP_TABLE */
 static bool
-check_for_table_action(of_list_action_t *actions)
+check_for_table_action(of_list_action_t *actions, uint32_t *queue_id)
 {
     of_object_t action;
-
-    if (of_list_action_first(actions, &action) < 0) {
-        return false;
+    int rv;
+    OF_LIST_ACTION_ITER(actions, &action, rv) {
+        switch (action.object_id) {
+        case OF_ACTION_OUTPUT: {
+            of_port_no_t port_no;
+            of_action_output_port_get(&action, &port_no);
+            if (port_no != OF_PORT_DEST_USE_TABLE) {
+                return false;
+            } else {
+                return true;
+            }
+        }
+        case OF_ACTION_SET_QUEUE: {
+            of_action_set_queue_queue_id_get(&action, queue_id);
+            break;
+        }
+        default:
+            LOG_ERROR("unsupported action %s", of_object_id_str[action.object_id]);
+            return false;
+        }
     }
 
-    if (action.object_id != OF_ACTION_OUTPUT) {
-        return false;
-    }
-
-    of_port_no_t port_no;
-    of_action_output_port_get(&action, &port_no);
-    if (port_no != OF_PORT_DEST_USE_TABLE) {
-        return false;
-    }
-
-    if (of_list_action_next(actions, &action) == 0) {
-        return false;
-    }
-
-    return true;
+    return false;
 }
 
 static void
