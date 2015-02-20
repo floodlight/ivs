@@ -82,6 +82,19 @@ ind_ovs_parse_key(struct nlattr *key, struct ind_ovs_parsed_key *pkey)
     assert(ATTR_BITMAP_TEST(pkey->populated, OVS_KEY_ATTR_ETHERNET));
 }
 
+void
+ind_ovs_emit_key(const struct ind_ovs_parsed_key *key, struct nl_msg *msg, bool omit_zero)
+{
+    static uint8_t zeroes[sizeof(*key)];
+#define field(attr, name, type) \
+    if (ATTR_BITMAP_TEST(key->populated, attr) && \
+            (!omit_zero || memcmp(&key->name, zeroes, sizeof(type)))) { \
+        nla_put(msg, attr, sizeof(type), &key->name); \
+    }
+    OVS_KEY_FIELDS
+#undef field
+}
+
 /* Should only be used when creating the match for a packet-in */
 void
 ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey,

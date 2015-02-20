@@ -74,6 +74,9 @@ ind_ovs_kflow_add(const struct nlattr *key)
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key((struct nlattr *)key, &pkey);
 
+    struct ind_ovs_parsed_key mask;
+    memset(&mask, 0, sizeof(mask));
+
     struct ind_ovs_kflow *kflow = aim_malloc(sizeof(*kflow) + key->nla_len);
 
     struct xbuf *stats = &ind_ovs_kflow_stats_xbuf;
@@ -86,7 +89,7 @@ ind_ovs_kflow_add(const struct nlattr *key)
     struct action_context actx;
     action_context_init(&actx, &pkey, msg);
 
-    indigo_error_t err = pipeline_process(&pkey, stats, &actx);
+    indigo_error_t err = pipeline_process(&pkey, &mask, stats, &actx);
     if (err < 0) {
         aim_free(kflow);
         ind_ovs_nlmsg_freelist_free(msg);
@@ -94,6 +97,13 @@ ind_ovs_kflow_add(const struct nlattr *key)
     }
 
     ind_ovs_nla_nest_end(msg, actions);
+
+    if (!ind_ovs_disable_megaflows) {
+        struct nlattr *mask_attr = nla_nest_start(msg, OVS_FLOW_ATTR_MASK);
+        assert(ATTR_BITMAP_TEST(mask.populated, OVS_KEY_ATTR_ETHERTYPE));
+        ind_ovs_emit_key(&mask, msg, true);
+        ind_ovs_nla_nest_end(msg, mask_attr);
+    }
 
     /* Copy actions before ind_ovs_transact() frees msg */
     kflow->actions = aim_malloc(nla_len(actions));
@@ -110,6 +120,7 @@ ind_ovs_kflow_add(const struct nlattr *key)
     kflow->in_port = in_port;
     kflow->stats.packets = 0;
     kflow->stats.bytes = 0;
+    kflow->mask = mask;
 
     memcpy(kflow->key, key, key->nla_len);
 
@@ -222,6 +233,9 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key(kflow->key, &pkey);
 
+    struct ind_ovs_parsed_key mask;
+    memset(&mask, 0, sizeof(mask));
+
     struct xbuf *stats = &ind_ovs_kflow_stats_xbuf;
     xbuf_reset(stats);
 
@@ -232,7 +246,7 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
     struct action_context actx;
     action_context_init(&actx, &pkey, msg);
 
-    indigo_error_t err = pipeline_process(&pkey, stats, &actx);
+    indigo_error_t err = pipeline_process(&pkey, &mask, stats, &actx);
     if (err < 0) {
         ind_ovs_kflow_delete(kflow);
         ind_ovs_nlmsg_freelist_free(msg);
@@ -255,15 +269,32 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
         memcpy(kflow->stats_handles, stats_handles, stats_handles_len);
     }
 
-    if (nla_len(actions) != kflow->actions_len ||
-            memcmp(nla_data(actions), kflow->actions, nla_len(actions))) {
+    bool actions_changed = nla_len(actions) != kflow->actions_len ||
+        memcmp(nla_data(actions), kflow->actions, nla_len(actions));
+    bool mask_changed = memcmp(&mask, &kflow->mask, sizeof(mask)) != 0;
+
+    if (!ind_ovs_disable_megaflows) {
+        struct nlattr *mask_attr = nla_nest_start(msg, OVS_FLOW_ATTR_MASK);
+        assert(ATTR_BITMAP_TEST(mask.populated, OVS_KEY_ATTR_ETHERTYPE));
+        ind_ovs_emit_key(&mask, msg, true);
+        ind_ovs_nla_nest_end(msg, mask_attr);
+    }
+
+    if (actions_changed || mask_changed) {
         if (ind_ovs_transact(msg) < 0) {
             LOG_ERROR("Failed to modify kernel flow");
             return;
         }
-        kflow->actions = aim_realloc(kflow->actions, nla_len(actions));
-        memcpy(kflow->actions, nla_data(actions), nla_len(actions));
-        kflow->actions_len = nla_len(actions);
+
+        if (actions_changed) {
+            kflow->actions = aim_realloc(kflow->actions, nla_len(actions));
+            memcpy(kflow->actions, nla_data(actions), nla_len(actions));
+            kflow->actions_len = nla_len(actions);
+        }
+
+        if (mask_changed) {
+            kflow->mask = mask;
+        }
     } else {
         ind_ovs_nlmsg_freelist_free(msg);
     }

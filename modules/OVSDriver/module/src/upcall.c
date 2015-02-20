@@ -239,6 +239,8 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key(key, &pkey);
 
+    struct ind_ovs_parsed_key mask = { 0 };
+
     xbuf_reset(&thread->stats);
 
     struct nlattr *actions = nla_nest_start(msg, OVS_PACKET_ATTR_ACTIONS);
@@ -246,7 +248,7 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     struct action_context actx;
     action_context_init(&actx, &pkey, msg);
 
-    indigo_error_t err = pipeline_process(&pkey, &thread->stats, &actx);
+    indigo_error_t err = pipeline_process(&pkey, &mask, &thread->stats, &actx);
     if (err < 0) {
         return;
     }

@@ -164,9 +164,14 @@ pipeline_lua_finish(void)
 
 indigo_error_t
 pipeline_lua_process(struct ind_ovs_parsed_key *key,
+                     struct ind_ovs_parsed_key *mask,
                      struct xbuf *stats,
                      struct action_context *actx)
 {
+    uint64_t populated = mask->populated;
+    memset(mask, 0xff, sizeof(*mask));
+    mask->populated = populated;
+
     pipeline_lua_fields_from_key(key, &context.fields);
     context.stats = stats;
     context.actx = actx;

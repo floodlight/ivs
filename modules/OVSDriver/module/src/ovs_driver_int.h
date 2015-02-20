@@ -134,6 +134,7 @@ struct ind_ovs_kflow {
     uint16_t num_stats_handles; /* size of stats_handles array */
     uint16_t actions_len; /* length of actions blob */
     uint64_t last_used; /* monotonic time in ms */
+    struct ind_ovs_parsed_key mask;
     void *actions; /* payload of actions nlattr */
     struct stats_handle *stats_handles;
     struct nlattr key[0];
@@ -158,6 +159,9 @@ struct ind_ovs_group {
 
 /* Translate an OVS key into a flat struct */
 void ind_ovs_parse_key(struct nlattr *key, struct ind_ovs_parsed_key *pkey);
+
+/* Translate a parsed key into nlattrs */
+void ind_ovs_emit_key(const struct ind_ovs_parsed_key *key, struct nl_msg *msg, bool omit_zeroes);
 
 /* Translate an OVS key into an OpenFlow match object */
 void ind_ovs_key_to_match(const struct ind_ovs_parsed_key *pkey, of_version_t version, of_match_t *match);
@@ -278,6 +282,12 @@ extern bool ind_ovs_benchmark_mode;
  * Set it with the environment variable IVS_DISABLE_KFLOWS=1.
  */
 extern bool ind_ovs_disable_kflows;
+
+/*
+ * Disable megaflows for debugging and performance comparison.
+ * Set with the environment variable IVS_DISABLE_MEGAFLOWS=1.
+ */
+extern bool ind_ovs_disable_megaflows;
 
 /*
  * Random number used to prevent guests from deliberately causing hash

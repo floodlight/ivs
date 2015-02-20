@@ -243,6 +243,12 @@ ind_ovs_dump_flow_attr(const struct nlattr *attr)
         nest_end();
         break;
 
+    case OVS_FLOW_ATTR_MASK:
+        nest_start(OVS_FLOW_ATTR_MASK);
+        ind_ovs_dump_nested(attr, ind_ovs_dump_key_attr);
+        nest_end();
+        break;
+
     case OVS_FLOW_ATTR_ACTIONS:
         nest_start(OVS_FLOW_ATTR_ACTIONS);
         ind_ovs_dump_nested(attr, ind_ovs_dump_action_attr);

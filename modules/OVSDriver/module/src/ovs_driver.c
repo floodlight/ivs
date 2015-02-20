@@ -47,6 +47,7 @@ struct nl_sock *ind_ovs_socket;
 int ovs_datapath_family, ovs_packet_family, ovs_vport_family, ovs_flow_family;
 bool ind_ovs_benchmark_mode = false;
 bool ind_ovs_disable_kflows = false;
+bool ind_ovs_disable_megaflows = false;
 uint32_t ind_ovs_salt;
 uint16_t ind_ovs_inband_vlan = VLAN_INVALID;
 
@@ -193,6 +194,12 @@ ind_ovs_init(const char *datapath_name)
     if (env_str != NULL && atoi(env_str) == 1) {
         LOG_WARN("Kernel flow installation disabled.");
         ind_ovs_disable_kflows = true;
+    }
+
+    env_str = getenv("IVS_DISABLE_MEGAFLOWS");
+    if (env_str != NULL && atoi(env_str) == 1) {
+        LOG_WARN("Megaflow installation disabled.");
+        ind_ovs_disable_megaflows = true;
     }
 
     ind_ovs_salt = get_entropy();
