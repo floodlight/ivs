@@ -170,6 +170,21 @@ indigo_error_t indigo_port_interface_add(
     return ind_ovs_transact(msg);
 }
 
+/* Like indigo_port_interface_add, but creates an internal port */
+indigo_error_t
+ind_ovs_port_add_internal(const char *port_name)
+{
+    if (strlen(port_name) >= 256) {
+        return INDIGO_ERROR_PARAM;
+    }
+
+    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_NEW);
+    nla_put_u32(msg, OVS_VPORT_ATTR_TYPE, OVS_VPORT_TYPE_INTERNAL);
+    nla_put_string(msg, OVS_VPORT_ATTR_NAME, port_name);
+    nla_put_u32(msg, OVS_VPORT_ATTR_UPCALL_PID, 0);
+    return ind_ovs_transact(msg);
+}
+
 indigo_error_t 
 indigo_port_interface_list(indigo_port_info_t** list)
 {
