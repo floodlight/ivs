@@ -170,6 +170,21 @@ indigo_error_t indigo_port_interface_add(
     return ind_ovs_transact(msg);
 }
 
+/* Like indigo_port_interface_add, but creates an internal port */
+indigo_error_t
+ind_ovs_port_add_internal(const char *port_name)
+{
+    if (strlen(port_name) >= 256) {
+        return INDIGO_ERROR_PARAM;
+    }
+
+    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_NEW);
+    nla_put_u32(msg, OVS_VPORT_ATTR_TYPE, OVS_VPORT_TYPE_INTERNAL);
+    nla_put_string(msg, OVS_VPORT_ATTR_NAME, port_name);
+    nla_put_u32(msg, OVS_VPORT_ATTR_UPCALL_PID, 0);
+    return ind_ovs_transact(msg);
+}
+
 indigo_error_t 
 indigo_port_interface_list(indigo_port_info_t** list)
 {
@@ -207,7 +222,8 @@ indigo_port_interface_list_destroy(indigo_port_info_t* list)
 
 
 void
-ind_ovs_port_added(uint32_t port_no, const char *ifname, of_mac_addr_t mac_addr)
+ind_ovs_port_added(uint32_t port_no, const char *ifname,
+                   enum ovs_vport_type type, of_mac_addr_t mac_addr)
 {
     indigo_error_t err;
 
@@ -219,6 +235,7 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname, of_mac_addr_t mac_addr)
 
     strncpy(port->ifname, ifname, sizeof(port->ifname));
     port->dp_port_no = port_no;
+    port->type = type;
     port->mac_addr = mac_addr;
     aim_ratelimiter_init(&port->upcall_log_limiter, 1000*1000, 5, NULL);
     aim_ratelimiter_init(&port->pktin_limiter, PORT_PKTIN_INTERVAL, PORT_PKTIN_BURST_SIZE, NULL);
@@ -752,16 +769,16 @@ port_desc_set(of_port_desc_t *of_port_desc, uint32_t port_no)
 
     uint32_t curr, advertised, supported, peer;
 
-    if (port_no == OVSP_LOCAL) {
+    if (port->type == OVS_VPORT_TYPE_NETDEV) {
+        ind_ovs_get_interface_features(port->ifname, &curr, &advertised,
+            &supported, &peer, of_port_desc->version);
+    } else {
         /* Internal ports do not support ethtool */
         curr = OF_PORT_FEATURE_FLAG_10GB_FD |
                OF_PORT_FEATURE_FLAG_COPPER_BY_VERSION(of_port_desc->version);
         advertised = 0;
         supported = 0;
         peer = 0;
-    } else {
-        ind_ovs_get_interface_features(port->ifname, &curr, &advertised,
-            &supported, &peer, of_port_desc->version);
     }
 
     if (of_port_desc->version < OF_VERSION_1_4) {

@@ -234,7 +234,7 @@ ind_ovs_init(const char *datapath_name)
 
     /* Pretend we received a port created notification for the internal port */
     of_mac_addr_t local_mac = { { 0, 0, 0, 0, 0, 0 } };
-    ind_ovs_port_added(OVSP_LOCAL, "local", local_mac);
+    ind_ovs_port_added(OVSP_LOCAL, "local", OVS_VPORT_TYPE_INTERNAL, local_mac);
 
     if ((ret = ind_soc_timer_event_register(
         (ind_soc_timer_callback_f)ind_ovs_kflow_expire, NULL, 2345)) != 0) {

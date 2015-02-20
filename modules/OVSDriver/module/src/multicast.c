@@ -51,6 +51,9 @@ ind_ovs_handle_vport_multicast(struct nlmsghdr *nlh)
     assert(attrs[OVS_VPORT_ATTR_NAME]);
     const char *ifname = nla_get_string(attrs[OVS_VPORT_ATTR_NAME]);
 
+    assert(attrs[OVS_VPORT_ATTR_TYPE]);
+    enum ovs_vport_type type = nla_get_u32(attrs[OVS_VPORT_ATTR_TYPE]);
+
     of_mac_addr_t mac_addr = of_mac_addr_all_zeros;
     struct ifaddrs *ifaddr, *ifa;
     if (getifaddrs(&ifaddr) != -1) {
@@ -68,7 +71,7 @@ ind_ovs_handle_vport_multicast(struct nlmsghdr *nlh)
     freeifaddrs(ifaddr);
 
     if (gnlh->cmd == OVS_VPORT_CMD_NEW) {
-        ind_ovs_port_added(port_no, ifname, mac_addr);
+        ind_ovs_port_added(port_no, ifname, type, mac_addr);
     } else if (gnlh->cmd == OVS_VPORT_CMD_DEL) {
         ind_ovs_port_deleted(port_no);
     }

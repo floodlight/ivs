@@ -27,5 +27,6 @@ void ind_ovs_finish(void);
 void ind_ovs_enable(void);
 
 void ind_ovs_uplink_add(const char *name);
+indigo_error_t ind_ovs_port_add_internal(const char *port_name);
 
 #endif
