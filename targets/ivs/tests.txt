@@ -19,5 +19,11 @@ nicira_dec_ttl
 ^actions.ForwardAll
 ^actions.ForwardFlood
 
+# IVS doesn't support matching on output port
+^detailed_contr_sw_messages.Outport1
+
+# IVS doesn't support overlap checking
+^detailed_contr_sw_messages.OverlapChecking
+
 # IVS doesn't support OFPPC_NO_FWD
 ^message_types.PortModFwd
