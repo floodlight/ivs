@@ -843,6 +843,9 @@ link_change_cb(struct nl_cache *cache,
     port->ifflags = ifflags;
     port->admin_down = !(ifflags & IFF_UP);
     port_status_notify(port->dp_port_no, OF_PORT_CHANGE_REASON_MODIFY);
+
+    ind_ovs_kflow_invalidate_all();
+    ind_ovs_upcall_respawn();
 }
 
 static void
