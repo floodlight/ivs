@@ -176,7 +176,6 @@ check_for_table_action(of_list_action_t *actions, uint32_t *queue_id)
             break;
         }
         default:
-            LOG_ERROR("unsupported action %s", of_object_id_str[action.object_id]);
             return false;
         }
     }
