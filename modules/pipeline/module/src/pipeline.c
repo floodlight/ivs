@@ -121,15 +121,21 @@ pipeline_list(of_desc_str_t **ret_pipelines, int *num_pipelines)
 
 indigo_error_t
 pipeline_process(struct ind_ovs_parsed_key *key,
+                 struct ind_ovs_parsed_key *mask,
                  struct xbuf *stats,
                  struct action_context *actx)
 {
     AIM_TRUE_OR_DIE(current_pipeline != NULL);
 
+    mask->populated = key->populated;
+    ATTR_BITMAP_SET(mask->populated, OVS_KEY_ATTR_ETHERTYPE);
+
     if (ind_ovs_inband_vlan != VLAN_INVALID &&
             VLAN_VID(ntohs(key->vlan)) == ind_ovs_inband_vlan
             && ind_ovs_uplink_check(key->in_port)) {
         AIM_LOG_VERBOSE("Sending in-band management packet from uplink to internal port");
+        mask->in_port = -1;
+        mask->vlan = -1;
         action_pop_vlan(actx);
         action_output(actx, IVS_INBAND_PORT);
         return INDIGO_ERROR_NONE;
@@ -138,6 +144,8 @@ pipeline_process(struct ind_ovs_parsed_key *key,
         AIM_LOG_VERBOSE("Sending in-band management packet from internal port to uplink");
         uint32_t port = ind_ovs_uplink_first();
         if (port != OF_PORT_DEST_NONE) {
+            mask->in_port = -1;
+            mask->vlan = -1;
             action_push_vlan(actx);
             action_set_vlan_vid(actx, ind_ovs_inband_vlan);
             if (queue_priority_inband != -1) {
@@ -149,7 +157,7 @@ pipeline_process(struct ind_ovs_parsed_key *key,
         }
         return INDIGO_ERROR_NONE;
     } else {
-        return current_pipeline->ops->process(key, stats, actx);
+        return current_pipeline->ops->process(key, mask, stats, actx);
     }
 }
 

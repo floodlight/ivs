@@ -37,6 +37,7 @@ struct pipeline_ops {
     void (*finish)(void);
     indigo_error_t (*process)(
         struct ind_ovs_parsed_key *key,
+        struct ind_ovs_parsed_key *mask,
         struct xbuf *stats,
         struct action_context *actx);
 };
@@ -77,6 +78,11 @@ void pipeline_list(of_desc_str_t **ret_pipelines, int *num_pipelines);
 /*
  * Send a packet through the pipeline.
  *
+ * 'key' is the packet key sent by the kernel. 'mask' is the megaflow mask
+ * that will be installed in the kernel. It should be initialized to zeroes
+ * and the pipeline implementation will set each bit where it used the
+ * corresponding key bit in its processing.
+ *
  * 'stats' should be an initialized, empty xbuf. It will be be filled with
  * struct stats_handle. These stats objects may belong to flows or tables
  * (and in the future meters or groups). For example, every table a packet
@@ -86,6 +92,7 @@ void pipeline_list(of_desc_str_t **ret_pipelines, int *num_pipelines);
  */
 indigo_error_t
 pipeline_process(struct ind_ovs_parsed_key *key,
+                 struct ind_ovs_parsed_key *mask,
                  struct xbuf *stats,
                  struct action_context *actx);
 

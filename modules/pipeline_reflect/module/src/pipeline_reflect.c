@@ -52,6 +52,7 @@ monotonic_ns(void)
 
 indigo_error_t
 pipeline_reflect_process(struct ind_ovs_parsed_key *key,
+                         struct ind_ovs_parsed_key *mask,
                          struct xbuf *stats,
                          struct action_context *actx)
 {
@@ -59,6 +60,8 @@ pipeline_reflect_process(struct ind_ovs_parsed_key *key,
         uint64_t end_time = monotonic_ns() + delay_ns;
         while (monotonic_ns() <= end_time);
     }
+
+    mask->in_port = -1;
 
     action_output(actx, key->in_port);
     return INDIGO_ERROR_NONE;

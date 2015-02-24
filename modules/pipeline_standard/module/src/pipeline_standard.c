@@ -124,11 +124,16 @@ pipeline_standard_finish(void)
 
 indigo_error_t
 pipeline_standard_process(struct ind_ovs_parsed_key *key,
+                          struct ind_ovs_parsed_key *mask,
                           struct xbuf *stats,
                           struct action_context *actx)
 {
     struct pipeline_standard_cfr cfr;
     pipeline_standard_key_to_cfr(key, &cfr);
+
+    uint64_t populated = mask->populated;
+    memset(mask, 0xff, sizeof(*mask));
+    mask->populated = populated;
 
     uint32_t hash = murmur_hash(&cfr, sizeof(cfr), 0);
 
