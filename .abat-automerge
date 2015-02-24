@@ -22,7 +22,9 @@ cd "$ROOTDIR"
 
 ./build/setup.sh
 ./build/precheckin.py
-scan-build --status-bugs ./build/precheckin.py
+
+make -C targets/ivs clean
+scan-build --status-bugs make -j8 -C targets/ivs GCC='$(CC)'
 
 export BUILD_ID=$(date +'%F.%R%z')-$(git rev-parse -q --short HEAD)
 
