@@ -95,4 +95,13 @@ void tcam_remove(struct tcam *tcam, struct tcam_entry *entry);
  */
 struct tcam_entry *tcam_match(struct tcam *tcam, const void *key);
 
+/*
+ * Search for a matching entry in a tcam.
+ *
+ * @param key Fields from the packet.
+ * @param mask Will be ORed with the mask of all entries the key
+ *             was compared to.
+ */
+struct tcam_entry *tcam_match_and_mask(struct tcam *tcam, const void *key, void *mask);
+
 #endif
