@@ -28,8 +28,8 @@ scan-build --status-bugs make -j8 -C targets/ivs GCC='$(CC)'
 
 export BUILD_ID=$(date +'%F.%R%z')-$(git rev-parse -q --short HEAD)
 
-ARCHS="i386 amd64"
-SUITES="precise trusty"
+ARCHS="amd64"
+SUITES="trusty"
 for ARCH in $ARCHS; do
     for SUITE in $SUITES; do
         ARCH=$ARCH SUITE=$SUITE ./build/build-debian-packages.sh
