@@ -298,8 +298,7 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname,
     ind_ovs_upcall_register(port);
     ind_ovs_pktin_register(port);
     LOG_INFO("Added %s %s", port->is_uplink ? "uplink" : "port", port->ifname);
-    ind_ovs_kflow_invalidate_all();
-    ind_ovs_upcall_respawn();
+    ind_ovs_barrier_defer_revalidation_internal();
     return;
 
 cleanup_port:
@@ -354,8 +353,7 @@ ind_ovs_port_deleted(uint32_t port_no)
     aim_free(port);
     ind_ovs_ports[port_no] = NULL;
 
-    ind_ovs_kflow_invalidate_all();
-    ind_ovs_upcall_respawn();
+    ind_ovs_barrier_defer_revalidation_internal();
 }
 
 indigo_error_t
@@ -392,8 +390,8 @@ indigo_port_modify(of_port_mod_t *port_mod)
     }
 
     /* TODO change other configuration? */
-    ind_ovs_kflow_invalidate_all();
-    ind_ovs_upcall_respawn();
+
+    ind_ovs_barrier_defer_revalidation_internal();
 
     return INDIGO_ERROR_NONE;
 }
@@ -844,8 +842,7 @@ link_change_cb(struct nl_cache *cache,
     port->admin_down = !(ifflags & IFF_UP);
     port_status_notify(port->dp_port_no, OF_PORT_CHANGE_REASON_MODIFY);
 
-    ind_ovs_kflow_invalidate_all();
-    ind_ovs_upcall_respawn();
+    ind_ovs_barrier_defer_revalidation_internal();
 }
 
 static void
