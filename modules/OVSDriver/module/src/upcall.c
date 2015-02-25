@@ -246,7 +246,7 @@ ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread,
     struct nlattr *actions = nla_nest_start(msg, OVS_PACKET_ATTR_ACTIONS);
 
     struct action_context actx;
-    action_context_init(&actx, &pkey, msg);
+    action_context_init(&actx, &pkey, NULL, msg);
 
     indigo_error_t err = pipeline_process(&pkey, &mask, &thread->stats, &actx);
     if (err < 0) {

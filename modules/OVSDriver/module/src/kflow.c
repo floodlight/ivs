@@ -87,7 +87,7 @@ ind_ovs_kflow_add(const struct nlattr *key)
     struct nlattr *actions = nla_nest_start(msg, OVS_FLOW_ATTR_ACTIONS);
 
     struct action_context actx;
-    action_context_init(&actx, &pkey, msg);
+    action_context_init(&actx, &pkey, &mask, msg);
 
     indigo_error_t err = pipeline_process(&pkey, &mask, stats, &actx);
     if (err < 0) {
@@ -244,7 +244,7 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
     struct nlattr *actions = nla_nest_start(msg, OVS_FLOW_ATTR_ACTIONS);
 
     struct action_context actx;
-    action_context_init(&actx, &pkey, msg);
+    action_context_init(&actx, &pkey, &mask, msg);
 
     indigo_error_t err = pipeline_process(&pkey, &mask, stats, &actx);
     if (err < 0) {

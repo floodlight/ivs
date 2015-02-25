@@ -30,13 +30,18 @@ static void commit_set_field_actions(struct action_context *ctx);
 void
 action_context_init(struct action_context *ctx,
                     const struct ind_ovs_parsed_key *key,
+                    struct ind_ovs_parsed_key *mask,
                     struct nl_msg *msg)
 {
     assert(ctx != NULL);
     memcpy(&ctx->current_key, key, sizeof(*key));
+    ctx->mask = mask;
     ctx->modified_attrs = 0;
     ctx->msg = msg;
 }
+
+#define MASK(field) \
+    (void) (ctx->mask && memset(&ctx->mask->field, 0xff, sizeof(ctx->mask->field)))
 
 /*
  * Output actions
@@ -63,6 +68,8 @@ action_userspace(struct action_context *ctx, void *userdata, int datalen,
     nla_put_u32(ctx->msg, OVS_USERSPACE_ATTR_PID, netlink_port);
     nla_put(ctx->msg, OVS_USERSPACE_ATTR_USERDATA, datalen, userdata);
     nla_nest_end(ctx->msg, action_attr);
+
+    MASK(in_port);
 }
 
 void
@@ -84,6 +91,7 @@ action_output_in_port(struct action_context *ctx)
 {
     commit_set_field_actions(ctx);
     nla_put_u32(ctx->msg, OVS_ACTION_ATTR_OUTPUT, ctx->current_key.in_port);
+    MASK(in_port);
 }
 
 /*
@@ -118,6 +126,8 @@ action_sample_to_userspace(struct action_context *ctx, void *userdata, int datal
         nla_nest_end(ctx->msg, sample_action_attr);
     }
     nla_nest_end(ctx->msg, sample_attr);
+
+    MASK(in_port);
 }
 
 /*
@@ -437,6 +447,8 @@ commit_set_field_actions(struct action_context *ctx)
          * of the VLAN field.
          */
         ATTR_BITMAP_CLEAR(ctx->modified_attrs, OVS_KEY_ATTR_VLAN);
+
+        MASK(vlan);
     }
 
 #define field(attr, name, type) \
@@ -445,6 +457,7 @@ commit_set_field_actions(struct action_context *ctx)
         assert(action_attr); \
         nla_put(ctx->msg, (attr), sizeof(type), &ctx->current_key.name); \
         nla_nest_end(ctx->msg, action_attr); \
+        MASK(name); \
     }
 OVS_KEY_FIELDS
 #undef field
