@@ -364,16 +364,19 @@ ind_ovs_nlmsg_freelist_free(struct nl_msg *msg)
 static indigo_error_t
 ind_ovs_interface_ioctl(long cmd, struct ifreq *req)
 {
-    indigo_error_t err = INDIGO_ERROR_NONE;
-    int sock = socket(AF_PACKET, SOCK_RAW, 0);
+    static int sock = -1;
     if (sock < 0) {
-        return INDIGO_ERROR_UNKNOWN;
+        sock = socket(AF_PACKET, SOCK_RAW, 0);
+        if (sock < 0) {
+            return INDIGO_ERROR_UNKNOWN;
+        }
     }
+
     if (ioctl(sock, cmd, req) < 0) {
-        err = sys2indigoerr(errno);
+        return sys2indigoerr(errno);
+    } else {
+        return INDIGO_ERROR_NONE;
     }
-    close(sock);
-    return err;
 }
 
 /*

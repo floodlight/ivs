@@ -212,6 +212,7 @@ void ind_ovs_vlan_stats_init(void);
 
 /* Interface of the barrier submodule */
 void ind_ovs_barrier_init(void);
+void ind_ovs_barrier_defer_revalidation_internal(void);
 
 /* Log Netlink attributes in human readable form */
 void ind_ovs_dump_nested(const struct nlattr *nla, void (*cb)(const struct nlattr *attr));

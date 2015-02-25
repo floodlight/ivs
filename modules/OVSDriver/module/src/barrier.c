@@ -81,6 +81,24 @@ ind_ovs_barrier_defer_revalidation(indigo_cxn_id_t cxn_id)
     }
 }
 
+/*
+ * Schedule a revalidation not triggered by an OpenFlow connection
+ *
+ * Used for port status changes. For the next 100ms, any other port status
+ * changes will be revalidated at the same time as this one. However the
+ * controller will likely react to the event more quickly and force a
+ * revalidation before this timer expires.
+ */
+void
+ind_ovs_barrier_defer_revalidation_internal(void)
+{
+    if (!barrier_timer_active) {
+        ind_soc_timer_event_register_with_priority(barrier_timer, NULL, 100,
+                                                   IND_SOC_LOWEST_PRIORITY);
+        barrier_timer_active = true;
+    }
+}
+
 static void
 revalidate(void)
 {
