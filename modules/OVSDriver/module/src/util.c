@@ -204,6 +204,7 @@ ind_ovs_create_nlsock(void)
 
     if ((ret = genl_connect(sk)) != 0) {
         LOG_ERROR("failed to connect netlink socket: %s", nl_geterror(ret));
+        nl_socket_free(sk);
         return NULL;
     }
 
