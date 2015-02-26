@@ -56,6 +56,21 @@ action_controller(struct action_context *ctx, uint64_t userdata)
     nla_nest_end(ctx->msg, action_attr);
 }
 
+/* Send the packet back to an upcall thread with the given userdata
+   on the specified netlink socket */
+void
+action_userspace(struct action_context *ctx, void *userdata, int datalen,
+                 uint32_t netlink_port)
+{
+    assert(datalen <= sizeof(uint64_t));
+    commit_set_field_actions(ctx);
+
+    struct nlattr *action_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_USERSPACE);
+    nla_put_u32(ctx->msg, OVS_USERSPACE_ATTR_PID, netlink_port);
+    nla_put(ctx->msg, OVS_USERSPACE_ATTR_USERDATA, datalen, userdata);
+    nla_nest_end(ctx->msg, action_attr);
+}
+
 void
 action_output(struct action_context *ctx, uint32_t port_no)
 {
@@ -97,6 +112,28 @@ action_sample_to_controller(struct action_context *ctx, uint64_t userdata, uint3
             struct nlattr *action_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_USERSPACE);
             nla_put_u32(ctx->msg, OVS_USERSPACE_ATTR_PID, netlink_port);
             nla_put_u64(ctx->msg, OVS_USERSPACE_ATTR_USERDATA, userdata);
+            nla_nest_end(ctx->msg, action_attr);
+        }
+        nla_nest_end(ctx->msg, sample_action_attr);
+    }
+    nla_nest_end(ctx->msg, sample_attr);
+}
+
+void
+action_sample_to_userspace(struct action_context *ctx, void *userdata, int datalen,
+                           uint32_t netlink_port, uint32_t probability)
+{
+    assert(datalen <= sizeof(uint64_t));
+    commit_set_field_actions(ctx);
+
+    struct nlattr *sample_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_SAMPLE);
+    nla_put_u32(ctx->msg, OVS_SAMPLE_ATTR_PROBABILITY, probability);
+    {
+        struct nlattr *sample_action_attr = nla_nest_start(ctx->msg, OVS_SAMPLE_ATTR_ACTIONS);
+        {
+            struct nlattr *action_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_USERSPACE);
+            nla_put_u32(ctx->msg, OVS_USERSPACE_ATTR_PID, netlink_port);
+            nla_put(ctx->msg, OVS_USERSPACE_ATTR_USERDATA, datalen, userdata);
             nla_nest_end(ctx->msg, action_attr);
         }
         nla_nest_end(ctx->msg, sample_action_attr);
