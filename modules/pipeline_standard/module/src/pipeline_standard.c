@@ -71,6 +71,8 @@ struct flowtable_entry {
 };
 
 static void pipeline_standard_update_cfr(struct pipeline_standard_cfr *cfr, struct xbuf *actions);
+static void memor(void *_dst, const void *_src, int len);
+static void translate_cfr_mask(struct ind_ovs_parsed_key *mask, const struct pipeline_standard_cfr *cfr, const struct pipeline_standard_cfr *cfr_mask);
 
 static int openflow_version = -1;
 static struct flowtable *flowtables[NUM_TABLES];
@@ -131,9 +133,11 @@ pipeline_standard_process(struct ind_ovs_parsed_key *key,
     struct pipeline_standard_cfr cfr;
     pipeline_standard_key_to_cfr(key, &cfr);
 
-    uint64_t populated = mask->populated;
-    memset(mask, 0xff, sizeof(*mask));
-    mask->populated = populated;
+    AIM_LOG_VERBOSE("CFR:");
+    pipeline_standard_dump_cfr(&cfr);
+
+    struct pipeline_standard_cfr cfr_mask;
+    memset(&cfr_mask, 0, sizeof(cfr_mask));
 
     uint32_t hash = murmur_hash(&cfr, sizeof(cfr), 0);
 
@@ -147,7 +151,7 @@ pipeline_standard_process(struct ind_ovs_parsed_key *key,
         struct flowtable *flowtable = flowtables[table_id];
         AIM_ASSERT(flowtable != NULL);
 
-        struct tcam_entry *tcam_entry = tcam_match(flowtable->tcam, &cfr);
+        struct tcam_entry *tcam_entry = tcam_match_and_mask(flowtable->tcam, &cfr, &cfr_mask);
         if (tcam_entry == NULL) {
             if (openflow_version < OF_VERSION_1_3) {
                 uint64_t userdata = IVS_PKTIN_USERDATA(OF_PACKET_IN_REASON_NO_MATCH, 0);
@@ -177,7 +181,81 @@ pipeline_standard_process(struct ind_ovs_parsed_key *key,
         }
     }
 
+    translate_cfr_mask(mask, &cfr, &cfr_mask);
+
     return INDIGO_ERROR_NONE;
+}
+
+/* For each field in the CFR, copy the mask to the appropriate field in the OVS key */
+static void
+translate_cfr_mask(struct ind_ovs_parsed_key *mask,
+                   const struct pipeline_standard_cfr *cfr,
+                   const struct pipeline_standard_cfr *cfr_mask)
+{
+#define MASK(key_field, cfr_field) \
+    do { \
+        assert(sizeof(mask->key_field) == sizeof(cfr_mask->cfr_field)); \
+        memor(&mask->key_field, &cfr_mask->cfr_field, sizeof(mask->key_field)); \
+    } while(0)
+
+    /* Some fields aren't allowed to have a partial mask by the kernel */
+#define MASK_EXACT(key_field, cfr_field) \
+    do { \
+        if (cfr_mask->cfr_field) { \
+            mask->key_field = -1; \
+        } \
+    } while(0)
+
+    MASK_EXACT(in_port, in_port);
+    MASK(ethernet.eth_dst, dl_dst);
+    MASK(ethernet.eth_src, dl_src);
+    MASK_EXACT(ethertype, dl_type);
+    MASK(vlan, dl_vlan);
+
+    if (cfr->dl_type == htons(ETH_P_IP)) {
+        MASK(ipv4.ipv4_tos, nw_tos);
+        MASK_EXACT(ipv4.ipv4_proto, nw_proto);
+        MASK(ipv4.ipv4_src, nw_src);
+        MASK(ipv4.ipv4_dst, nw_dst);
+    } else if (cfr->dl_type == htons(ETH_P_IPV6)) {
+        MASK(ipv6.ipv6_tclass, nw_tos);
+        MASK_EXACT(ipv6.ipv6_proto, nw_proto);
+        MASK(ipv6.ipv6_src, ipv6_src);
+        MASK(ipv6.ipv6_dst, ipv6_dst);
+    } else if (cfr->dl_type == htons(ETH_P_ARP)) {
+        MASK_EXACT(arp.arp_op, nw_proto);
+        MASK(arp.arp_sip, nw_src);
+        MASK(arp.arp_tip, nw_dst);
+    }
+
+    if (cfr->nw_proto == IPPROTO_TCP) {
+        MASK(tcp.tcp_src, tp_src);
+        MASK(tcp.tcp_dst, tp_dst);
+    } else if (cfr->nw_proto == IPPROTO_UDP) {
+        MASK(udp.udp_src, tp_src);
+        MASK(udp.udp_dst, tp_dst);
+    } else if (cfr->nw_proto == IPPROTO_ICMP) {
+        MASK_EXACT(icmp.icmp_type, tp_src);
+        MASK_EXACT(icmp.icmp_code, tp_dst);
+    } else if (cfr->nw_proto == IPPROTO_ICMPV6) {
+        MASK_EXACT(icmpv6.icmpv6_type, tp_src);
+        MASK_EXACT(icmpv6.icmpv6_code, tp_dst);
+    }
+
+#undef MASK
+#undef MASK_EXACT
+}
+
+static void
+memor(void *_dst, const void *_src, int len)
+{
+    char *dst = _dst;
+    const char *src = _src;
+
+    int i;
+    for (i = 0; i < len; i++) {
+        dst[i] |= src[i];
+    }
 }
 
 static struct pipeline_ops pipeline_standard_ops = {
