@@ -57,6 +57,14 @@ void action_output_local(struct action_context *ctx);
 void action_output_in_port(struct action_context *ctx);
 void action_sample_to_controller(struct action_context *ctx, uint64_t userdata, uint32_t probability);
 
+/* Userspace Output */
+
+void action_userspace(struct action_context *ctx, void *userdata, int datalen,
+                      uint32_t netlink_port);
+void action_sample_to_userspace(struct action_context *ctx, void *userdata,
+                                int datalen, uint32_t netlink_port,
+                                uint32_t probability);
+
 /* Ethernet */
 
 void action_set_eth_dst(struct action_context *ctx, of_mac_addr_t mac);
