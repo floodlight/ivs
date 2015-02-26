@@ -111,6 +111,7 @@ ind_ovs_kflow_add(const struct nlattr *key)
     kflow->actions_len = nla_len(actions);
 
     if (ind_ovs_transact(msg) < 0) {
+        AIM_LOG_ERROR("Failed to insert kernel flow");
         aim_free(kflow->actions);
         aim_free(kflow);
         return INDIGO_ERROR_UNKNOWN;
@@ -255,6 +256,13 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
 
     ind_ovs_nla_nest_end(msg, actions);
 
+    if (memcmp(&mask, &kflow->mask, sizeof(mask))) {
+        LOG_VERBOSE("Mask changed, deleting kernel flow");
+        ind_ovs_nlmsg_freelist_free(msg);
+        ind_ovs_kflow_delete(kflow);
+        return;
+    }
+
     struct stats_handle *stats_handles = xbuf_data(stats);
     int num_stats_handles = xbuf_length(stats) / sizeof(*stats_handles);
     size_t stats_handles_len = num_stats_handles * sizeof(*stats_handles);
@@ -271,18 +279,19 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
 
     bool actions_changed = nla_len(actions) != kflow->actions_len ||
         memcmp(nla_data(actions), kflow->actions, nla_len(actions));
-    bool mask_changed = memcmp(&mask, &kflow->mask, sizeof(mask)) != 0;
 
-    if (!ind_ovs_disable_megaflows) {
-        struct nlattr *mask_attr = nla_nest_start(msg, OVS_FLOW_ATTR_MASK);
-        assert(ATTR_BITMAP_TEST(mask.populated, OVS_KEY_ATTR_ETHERTYPE));
-        ind_ovs_emit_key(&mask, msg, true);
-        ind_ovs_nla_nest_end(msg, mask_attr);
-    }
+    if (actions_changed) {
+        if (!ind_ovs_disable_megaflows) {
+            struct nlattr *mask_attr = nla_nest_start(msg, OVS_FLOW_ATTR_MASK);
+            assert(ATTR_BITMAP_TEST(mask.populated, OVS_KEY_ATTR_ETHERTYPE));
+            ind_ovs_emit_key(&mask, msg, true);
+            ind_ovs_nla_nest_end(msg, mask_attr);
+        }
 
-    if (actions_changed || mask_changed) {
         if (ind_ovs_transact(msg) < 0) {
-            LOG_ERROR("Failed to modify kernel flow");
+            LOG_ERROR("Failed to modify kernel flow, deleting it");
+            ind_ovs_nlmsg_freelist_free(msg);
+            ind_ovs_kflow_delete(kflow);
             return;
         }
 
@@ -290,10 +299,6 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
             kflow->actions = aim_realloc(kflow->actions, nla_len(actions));
             memcpy(kflow->actions, nla_data(actions), nla_len(actions));
             kflow->actions_len = nla_len(actions);
-        }
-
-        if (mask_changed) {
-            kflow->mask = mask;
         }
     } else {
         ind_ovs_nlmsg_freelist_free(msg);
