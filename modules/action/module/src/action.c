@@ -62,7 +62,6 @@ void
 action_userspace(struct action_context *ctx, void *userdata, int datalen,
                  uint32_t netlink_port)
 {
-    assert(datalen <= sizeof(uint64_t));
     commit_set_field_actions(ctx);
 
     struct nlattr *action_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_USERSPACE);
@@ -123,7 +122,6 @@ void
 action_sample_to_userspace(struct action_context *ctx, void *userdata, int datalen,
                            uint32_t netlink_port, uint32_t probability)
 {
-    assert(datalen <= sizeof(uint64_t));
     commit_set_field_actions(ctx);
 
     struct nlattr *sample_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_SAMPLE);
