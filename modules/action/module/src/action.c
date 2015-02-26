@@ -48,12 +48,7 @@ action_controller(struct action_context *ctx, uint64_t userdata)
 {
     uint32_t netlink_port = ind_ovs_port_lookup_netlink(ctx->current_key.in_port);
 
-    commit_set_field_actions(ctx);
-
-    struct nlattr *action_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_USERSPACE);
-    nla_put_u32(ctx->msg, OVS_USERSPACE_ATTR_PID, netlink_port);
-    nla_put_u64(ctx->msg, OVS_USERSPACE_ATTR_USERDATA, userdata);
-    nla_nest_end(ctx->msg, action_attr);
+    action_userspace(ctx, &userdata, sizeof(uint64_t), netlink_port);
 }
 
 /* Send the packet back to an upcall thread with the given userdata
@@ -101,21 +96,7 @@ action_sample_to_controller(struct action_context *ctx, uint64_t userdata, uint3
 {
     uint32_t netlink_port = ind_ovs_port_lookup_netlink(ctx->current_key.in_port);
 
-    commit_set_field_actions(ctx);
-
-    struct nlattr *sample_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_SAMPLE);
-    nla_put_u32(ctx->msg, OVS_SAMPLE_ATTR_PROBABILITY, probability);
-    {
-        struct nlattr *sample_action_attr = nla_nest_start(ctx->msg, OVS_SAMPLE_ATTR_ACTIONS);
-        {
-            struct nlattr *action_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_USERSPACE);
-            nla_put_u32(ctx->msg, OVS_USERSPACE_ATTR_PID, netlink_port);
-            nla_put_u64(ctx->msg, OVS_USERSPACE_ATTR_USERDATA, userdata);
-            nla_nest_end(ctx->msg, action_attr);
-        }
-        nla_nest_end(ctx->msg, sample_action_attr);
-    }
-    nla_nest_end(ctx->msg, sample_attr);
+    action_sample_to_userspace(ctx, &userdata, sizeof(uint64_t), netlink_port, probability);
 }
 
 void
