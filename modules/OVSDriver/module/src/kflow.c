@@ -24,6 +24,14 @@
 #define IND_OVS_KFLOW_EXPIRATION_MS 2345
 #define NUM_KFLOW_BUCKETS 8192
 
+#ifndef NDEBUG
+#define NUM_KFLOW_MASK_TESTS 2
+#else
+#define NUM_KFLOW_MASK_TESTS 0
+#endif
+
+static void test_kflow_mask(struct ind_ovs_kflow *kflow);
+
 static struct list_head ind_ovs_kflows;
 static struct list_head ind_ovs_kflow_buckets[NUM_KFLOW_BUCKETS];
 static struct xbuf ind_ovs_kflow_stats_xbuf;
@@ -135,6 +143,8 @@ ind_ovs_kflow_add(const struct nlattr *key)
     list_push(bucket, &kflow->bucket_links);
 
     port->num_kflows++;
+
+    test_kflow_mask(kflow);
 
     return INDIGO_ERROR_NONE;
 }
@@ -303,6 +313,8 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
     } else {
         ind_ovs_nlmsg_freelist_free(msg);
     }
+
+    test_kflow_mask(kflow);
 }
 
 /*
@@ -357,6 +369,72 @@ ind_ovs_kflow_expire(void)
             LOG_VERBOSE("expiring kflow");
             ind_ovs_kflow_delete(kflow);
         }
+    }
+}
+
+/* Overwrite the bits in 'key' where 'mask' is 0 with random values */
+static void
+randomize_unmasked(char *key, const char *mask, int len)
+{
+    int i;
+    for (i = 0; i < len; i++) {
+        if (mask[i] != 0xff) {
+            key[i] ^= rand() & ~mask[i];
+        }
+    }
+}
+
+/*
+ * Self test for megaflows
+ *
+ * In debug builds, this function is run whenever we add or modify a kernel
+ * flow. It double-checks the validity of the mask by randomizing the parts of
+ * the key where the mask is zero. If changing any of those bits causes the
+ * output of the pipeline to change then the mask was incorrect.
+ */
+static void
+test_kflow_mask(struct ind_ovs_kflow *kflow)
+{
+    int i;
+    for (i = 0; i < NUM_KFLOW_MASK_TESTS; i++) {
+        LOG_VERBOSE("Testing kflow mask (iteration %d)", i);
+
+        struct ind_ovs_parsed_key pkey;
+        ind_ovs_parse_key((struct nlattr *)kflow->key, &pkey);
+        uint64_t populated = pkey.populated;
+
+        randomize_unmasked((char *)&pkey, (char *)&kflow->mask, sizeof(pkey));
+        pkey.populated = populated;
+
+        struct ind_ovs_parsed_key mask;
+        memset(&mask, 0, sizeof(mask));
+
+        struct xbuf *stats = &ind_ovs_kflow_stats_xbuf;
+        xbuf_reset(stats);
+
+        struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_NEW);
+        struct nlattr *actions = nla_nest_start(msg, OVS_FLOW_ATTR_ACTIONS);
+
+        struct action_context actx;
+        action_context_init(&actx, &pkey, &mask, msg);
+
+        indigo_error_t err = pipeline_process(&pkey, &mask, stats, &actx);
+        if (err < 0) {
+            abort();
+        }
+
+        ind_ovs_nla_nest_end(msg, actions);
+
+        LOG_VERBOSE("Resulting actions:");
+        ind_ovs_dump_msg(nlmsg_hdr(msg));
+
+        assert(nla_len(actions) == kflow->actions_len);
+        assert(!memcmp(nla_data(actions), kflow->actions, nla_len(actions)));
+        assert(!memcmp(&mask, &kflow->mask, sizeof(mask)));
+        assert(xbuf_length(stats) == kflow->num_stats_handles * sizeof(struct stats_handle));
+        assert(!memcmp(xbuf_data(stats), kflow->stats_handles, xbuf_length(stats)));
+
+        ind_ovs_nlmsg_freelist_free(msg);
     }
 }
 
