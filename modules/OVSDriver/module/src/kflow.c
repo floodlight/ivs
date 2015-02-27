@@ -378,7 +378,7 @@ randomize_unmasked(char *key, const char *mask, int len)
 {
     int i;
     for (i = 0; i < len; i++) {
-        if (mask[i] != 0xff) {
+        if (~mask[i]) {
             key[i] ^= rand() & ~mask[i];
         }
     }
