@@ -35,6 +35,7 @@
  */
 struct action_context {
     struct ind_ovs_parsed_key current_key; /* see ind_ovs_commit_set_field_actions */
+    struct ind_ovs_parsed_key *mask;
     uint64_t modified_attrs; /* bitmap of OVS_KEY_ATTR_* */
     struct nl_msg *msg; /* netlink message to add action attributes to */
 };
@@ -44,9 +45,13 @@ struct action_context {
  *
  * 'msg' will have OVS_ACTION_ATTR_* attributes appended to it as a side
  * effect of calling the action functions below.
+ *
+ * 'mask', if not NULL, will be ORed with the mask of the portions of the key
+ * used during action translation.
  */
 void action_context_init(struct action_context *ctx,
                          const struct ind_ovs_parsed_key *key,
+                         struct ind_ovs_parsed_key *mask,
                          struct nl_msg *msg);
 
 /* Output */

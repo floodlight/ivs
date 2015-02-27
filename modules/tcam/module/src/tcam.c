@@ -75,6 +75,7 @@ static struct tcam_shard *tcam_shard_create(struct tcam *tcam, const void *mask)
 static void tcam_shard_destroy(struct tcam *tcam, struct tcam_shard *shard);
 static void tcam_shard_grow(struct tcam_shard *shard);
 static int memcmp_masked(const void *a, const void *b, const void *mask, int len);
+static void memor(void *dst, const void *src, int len);
 static uint32_t hash_key(const struct tcam *tcam, const void *key, const void *mask);
 
 /* Documented in tcam.h */
@@ -173,6 +174,13 @@ tcam_remove(struct tcam *tcam, struct tcam_entry *entry)
 struct tcam_entry *
 tcam_match(struct tcam *tcam, const void *key)
 {
+    return tcam_match_and_mask(tcam, key, NULL);
+}
+
+/* Documented in tcam.h */
+struct tcam_entry *
+tcam_match_and_mask(struct tcam *tcam, const void *key, void *mask)
+{
     struct tcam_entry *found = NULL;
     list_links_t *cur;
     uint16_t cur_priority = 0;
@@ -182,6 +190,10 @@ tcam_match(struct tcam *tcam, const void *key)
         struct tcam_shard *shard = container_of(cur, links, struct tcam_shard);
 
         uint32_t hash = hash_key(tcam, key, shard->mask);
+
+        if (mask) {
+            memor(mask, shard->mask, tcam->key_size);
+        }
 
         if (!bloom_filter_lookup(shard->bloom_filter, hash)) {
             continue;
@@ -337,6 +349,21 @@ memcmp_masked(const void *_a, const void *_b, const void *mask, int len)
     }
 
     return 0;
+}
+
+/*
+ * Binary OR src into dst
+ */
+static void
+memor(void *_dst, const void *_src, int len)
+{
+    uint32_t *__attribute__((__may_alias__)) dst = _dst;
+    const uint32_t *__attribute__((__may_alias__)) src = _src;
+
+    int i;
+    for (i = 0; i < len/4; i++) {
+        dst[i] |= src[i];
+    }
 }
 
 static uint32_t

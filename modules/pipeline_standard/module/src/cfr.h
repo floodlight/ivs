@@ -9,8 +9,7 @@
  * Does not contain the non-OpenFlow fields of the flow key.
  * Wildcarded fields must be zeroed in the flow entry's CFR.
  * sizeof(struct pipeline_standard_cfr) must be a multiple of 8.
- * All fields are in network byte order except in_port, lag_id, the
- * class_ids, egr_port_group_id, and global_vrf_allowed.
+ * All fields are in network byte order except in_port.
  */
 
 struct pipeline_standard_cfr {

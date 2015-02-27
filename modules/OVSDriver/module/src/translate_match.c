@@ -86,13 +86,36 @@ void
 ind_ovs_emit_key(const struct ind_ovs_parsed_key *key, struct nl_msg *msg, bool omit_zero)
 {
     static uint8_t zeroes[sizeof(*key)];
+
 #define field(attr, name, type) \
-    if (ATTR_BITMAP_TEST(key->populated, attr) && \
+    if (ATTR_BITMAP_TEST(populated, attr) && \
             (!omit_zero || memcmp(&key->name, zeroes, sizeof(type)))) { \
         nla_put(msg, attr, sizeof(type), &key->name); \
     }
+
+    struct nlattr *encap = NULL;
+    uint64_t populated = key->populated;
+    const uint64_t outer_mask =
+        (1<<OVS_KEY_ATTR_PRIORITY) |
+        (1<<OVS_KEY_ATTR_IN_PORT) |
+        (1<<OVS_KEY_ATTR_ETHERNET) |
+        (1<<OVS_KEY_ATTR_VLAN);
+
+    if (ATTR_BITMAP_TEST(key->populated, OVS_KEY_ATTR_VLAN)) {
+        populated = key->populated & (outer_mask & ~(1<<OVS_KEY_ATTR_VLAN));
+        OVS_KEY_FIELDS
+        nla_put_u16(msg, OVS_KEY_ATTR_ETHERTYPE, 0xffff);
+        nla_put_u16(msg, OVS_KEY_ATTR_VLAN, key->vlan | htons(VLAN_CFI_BIT));
+        encap = nla_nest_start(msg, OVS_KEY_ATTR_ENCAP);
+        populated = key->populated & ~outer_mask;
+    }
+
     OVS_KEY_FIELDS
 #undef field
+
+    if (encap) {
+        nla_nest_end(msg, encap);
+    }
 }
 
 /* Should only be used when creating the match for a packet-in */

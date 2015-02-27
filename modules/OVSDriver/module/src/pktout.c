@@ -199,7 +199,7 @@ static indigo_error_t
 translate_openflow_actions(of_list_action_t *actions, struct ind_ovs_parsed_key *pkey, struct nl_msg *msg)
 {
     struct action_context ctx;
-    action_context_init(&ctx, pkey, msg);
+    action_context_init(&ctx, pkey, NULL, msg);
 
     of_object_t act;
     int rv;

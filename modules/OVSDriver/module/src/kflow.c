@@ -24,6 +24,14 @@
 #define IND_OVS_KFLOW_EXPIRATION_MS 2345
 #define NUM_KFLOW_BUCKETS 8192
 
+#ifndef NDEBUG
+#define NUM_KFLOW_MASK_TESTS 2
+#else
+#define NUM_KFLOW_MASK_TESTS 0
+#endif
+
+static void test_kflow_mask(struct ind_ovs_kflow *kflow);
+
 static struct list_head ind_ovs_kflows;
 static struct list_head ind_ovs_kflow_buckets[NUM_KFLOW_BUCKETS];
 static struct xbuf ind_ovs_kflow_stats_xbuf;
@@ -87,7 +95,7 @@ ind_ovs_kflow_add(const struct nlattr *key)
     struct nlattr *actions = nla_nest_start(msg, OVS_FLOW_ATTR_ACTIONS);
 
     struct action_context actx;
-    action_context_init(&actx, &pkey, msg);
+    action_context_init(&actx, &pkey, &mask, msg);
 
     indigo_error_t err = pipeline_process(&pkey, &mask, stats, &actx);
     if (err < 0) {
@@ -111,6 +119,7 @@ ind_ovs_kflow_add(const struct nlattr *key)
     kflow->actions_len = nla_len(actions);
 
     if (ind_ovs_transact(msg) < 0) {
+        AIM_LOG_ERROR("Failed to insert kernel flow");
         aim_free(kflow->actions);
         aim_free(kflow);
         return INDIGO_ERROR_UNKNOWN;
@@ -134,6 +143,8 @@ ind_ovs_kflow_add(const struct nlattr *key)
     list_push(bucket, &kflow->bucket_links);
 
     port->num_kflows++;
+
+    test_kflow_mask(kflow);
 
     return INDIGO_ERROR_NONE;
 }
@@ -244,7 +255,7 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
     struct nlattr *actions = nla_nest_start(msg, OVS_FLOW_ATTR_ACTIONS);
 
     struct action_context actx;
-    action_context_init(&actx, &pkey, msg);
+    action_context_init(&actx, &pkey, &mask, msg);
 
     indigo_error_t err = pipeline_process(&pkey, &mask, stats, &actx);
     if (err < 0) {
@@ -254,6 +265,13 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
     }
 
     ind_ovs_nla_nest_end(msg, actions);
+
+    if (memcmp(&mask, &kflow->mask, sizeof(mask))) {
+        LOG_VERBOSE("Mask changed, deleting kernel flow");
+        ind_ovs_nlmsg_freelist_free(msg);
+        ind_ovs_kflow_delete(kflow);
+        return;
+    }
 
     struct stats_handle *stats_handles = xbuf_data(stats);
     int num_stats_handles = xbuf_length(stats) / sizeof(*stats_handles);
@@ -271,18 +289,19 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
 
     bool actions_changed = nla_len(actions) != kflow->actions_len ||
         memcmp(nla_data(actions), kflow->actions, nla_len(actions));
-    bool mask_changed = memcmp(&mask, &kflow->mask, sizeof(mask)) != 0;
 
-    if (!ind_ovs_disable_megaflows) {
-        struct nlattr *mask_attr = nla_nest_start(msg, OVS_FLOW_ATTR_MASK);
-        assert(ATTR_BITMAP_TEST(mask.populated, OVS_KEY_ATTR_ETHERTYPE));
-        ind_ovs_emit_key(&mask, msg, true);
-        ind_ovs_nla_nest_end(msg, mask_attr);
-    }
+    if (actions_changed) {
+        if (!ind_ovs_disable_megaflows) {
+            struct nlattr *mask_attr = nla_nest_start(msg, OVS_FLOW_ATTR_MASK);
+            assert(ATTR_BITMAP_TEST(mask.populated, OVS_KEY_ATTR_ETHERTYPE));
+            ind_ovs_emit_key(&mask, msg, true);
+            ind_ovs_nla_nest_end(msg, mask_attr);
+        }
 
-    if (actions_changed || mask_changed) {
         if (ind_ovs_transact(msg) < 0) {
-            LOG_ERROR("Failed to modify kernel flow");
+            LOG_ERROR("Failed to modify kernel flow, deleting it");
+            ind_ovs_nlmsg_freelist_free(msg);
+            ind_ovs_kflow_delete(kflow);
             return;
         }
 
@@ -291,13 +310,11 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
             memcpy(kflow->actions, nla_data(actions), nla_len(actions));
             kflow->actions_len = nla_len(actions);
         }
-
-        if (mask_changed) {
-            kflow->mask = mask;
-        }
     } else {
         ind_ovs_nlmsg_freelist_free(msg);
     }
+
+    test_kflow_mask(kflow);
 }
 
 /*
@@ -352,6 +369,72 @@ ind_ovs_kflow_expire(void)
             LOG_VERBOSE("expiring kflow");
             ind_ovs_kflow_delete(kflow);
         }
+    }
+}
+
+/* Overwrite the bits in 'key' where 'mask' is 0 with random values */
+static void
+randomize_unmasked(char *key, const char *mask, int len)
+{
+    int i;
+    for (i = 0; i < len; i++) {
+        if (~mask[i]) {
+            key[i] ^= rand() & ~mask[i];
+        }
+    }
+}
+
+/*
+ * Self test for megaflows
+ *
+ * In debug builds, this function is run whenever we add or modify a kernel
+ * flow. It double-checks the validity of the mask by randomizing the parts of
+ * the key where the mask is zero. If changing any of those bits causes the
+ * output of the pipeline to change then the mask was incorrect.
+ */
+static void
+test_kflow_mask(struct ind_ovs_kflow *kflow)
+{
+    int i;
+    for (i = 0; i < NUM_KFLOW_MASK_TESTS; i++) {
+        LOG_VERBOSE("Testing kflow mask (iteration %d)", i);
+
+        struct ind_ovs_parsed_key pkey;
+        ind_ovs_parse_key((struct nlattr *)kflow->key, &pkey);
+        uint64_t populated = pkey.populated;
+
+        randomize_unmasked((char *)&pkey, (char *)&kflow->mask, sizeof(pkey));
+        pkey.populated = populated;
+
+        struct ind_ovs_parsed_key mask;
+        memset(&mask, 0, sizeof(mask));
+
+        struct xbuf *stats = &ind_ovs_kflow_stats_xbuf;
+        xbuf_reset(stats);
+
+        struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_NEW);
+        struct nlattr *actions = nla_nest_start(msg, OVS_FLOW_ATTR_ACTIONS);
+
+        struct action_context actx;
+        action_context_init(&actx, &pkey, &mask, msg);
+
+        indigo_error_t err = pipeline_process(&pkey, &mask, stats, &actx);
+        if (err < 0) {
+            abort();
+        }
+
+        ind_ovs_nla_nest_end(msg, actions);
+
+        LOG_VERBOSE("Resulting actions:");
+        ind_ovs_dump_msg(nlmsg_hdr(msg));
+
+        assert(nla_len(actions) == kflow->actions_len);
+        assert(!memcmp(nla_data(actions), kflow->actions, nla_len(actions)));
+        assert(!memcmp(&mask, &kflow->mask, sizeof(mask)));
+        assert(xbuf_length(stats) == kflow->num_stats_handles * sizeof(struct stats_handle));
+        assert(!memcmp(xbuf_data(stats), kflow->stats_handles, xbuf_length(stats)));
+
+        ind_ovs_nlmsg_freelist_free(msg);
     }
 }
 

@@ -43,6 +43,13 @@ make_key(uint64_t pattern)
     return key;
 }
 
+static bool
+key_equal(const struct tcam_key *key, uint64_t pattern)
+{
+    struct tcam_key key2 = make_key(pattern);
+    return !memcmp(key, &key2, sizeof(struct tcam_key));
+}
+
 static void
 test_basic(void)
 {
@@ -213,6 +220,81 @@ test_random(void)
     free(es);
 }
 
+static void
+test_mask(void)
+{
+    struct tcam *tcam = tcam_create(sizeof(struct tcam_key), 42);
+
+    struct tcam_key key, mask;
+    struct tcam_entry A, B, *match;
+
+    key =  make_key(0x12340000);
+    mask = make_key(0xffff0000);
+    tcam_insert(tcam, &A, &key, &mask, 0);
+
+    /* Higher priority */
+    key =  make_key(0x00345600);
+    mask = make_key(0x00ffff00);
+    tcam_insert(tcam, &B, &key, &mask, 1);
+
+    /* Should match B */
+    key = make_key(0x12345678);
+    mask = make_key(0);
+    match = tcam_match_and_mask(tcam, &key, &mask);
+    assert(match == &B);
+    assert(key_equal(&mask, 0xffffff00));
+
+    /* Should match B, pre-existing mask */
+    key = make_key(0x12345678);
+    mask = make_key(0x000000aa);
+    match = tcam_match_and_mask(tcam, &key, &mask);
+    assert(match == &B);
+    assert(key_equal(&mask, 0xffffffaa));
+
+    /* Should match A */
+    key = make_key(0x1234ffff);
+    mask = make_key(0);
+    match = tcam_match_and_mask(tcam, &key, &mask);
+    assert(match == &A);
+    assert(key_equal(&mask, 0xffffff00));
+
+    /* Should match B */
+    key = make_key(0xff3456ff);
+    mask = make_key(0);
+    match = tcam_match_and_mask(tcam, &key, &mask);
+    assert(match == &B);
+    assert(key_equal(&mask, 0xffffff00));
+
+    /* Should not match anything */
+    key = make_key(0xffffffff);
+    mask = make_key(0);
+    match = tcam_match_and_mask(tcam, &key, &mask);
+    assert(match == NULL);
+    assert(key_equal(&mask, 0xffffff00));
+
+    /* Remove B */
+    tcam_remove(tcam, &B);
+
+    /* Should match A */
+    key = make_key(0x12345678);
+    mask = make_key(0);
+    match = tcam_match_and_mask(tcam, &key, &mask);
+    assert(match == &A);
+    assert(key_equal(&mask, 0xffff0000)); /* different mask */
+
+    /* Remove A */
+    tcam_remove(tcam, &A);
+
+    /* Should not match anything */
+    key = make_key(0x12345678);
+    mask = make_key(0);
+    match = tcam_match_and_mask(tcam, &key, &mask);
+    assert(match == NULL);
+    assert(key_equal(&mask, 0x00000000)); /* empty mask */
+
+    tcam_destroy(tcam);
+}
+
 int aim_main(int argc, char* argv[])
 {
     (void) argc;
@@ -221,6 +303,7 @@ int aim_main(int argc, char* argv[])
     test_basic();
     test_collisions();
     test_random();
+    test_mask();
 
     return 0;
 }

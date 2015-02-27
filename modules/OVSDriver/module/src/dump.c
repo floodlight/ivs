@@ -166,8 +166,8 @@ ind_ovs_dump_key_attr(const struct nlattr *attr)
              "src=" FORMAT_MAC " dst=" FORMAT_MAC,
              VALUE_MAC(x->eth_src), VALUE_MAC(x->eth_dst));
         leaf(OVS_KEY_ATTR_VLAN, uint16_t,
-             "vid=%u pcp=%u",
-             VLAN_VID(ntohs(*x)), VLAN_PCP(ntohs(*x)));
+             "vid=%u pcp=%u cfi=%u",
+             VLAN_VID(ntohs(*x)), VLAN_PCP(ntohs(*x)), !!(ntohs(*x) & VLAN_CFI_BIT));
         leaf(OVS_KEY_ATTR_ETHERTYPE, uint16_t, "%#.4hx", ntohs(*x));
         leaf(OVS_KEY_ATTR_IPV4, struct ovs_key_ipv4,
              "proto=%u src=" FORMAT_IPV4 " dst=" FORMAT_IPV4 " tos=%hhu",
