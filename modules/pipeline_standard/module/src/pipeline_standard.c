@@ -139,7 +139,8 @@ pipeline_standard_process(struct ind_ovs_parsed_key *key,
     struct pipeline_standard_cfr cfr_mask;
     memset(&cfr_mask, 0, sizeof(cfr_mask));
 
-    uint32_t hash = murmur_hash(&cfr, sizeof(cfr), 0);
+    uint32_t hash = murmur_hash(&key->ethernet, sizeof(key->ethernet), 0);
+    memset(&mask->ethernet, 0xff, sizeof(mask->ethernet));
 
     uint8_t table_id = 0;
     if (flowtables[table_id] == NULL) {
