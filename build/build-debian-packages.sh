@@ -1,7 +1,7 @@
-#!/bin/bash -ex
+#!/bin/bash -eux
 ################################################################
 #
-#        Copyright 2013, Big Switch Networks, Inc.
+#        Copyright 2015, Big Switch Networks, Inc.
 #
 # Licensed under the Eclipse Public License, Version 1.0 (the
 # "License"); you may not use this file except in compliance
@@ -18,48 +18,32 @@
 #
 ################################################################
 
-if [ -f /etc/debian_version ]; then
-    : Suite: ${SUITE:=$(lsb_release -sc)}
-    : Arch: ${ARCH:=$(dpkg --print-architecture)}
-else
-    : Suite: ${SUITE:=oneiric}
-    : Arch: ${ARCH:=i386}
-fi
+ROOTDIR=$(dirname $(readlink -f $0))/..
+cd "$ROOTDIR"
 
 : Build ID: ${BUILD_ID:=devel}
+SUITE=trusty
+ARCH=amd64
+DOCKER_IMAGE=bigswitch/ivs-builder:ubuntu14.04
 
-BASEPATH="/var/cache/pbuilder/base-${SUITE}-${ARCH}.cow"
+BUILDDIR=$(mktemp -d)
+
+mkdir -p $BUILDDIR/ivs
+
+# Copy source code to a volume that will be mounted in the container
+#cp build/build-debian-packages-inner.sh $BUILDDIR/build-debian-packages-inner.sh
+./build/files.sh > "$BUILDDIR/files"
+rsync --files-from="$BUILDDIR/files" . "$BUILDDIR/ivs"
+rm "$BUILDDIR/files"
+
+docker.io run -v $BUILDDIR:/work -w /work/ivs $DOCKER_IMAGE ./build/build-debian-packages-inner.sh
+
+# Copy built packages to pkg/
 OUTDIR=$(readlink -m "pkg/$SUITE-$ARCH/$BUILD_ID")
-
-if [ ! -d ${BASEPATH} ]; then
-    sudo cowbuilder --create \
-                    --basepath ${BASEPATH} \
-                    --distribution ${SUITE} \
-                    --debootstrapopts --arch --debootstrapopts ${ARCH} \
-                    --components "main universe"
-fi
-
 rm -rf "$OUTDIR" && mkdir -p "$OUTDIR"
-
-REPO=$PWD
-COPY=`mktemp -d`
-
-./build/files.sh > "$COPY/files"
-rsync --files-from="$COPY/files" . "$COPY"
-
-cd "$COPY"
-./build/setup.sh
-
-pdebuild --pbuilder cowbuilder \
-         --architecture "$ARCH" \
-         --buildresult "$OUTDIR" \
-         -- \
-         --distribution "$SUITE" \
-         --basepath "$BASEPATH"
-
-cd -
-rm -rf "$COPY"
+mv $BUILDDIR/*.deb "$OUTDIR"
 git log > "$OUTDIR/gitlog.txt"
 touch "$OUTDIR/build-$BUILD_ID"
-
 ln -snf $(basename $OUTDIR) $OUTDIR/../latest
+
+rm -rf "$BUILDDIR"
