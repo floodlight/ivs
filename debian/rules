@@ -13,7 +13,7 @@
 	dh $@ 
 
 override_dh_auto_build:
-	make RELEASE=1
+	make -j8 RELEASE=1
 
 override_dh_auto_install:
 	make install DESTDIR=debian/ivs
