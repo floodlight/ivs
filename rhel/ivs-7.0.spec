@@ -44,7 +44,7 @@ platform][1], which provides a common core for many physical and virtual switche
 %setup -q -n ivs
 
 %build
-make
+make RELEASE=1
 
 %install
 rm -rf $RPM_BUILD_ROOT
