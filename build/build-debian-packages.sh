@@ -32,9 +32,7 @@ mkdir -p $BUILDDIR/ivs
 
 # Copy source code to a volume that will be mounted in the container
 #cp build/build-debian-packages-inner.sh $BUILDDIR/build-debian-packages-inner.sh
-./build/files.sh > "$BUILDDIR/files"
-rsync --files-from="$BUILDDIR/files" . "$BUILDDIR/ivs"
-rm "$BUILDDIR/files"
+rsync --files-from <(./build/files.sh) . "$BUILDDIR/ivs"
 
 docker.io run -v $BUILDDIR:/work -w /work/ivs $DOCKER_IMAGE ./build/build-debian-packages-inner.sh
 
