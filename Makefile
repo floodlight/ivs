@@ -21,22 +21,22 @@ IVS_BUILD := targets/ivs/build/gcc-local
 IVS_CTL_BUILD := targets/ivs-ctl/build/gcc-local
 
 all:
-	make -C targets/ivs
-	make -C targets/ivs-ctl
+	${MAKE} -C targets/ivs
+	${MAKE} -C targets/ivs-ctl
 
 install: all
 	install -D $(IVS_BUILD)/bin/ivs $(DESTDIR)/usr/sbin/ivs
 	install -D $(IVS_CTL_BUILD)/bin/ivs-ctl $(DESTDIR)/usr/sbin/ivs-ctl
 
 clean:
-	make -C targets/ivs clean
-	make -C targets/ivs-ctl clean
+	${MAKE} -C targets/ivs clean
+	${MAKE} -C targets/ivs-ctl clean
 	# The build system creates these even during make clean
 	rm -f modules/OVSDriver/OVSDriver.mk targets/ivs-ctl/IVSCtl.mk targets/ivs/Manifest.mk targets/ivs/IVS.mk targets/ivs/dependmodules.x
 	(cd indigo; rm -f modules/AIM/AIM.mk modules/BigData/BigList/BigList.mk modules/ELS/ELS.mk modules/FME/FME.mk modules/IOF/IOF.mk modules/IVS/IVS.mk modules/Indigo/OFConnectionManager/OFConnectionManager.mk modules/Indigo/OFStateManager/OFStateManager.mk modules/Indigo/SocketManager/SocketManager.mk modules/Indigo/indigo/indigo.mk modules/NSS/NSS.mk modules/PPE/PPE.mk modules/loci/loci.mk modules/murmur/murmur.mk modules/uCli/uCli.mk)
 
 deb:
-	fakeroot make -f debian/rules binary
+	fakeroot ${MAKE} -f debian/rules binary
 
 rpm:
 	rhel/rpm-from-source

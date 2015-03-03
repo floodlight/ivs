@@ -36,6 +36,8 @@ for ARCH in $ARCHS; do
     done
 done
 
+./build/build-rhel-packages.sh
+
 # Publish packages from official builds
 if [ "${PUBLISH_DIR-}" ]; then
     mkdir -p "$PUBLISH_DIR"

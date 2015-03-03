@@ -18,6 +18,7 @@
 
 Name: ivs
 Summary: Indigo Virtual Switch
+Group: System Environment/Daemons
 URL: http://www.bigswitch.com/
 Version: 0.5
 Release: 1%{?dist}
@@ -28,6 +29,9 @@ Source: ivs.tar.gz
 Requires(post):  systemd-units
 Requires(preun): systemd-units
 Requires(postun): systemd-units
+
+Requires: libnl3
+BuildRequires: bash, python, pkgconfig, libnl3-devel
 
 %description
 Indigo Virtual Switch (IVS) is a pure OpenFlow virtual switch designed for high
@@ -40,7 +44,7 @@ platform][1], which provides a common core for many physical and virtual switche
 %setup -q -n ivs
 
 %build
-make
+make RELEASE=1
 
 %install
 rm -rf $RPM_BUILD_ROOT
