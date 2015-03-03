@@ -812,6 +812,13 @@ port_desc_set(of_port_desc_t *of_port_desc, uint32_t port_no)
         of_port_desc_prop_ethernet_supported_set(&prop, supported);
         of_port_desc_prop_ethernet_peer_set(&prop, peer);
         /* TODO curr_speed, max_speed */
+
+        if (port->is_uplink) {
+            of_port_desc_prop_bsn_uplink_init(&prop, props.version, -1, 1);
+            if (of_list_port_desc_prop_append_bind(&props, &prop) < 0) {
+                AIM_DIE("unexpected error appending to port_desc");
+            }
+        }
     }
 }
 
