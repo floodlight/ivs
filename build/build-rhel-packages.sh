@@ -30,7 +30,7 @@ mkdir -p $BUILDDIR/SOURCES $BUILDDIR/RPMS
 # Copy source code to a volume that will be mounted in the container
 cp build/build-rhel-packages-inner.sh $BUILDDIR/build-rhel-packages-inner.sh
 cp rhel/ivs-7.0.spec $BUILDDIR/SOURCES
-./build/files.sh | tar -T- -c -z -f $BUILDDIR/SOURCES/ivs.tar.gz --transform 's,^,ivs/,'
+tar -T <(./build/files.sh) -c -z -f $BUILDDIR/SOURCES/ivs.tar.gz --transform 's,^,ivs/,'
 
 docker.io run -v $BUILDDIR:/rpmbuild bigswitch/ivs-builder:centos7 /rpmbuild/build-rhel-packages-inner.sh
 

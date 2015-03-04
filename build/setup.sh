@@ -60,11 +60,6 @@ if ! python -c 'import pcap' &> /dev/null; then
     $APT_GET install python-pypcap
 fi
 
-if ! which cowbuilder &> /dev/null; then
-    echo "Installing cowbuilder"
-    $APT_GET install cowbuilder
-fi
-
 # libnl packaging changed between oneiric and precise
 if [ $(lsb_release -sc) \< precise ]; then
     if ! pkg-config --exists libnl-3.0; then

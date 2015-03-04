@@ -20,9 +20,6 @@
 /*
  * Translate actions from LOCI into OVS Netlink attributes.
  */
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC optimize (4)
-#endif
 #include "action.h"
 #include <byteswap.h>
 #include <linux/if_ether.h>
@@ -35,6 +32,10 @@
 #include <AIM/aim_log.h>
 
 static void process_group(struct action_context *ctx, struct group *group, uint32_t hash, struct xbuf *stats);
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC optimize (4)
+#endif
 
 void
 pipeline_standard_translate_actions(

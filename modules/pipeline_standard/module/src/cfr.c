@@ -17,9 +17,6 @@
  *
  ****************************************************************/
 
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC optimize (4)
-#endif
 #include <ivs/ivs.h>
 #include <byteswap.h>
 #include <linux/if_ether.h>
@@ -28,6 +25,10 @@
 
 #define AIM_LOG_MODULE_NAME pipeline_standard
 #include <AIM/aim_log.h>
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC optimize (4)
+#endif
 
 void
 pipeline_standard_key_to_cfr(const struct ind_ovs_parsed_key *pkey,

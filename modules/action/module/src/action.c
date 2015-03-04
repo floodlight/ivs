@@ -17,15 +17,16 @@
  *
  ****************************************************************/
 
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC optimize (4)
-#endif
 #include <action/action.h>
 #include <byteswap.h>
 #include <linux/if_ether.h>
 #include <netlink/genl/genl.h>
 
 static void commit_set_field_actions(struct action_context *ctx);
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC optimize (4)
+#endif
 
 void
 action_context_init(struct action_context *ctx,

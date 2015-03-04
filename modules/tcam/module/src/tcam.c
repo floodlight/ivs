@@ -33,9 +33,6 @@
  * TODO optimize single-entry shards
  */
 
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC optimize (4)
-#endif
 #include <AIM/aim.h>
 #include <BigHash/bighash.h>
 #include <tcam/tcam.h>
@@ -77,6 +74,10 @@ static void tcam_shard_grow(struct tcam_shard *shard);
 static int memcmp_masked(const void *a, const void *b, const void *mask, int len);
 static void memor(void *dst, const void *src, int len);
 static uint32_t hash_key(const struct tcam *tcam, const void *key, const void *mask);
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC optimize (4)
+#endif
 
 /* Documented in tcam.h */
 struct tcam *

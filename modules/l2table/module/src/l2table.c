@@ -25,9 +25,6 @@
  * reused by insertions.
  */
 
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC optimize (4)
-#endif
 #include <l2table/l2table.h>
 #include <stdbool.h>
 #include <murmur/murmur.h>
@@ -60,6 +57,10 @@ struct l2table {
 static aim_error_t l2table_resize__(struct l2table *t);
 static uint64_t l2table_encode_key__(const uint8_t mac[L2TABLE_MAC_LEN], uint16_t vlan_id);
 static void l2table_decode_key__(uint64_t key, uint8_t mac[L2TABLE_MAC_LEN], uint16_t *vlan_id);
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC optimize (4)
+#endif
 
 struct l2table *
 l2table_create(uint32_t salt)

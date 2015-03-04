@@ -19,8 +19,7 @@ Building IVS
 ------------
 
 1. Install required dependencies:
-  - Ubuntu 11.10: `sudo apt-get install libnl3-dev pkg-config python-tz libpcap-dev openvswitch-datapath-dkms`
-  - Ubuntu 12.04: `sudo apt-get install libnl-3-dev libnl-genl-3-dev libnl-route-3-dev pkg-config python-tz libpcap-dev openvswitch-datapath-dkms`
+  - Ubuntu 14.04: `sudo apt-get install libnl-3-dev libnl-genl-3-dev libnl-route-3-dev pkg-config python-tz libpcap-dev`
 
 2. Clone the IVS repository: `git clone --recurse-submodules https://github.com/floodlight/ivs.git`
     - NOTE that if you did not use clone with the "--recursive-submodules" option, you can fix this by running
@@ -42,13 +41,17 @@ Packaging, including init scripts, is available for Debian-based
 distributions in the `debian` directory. If using git we recommend
 git-buildpackage.
 
-When building packages for multiple architectures and distributions we use the
-`build/build-debian-packages.sh` script. This script uses the cowbuilder
-package to create a chroot for the target distribution and build the package
-inside it. The `SUITE` and `ARCH` environment variables are used to determine
-the target distribution. For example:
+The script `build/build-debian-packages.sh` uses Docker to build packages for
+Ubuntu 14.04.
 
-    SUITE=oneiric ARCH=i386 ./build/build-debian-packages.sh
+Building CentOS/RHEL packages
+-----------------------------
+
+Packaging, including init scripts, is available for Red Hat-based
+distributions in the `rhel` directory.
+
+The script `build/build-rhel-packages.sh` uses Docker to build packages for
+CentOS 7.
 
 Usage
 -----

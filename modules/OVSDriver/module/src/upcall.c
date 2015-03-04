@@ -17,9 +17,6 @@
  *
  ****************************************************************/
 
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC optimize (4)
-#endif
 #define AIM_CONFIG_INCLUDE_GNU_SOURCE 1
 #include "ovs_driver_int.h"
 #include "indigo/forwarding.h"
@@ -109,6 +106,10 @@ static void ind_ovs_upcall_thread_init(struct ind_ovs_upcall_thread *thread);
 
 static int ind_ovs_num_upcall_threads;
 static struct ind_ovs_upcall_thread *ind_ovs_upcall_threads[MAX_UPCALL_THREADS];
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC optimize (4)
+#endif
 
 static void
 ind_ovs_upcall_thread_main(struct ind_ovs_upcall_thread *thread)
