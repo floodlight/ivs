@@ -49,6 +49,19 @@ aim_ratelimiter_t nl_cache_refill_limiter;
 
 static struct ind_ovs_port_counters dummy_stats;
 
+/*
+ * Truncate the object to its initial length.
+ *
+ * This allows the caller to reuse a single allocated object even if
+ * it has been appended to.
+ */
+static void
+truncate_of_object(of_object_t *obj)
+{
+    of_object_init_map[obj->object_id](obj, obj->version, -1, 0);
+    obj->wbuf->current_bytes = obj->length;
+}
+
 static void
 ind_ovs_update_link_stats()
 {
@@ -123,6 +136,7 @@ indigo_error_t indigo_port_features_get(
     int i;
     for (i = 0; i < IND_OVS_MAX_PORTS; i++) {
         if (ind_ovs_ports[i]) {
+            truncate_of_object(of_port_desc);
             port_desc_set(of_port_desc, i);
             /* TODO error handling */
             of_list_port_desc_append(of_list_port_desc, of_port_desc);
@@ -628,6 +642,7 @@ indigo_error_t indigo_port_desc_stats_get(
     int i;
     for (i = 0; i < IND_OVS_MAX_PORTS; i++) {
         if (ind_ovs_ports[i]) {
+            truncate_of_object(of_port_desc);
             port_desc_set(of_port_desc, i);
             /* TODO error handling */
             of_list_port_desc_append(of_list_port_desc, of_port_desc);
@@ -797,6 +812,13 @@ port_desc_set(of_port_desc_t *of_port_desc, uint32_t port_no)
         of_port_desc_prop_ethernet_supported_set(&prop, supported);
         of_port_desc_prop_ethernet_peer_set(&prop, peer);
         /* TODO curr_speed, max_speed */
+
+        if (port->is_uplink) {
+            of_port_desc_prop_bsn_uplink_init(&prop, props.version, -1, 1);
+            if (of_list_port_desc_prop_append_bind(&props, &prop) < 0) {
+                AIM_DIE("unexpected error appending to port_desc");
+            }
+        }
     }
 }
 
