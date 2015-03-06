@@ -55,6 +55,7 @@ static void help(void)
     fprintf(stderr, "  del-port INTERFACE: delete a port from the datapath\n");
     fprintf(stderr, "  cli ...: run an internal CLI command\n");
     fprintf(stderr, "  dump-flows: print information about each kernel flow\n");
+    fprintf(stderr, "  list-ports: print the name of each port\n");
 }
 
 static void
@@ -499,6 +500,46 @@ dump_flows(const char *datapath)
     nlmsg_free(msg);
 }
 
+static int
+list_port__(struct nl_msg *msg, void *arg)
+{
+    struct nlmsghdr *nlh = nlmsg_hdr(msg);
+    struct nlattr *attrs[OVS_VPORT_ATTR_MAX+1];
+    if (genlmsg_parse(nlh, sizeof(struct ovs_header),
+                    attrs, OVS_VPORT_ATTR_MAX,
+                    NULL) < 0) {
+        abort();
+    }
+
+    puts((char *)nla_data(attrs[OVS_VPORT_ATTR_NAME]));
+
+    return NL_OK;
+}
+
+static void
+list_ports(const char *datapath)
+{
+    unsigned int dp_ifindex = if_nametoindex(datapath);
+    if (dp_ifindex == 0) {
+        fprintf(stderr, "Failed: no such datapath '%s'\n", datapath);
+        exit(1);
+    }
+
+    struct nl_msg *msg = nlmsg_alloc();
+    struct ovs_header *hdr = genlmsg_put(msg, NL_AUTO_PORT, NL_AUTO_SEQ,
+                                         ovs_vport_family, sizeof(*hdr),
+                                         NLM_F_DUMP, OVS_VPORT_CMD_GET, OVS_VPORT_VERSION);
+    hdr->dp_ifindex = dp_ifindex;
+    if (nl_send_auto(sk2, msg) < 0) {
+        abort();
+    }
+
+    nl_socket_modify_cb(sk2, NL_CB_VALID, NL_CB_CUSTOM, list_port__, NULL);
+    nl_recvmsgs_default(sk2);
+
+    nlmsg_free(msg);
+}
+
 static struct nl_sock *
 create_genl_socket(void)
 {
@@ -582,6 +623,12 @@ main(int argc, char *argv[])
             return 1;
         }
         dump_flows(datapath_name);
+    } else if (!strcmp(cmd, "list-ports")) {
+        if (argc != 1) {
+            fprintf(stderr, "Wrong number of arguments for the %s command (try help)\n", cmd);
+            return 1;
+        }
+        list_ports(datapath_name);
     } else {
         fprintf(stderr, "Unknown command '%s' (try help)\n", cmd);
         return 1;
