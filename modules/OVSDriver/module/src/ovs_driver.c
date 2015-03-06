@@ -133,7 +133,7 @@ ind_ovs_dpid_set(const char *datapath_name)
     }
 
     memcpy(&dpid, mac, sizeof(mac));
-    dpid |= htobe64(murmur_hash(datapath_name, strlen(datapath_name), 0) & 0xFFFF);
+    dpid |= htobe64(murmur_hash(datapath_name, strlen(datapath_name), 0x17ccd) & 0xFFFF);
     indigo_core_dpid_set(be64toh(dpid));
 
     freeifaddrs(ifaddr);
