@@ -34,7 +34,7 @@ mkdir -p $BUILDDIR/ivs
 #cp build/build-debian-packages-inner.sh $BUILDDIR/build-debian-packages-inner.sh
 rsync --files-from <(./build/files.sh) . "$BUILDDIR/ivs"
 
-docker.io run -v $BUILDDIR:/work -w /work/ivs $DOCKER_IMAGE ./build/build-debian-packages-inner.sh
+docker.io run -e BUILD_ID=$BUILD_ID -v $BUILDDIR:/work -w /work/ivs $DOCKER_IMAGE ./build/build-debian-packages-inner.sh
 
 # Copy built packages to pkg/
 OUTDIR=$(readlink -m "pkg/$SUITE-$ARCH/$BUILD_ID")
