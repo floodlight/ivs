@@ -23,6 +23,19 @@
 
 static aim_ratelimiter_t ind_ovs_pktin_limiter;
 
+DEBUG_COUNTER(not_enabled, "ovsdriver.pktin.not_enabled",
+              "Dropped packet-in because it is disabled on the port");
+DEBUG_COUNTER(global_ratelimited, "ovsdriver.pktin.global_ratelimited",
+              "Dropped packet-in because of the global ratelimiter");
+DEBUG_COUNTER(bad_match, "ovsdriver.pktin.bad_match",
+              "Dropped packet-in because it had a bad OpenFlow match");
+DEBUG_COUNTER(bad_data, "ovsdriver.pktin.bad_data",
+              "Dropped packet-in because it had too much data");
+DEBUG_COUNTER(pktin, "ovsdriver.pktin",
+              "Received packet-in message from the kernel");
+DEBUG_COUNTER(port_ratelimited, "ovsdriver.pktin.port_ratelimited",
+              "Dropped packet-in because of the port ratelimiter");
+
 static indigo_error_t
 ind_ovs_pktin(of_port_no_t in_port,
               uint8_t *data, unsigned int len, uint8_t reason, uint64_t metadata,
@@ -34,17 +47,18 @@ ind_ovs_pktin(of_port_no_t in_port,
     of_version_t ctrlr_of_version;
 
     if (indigo_cxn_get_async_version(&ctrlr_of_version) != INDIGO_ERROR_NONE) {
-        LOG_TRACE("No active controller connection");
         return INDIGO_ERROR_NONE;
     }
 
     if (port != NULL && port->no_packet_in) {
         LOG_TRACE("Packet-in not enabled from this port");
+        debug_counter_inc(&not_enabled);
         return INDIGO_ERROR_NONE;
     }
 
     if (!ind_ovs_benchmark_mode &&
         aim_ratelimiter_limit(&ind_ovs_pktin_limiter, monotonic_us()) != 0) {
+        debug_counter_inc(&global_ratelimited);
         return INDIGO_ERROR_NONE;
     }
 
@@ -69,6 +83,7 @@ ind_ovs_pktin(of_port_no_t in_port,
     } else {
         if (LOXI_FAILURE(of_packet_in_match_set(of_packet_in, &match))) {
             LOG_ERROR("Failed to write match to packet-in message");
+            debug_counter_inc(&bad_match);
             of_packet_in_delete(of_packet_in);
             return INDIGO_ERROR_UNKNOWN;
         }
@@ -80,6 +95,7 @@ ind_ovs_pktin(of_port_no_t in_port,
 
     if (LOXI_FAILURE(of_packet_in_data_set(of_packet_in, &of_octets))) {
         LOG_ERROR("Failed to write packet data to packet-in message");
+        debug_counter_inc(&bad_data);
         of_packet_in_delete(of_packet_in);
         return INDIGO_ERROR_UNKNOWN;
     }
@@ -92,10 +108,13 @@ ind_ovs_pktin_recv(struct nl_msg *msg, void *arg)
 {
     struct ind_ovs_port *port = arg;
 
+    debug_counter_inc(&pktin);
+
     if (!ind_ovs_benchmark_mode && aim_ratelimiter_limit(&port->pktin_limiter, monotonic_us()) != 0) {
         if (aim_ratelimiter_limit(&port->upcall_log_limiter, monotonic_us()) == 0) {
             LOG_WARN("rate limiting packet-ins from port %s", port->ifname);
         }
+        debug_counter_inc(&port_ratelimited);
         return NL_OK;
     }
 
