@@ -103,7 +103,7 @@ ind_ovs_dpid_set(const char *datapath_name)
 {
     bool found = false;
     uint8_t mac[6];
-    uint64_t dpid = 0; /* big endian */
+    uint64_t dpid;
     struct ifaddrs *ifaddr, *ifa;
 
     if (getifaddrs(&ifaddr) == -1) {
@@ -132,9 +132,10 @@ ind_ovs_dpid_set(const char *datapath_name)
         mac[5] = x >> 24;
     }
 
-    memcpy(&dpid, mac, sizeof(mac));
-    dpid |= htobe64(murmur_hash(datapath_name, strlen(datapath_name), 0x17ccd) & 0xFFFF);
-    indigo_core_dpid_set(be64toh(dpid));
+    dpid = ((uint64_t)mac[0] << 40) | ((uint64_t)mac[1] << 32) | (mac[2] << 24) |
+        (mac[3] << 16) | (mac[4] << 8) | mac[5];
+    dpid |= (uint64_t)murmur_hash(datapath_name, strlen(datapath_name), 0x17ccd) << 48;
+    indigo_core_dpid_set(dpid);
 
     freeifaddrs(ifaddr);
 }
