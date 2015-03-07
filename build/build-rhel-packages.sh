@@ -32,7 +32,7 @@ cp build/build-rhel-packages-inner.sh $BUILDDIR/build-rhel-packages-inner.sh
 cp rhel/ivs-7.0.spec $BUILDDIR/SOURCES
 tar -T <(./build/files.sh) -c -z -f $BUILDDIR/SOURCES/ivs.tar.gz --transform 's,^,ivs/,'
 
-docker.io run -v $BUILDDIR:/rpmbuild bigswitch/ivs-builder:centos7 /rpmbuild/build-rhel-packages-inner.sh
+docker.io run -e BUILD_ID=$BUILD_ID -v $BUILDDIR:/rpmbuild bigswitch/ivs-builder:centos7 /rpmbuild/build-rhel-packages-inner.sh
 
 # Copy built RPMs to pkg/
 OUTDIR=$(readlink -m "pkg/centos7-x86_64/$BUILD_ID")
