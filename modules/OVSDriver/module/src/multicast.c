@@ -34,6 +34,13 @@
 
 static struct nl_sock *ind_ovs_multicast_socket;
 
+DEBUG_COUNTER(other_datapath, "ovsdriver.multicast.other_datapath",
+              "Received a Netlink multicast message for another datapath");
+DEBUG_COUNTER(received, "ovsdriver.multicast.received",
+              "Received a Netlink multicast message");
+DEBUG_COUNTER(overrun, "ovsdriver.multicast.overrun",
+              "Overrun on the Netlink multicast socket");
+
 static void
 ind_ovs_handle_vport_multicast(struct nlmsghdr *nlh)
 {
@@ -103,8 +110,11 @@ ind_ovs_recv_multicast(struct nl_msg *msg, void *arg)
 
     if (ovs_header->dp_ifindex != ind_ovs_dp_ifindex) {
         /* Not our datapath */
+        debug_counter_inc(&other_datapath);
         return NL_OK;
     }
+
+    debug_counter_inc(&received);
 
     LOG_VERBOSE("Received multicast message:");
     ind_ovs_dump_msg(nlmsg_hdr(msg));
@@ -133,6 +143,7 @@ ind_ovs_handle_multicast(void)
          * TODO handle missed vport deletion
          */
         AIM_LOG_WARN("Multicast socket overrun");
+        debug_counter_inc(&overrun);
 
         /* Request dump of vports */
         struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_GET);

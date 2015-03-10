@@ -24,6 +24,14 @@
 static bool check_for_table_action(of_list_action_t *actions, uint32_t *queue_id);
 static indigo_error_t translate_openflow_actions(of_list_action_t *actions, struct ind_ovs_parsed_key *key, struct nl_msg *msg);
 
+DEBUG_COUNTER(invalid_in_port, "ovsdriver.pktout.invalid_in_port", "Packet-out failed due to an invalid in_port");
+DEBUG_COUNTER(kernel_failed_parse, "ovsdriver.pktout.kernel_failed_parse",
+              "Packet-out failed due to an error from the kernel when parsing the packet");
+DEBUG_COUNTER(translate_actions_failed, "ovsdriver.pktout.translate_actions_failed",
+              "Packet-out failed due to an error translating actions");
+DEBUG_COUNTER(kernel_failed_execute, "ovsdriver.pktout.kernel_failed_execute",
+              "Packet-out failed due to an error from the kernel when executing the actions");
+
 indigo_error_t
 indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
 {
@@ -47,6 +55,7 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
         /* Send the packet to in_port's upcall thread */
         struct ind_ovs_port *in_port = ind_ovs_port_lookup(of_port_num);
         if (in_port == NULL) {
+            debug_counter_inc(&invalid_in_port);
             LOG_ERROR("controller specified an invalid packet-out in_port: 0x%x", of_port_num);
             return INDIGO_ERROR_PARAM;
         }
@@ -90,6 +99,7 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
     int err = nl_send_auto(ind_ovs_socket, msg);
     if (err < 0) {
         LOG_ERROR("nl_send failed: %s", nl_geterror(err));
+        debug_counter_inc(&kernel_failed_parse);
         ind_ovs_nlmsg_freelist_free(msg);
         return INDIGO_ERROR_UNKNOWN;
     }
@@ -104,6 +114,7 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
     struct nl_msg *reply_msg = ind_ovs_recv_nlmsg(ind_ovs_socket);
     if (reply_msg == NULL) {
         LOG_ERROR("ind_ovs_recv_nlmsg failed: %s", strerror(errno));
+        debug_counter_inc(&kernel_failed_parse);
         ind_ovs_nlmsg_freelist_free(msg);
         return INDIGO_ERROR_UNKNOWN;
     }
@@ -112,6 +123,7 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
     if (nlh->nlmsg_type == NLMSG_ERROR) {
         assert(nlh->nlmsg_seq == nlmsg_hdr(msg)->nlmsg_seq);
         LOG_ERROR("Kernel failed to parse packet-out data");
+        debug_counter_inc(&kernel_failed_parse);
         ind_ovs_nlmsg_freelist_free(msg);
         ind_ovs_nlmsg_freelist_free(reply_msg);
         return INDIGO_ERROR_UNKNOWN;
@@ -140,6 +152,7 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
     struct nlattr *actions_attr = nla_nest_start(msg, OVS_PACKET_ATTR_ACTIONS);
     rv = translate_openflow_actions(of_list_action, &pkey, msg);
     if (rv < 0) {
+        debug_counter_inc(&translate_actions_failed);
         ind_ovs_nlmsg_freelist_free(msg);
         return rv;
     }
@@ -147,6 +160,7 @@ indigo_fwd_packet_out(of_packet_out_t *of_packet_out)
 
     /* Send the second message */
     if (ind_ovs_transact(msg) < 0) {
+        debug_counter_inc(&kernel_failed_execute);
         LOG_ERROR("OVS_PACKET_CMD_EXECUTE failed");
         return INDIGO_ERROR_UNKNOWN;
     }
