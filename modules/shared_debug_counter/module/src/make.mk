@@ -19,5 +19,5 @@
 
 LIBRARY := shared_debug_counter
 $(LIBRARY)_SUBDIR := $(dir $(lastword $(MAKEFILE_LIST)))
-LDFLAGS += -T $(shared_debug_counter_SUBDIR)/link.ld
+LDFLAGS += -Xlinker -T$(shared_debug_counter_SUBDIR)/link.ld
 include $(BUILDER)/lib.mk
