@@ -471,8 +471,7 @@ aim_main(int argc, char* argv[])
         BIGLIST_FOREACH_DATA(element, uplinks, char *, str) {
             AIM_LOG_VERBOSE("Adding uplink %s (port %d)", str, port_no);
             if (indigo_port_interface_add(str, port_no, NULL)) {
-                AIM_LOG_FATAL("Failed to add uplink %s", str);
-                return 1;
+                AIM_LOG_ERROR("Failed to add uplink %s", str);
             }
             ind_ovs_uplink_add(str);
             port_no++;
@@ -486,8 +485,7 @@ aim_main(int argc, char* argv[])
         BIGLIST_FOREACH_DATA(element, interfaces, char *, str) {
             AIM_LOG_VERBOSE("Adding interface %s (port %d)", str, port_no);
             if (indigo_port_interface_add(str, port_no, NULL)) {
-                AIM_LOG_FATAL("Failed to add interface %s", str);
-                return 1;
+                AIM_LOG_ERROR("Failed to add interface %s", str);
             }
             port_no++;
         }
@@ -500,8 +498,7 @@ aim_main(int argc, char* argv[])
         BIGLIST_FOREACH_DATA(element, internal_ports, char *, str) {
             AIM_LOG_VERBOSE("Adding internal port %s (port %d)", str, port_no);
             if (ind_ovs_port_add_internal(str)) {
-                AIM_LOG_FATAL("Failed to add internal port %s", str);
-                return 1;
+                AIM_LOG_ERROR("Failed to add internal port %s", str);
             }
             port_no++;
         }
