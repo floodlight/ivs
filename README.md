@@ -20,6 +20,7 @@ Building IVS
 
 1. Install required dependencies:
   - Ubuntu 14.04: `sudo apt-get install libnl-3-dev libnl-genl-3-dev libnl-route-3-dev pkg-config python-tz libpcap-dev`
+  - CentOS 7: `sudo yum groupinstall 'Development Tools' && sudo yum install libnl3-devel`
 
 2. Clone the IVS repository: `git clone --recurse-submodules https://github.com/floodlight/ivs.git`
     - NOTE that if you did not use clone with the "--recursive-submodules" option, you can fix this by running
