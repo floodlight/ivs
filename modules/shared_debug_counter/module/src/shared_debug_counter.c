@@ -26,14 +26,11 @@
 #define AIM_LOG_MODULE_NAME shared_debug_counter
 #include <AIM/aim_log.h>
 
-#define ALIGN(x, y) (((x) + (y) - 1) & ~((y) - 1))
-
 void __attribute__((noinline))
 shared_debug_counter_init(void)
 {
     extern char shared_debug_counter_start[], shared_debug_counter_end[];
     int len = shared_debug_counter_end - shared_debug_counter_start;
-    int aligned_len = ALIGN(len, sysconf(_SC_PAGESIZE));
 
     if (len == 0) {
         return;
@@ -41,11 +38,7 @@ shared_debug_counter_init(void)
 
     void *copy = aim_memdup(shared_debug_counter_start, len);
 
-    if (munmap(shared_debug_counter_start, aligned_len) < 0) {
-        AIM_DIE("munmap failed: %s", strerror(errno));
-    }
-
-    if (mmap(shared_debug_counter_start, aligned_len, PROT_READ|PROT_WRITE,
+    if (mmap(shared_debug_counter_start, len, PROT_READ|PROT_WRITE,
              MAP_SHARED|MAP_ANONYMOUS|MAP_FIXED, -1, 0) == MAP_FAILED) {
         AIM_DIE("mmap failed: %s", strerror(errno));
     }
