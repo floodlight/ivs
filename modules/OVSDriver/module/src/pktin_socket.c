@@ -20,7 +20,6 @@
 #include "ovs_driver_int.h"
 #include <indigo/of_state_manager.h>
 #include <SocketManager/socketmanager.h>
-#include <debug_counter/debug_counter.h>
 
 DEBUG_COUNTER(pktin_ratelimited, "ovsdriver.pktin.ratelimited",
               "Dropped packet-in because of the ratelimiter");

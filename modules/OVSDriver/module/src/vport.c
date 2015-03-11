@@ -49,6 +49,18 @@ aim_ratelimiter_t nl_cache_refill_limiter;
 
 static struct ind_ovs_port_counters dummy_stats;
 
+DEBUG_COUNTER(add_redundant, "ovsdriver.vport.add_redundant", "Received port add notification for existing port");
+DEBUG_COUNTER(add, "ovsdriver.vport.add", "Received port add notification for a new port");
+DEBUG_COUNTER(add_notify_failed, "ovsdriver.vport.add_notify_failed", "Failed to notify controller of new port");
+DEBUG_COUNTER(add_failed, "ovsdriver.vport.add_failed", "Failed to add port");
+DEBUG_COUNTER(delete_redundant, "ovsdriver.vport.delete_redundant", "Received port delete notification for nonexistent port");
+DEBUG_COUNTER(delete, "ovsdriver.vport.delete", "Received port delete notification");
+DEBUG_COUNTER(delete_notify_failed, "ovsdriver.vport.delete_notify_failed", "Failed to notify controller of deleted port");
+DEBUG_COUNTER(modify_nonexistent, "ovsdriver.vport.modify_nonexistent", "Received port modify notification for nonexistent port");
+DEBUG_COUNTER(modify, "ovsdriver.vport.modify", "Received port modify notification");
+DEBUG_COUNTER(modify_notify_failed, "ovsdriver.vport.modify_notify_failed", "Failed to notify controller of modified port");
+DEBUG_COUNTER(link_change, "ovsdriver.vport.link_change", "Received link change notification");
+
 /*
  * Truncate the object to its initial length.
  *
@@ -242,8 +254,11 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname,
     indigo_error_t err;
 
     if (ind_ovs_ports[port_no]) {
+        debug_counter_inc(&add_redundant);
         return;
     }
+
+    debug_counter_inc(&add);
 
     struct ind_ovs_port *port = aim_zmalloc(sizeof(*port));
 
@@ -305,6 +320,7 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname,
 
     if ((err = port_status_notify(port_no, OF_PORT_CHANGE_REASON_ADD)) < 0) {
         LOG_WARN("failed to notify controller of port addition");
+        debug_counter_inc(&add_notify_failed);
         /* Can't cleanup the port because it's already visible to other
          * threads. */
     }
@@ -316,6 +332,7 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname,
     return;
 
 cleanup_port:
+    debug_counter_inc(&add_failed);
     assert(ind_ovs_ports[port_no] == NULL);
     if (port->notify_socket) {
         nl_socket_free(port->notify_socket);
@@ -349,14 +366,18 @@ ind_ovs_port_deleted(uint32_t port_no)
     assert(port_no < IND_OVS_MAX_PORTS);
     struct ind_ovs_port *port = ind_ovs_ports[port_no];
     if (port == NULL) {
+        debug_counter_inc(&delete_redundant);
         return;
     }
+
+    debug_counter_inc(&delete);
 
     ind_ovs_pktin_unregister(port);
     ind_ovs_upcall_unregister(port);
 
     if (port_status_notify(port_no, OF_PORT_CHANGE_REASON_DELETE) < 0) {
         LOG_ERROR("failed to notify controller of port deletion");
+        debug_counter_inc(&delete_notify_failed);
     }
 
     LOG_INFO("Deleted %s %s", port->is_uplink ? "uplink" : "port", port->ifname);
@@ -382,8 +403,11 @@ indigo_port_modify(of_port_mod_t *port_mod)
 
     struct ind_ovs_port *port = ind_ovs_port_lookup(port_no);
     if (port == NULL) {
+        debug_counter_inc(&modify_nonexistent);
         return INDIGO_ERROR_NOT_FOUND;
     }
+
+    debug_counter_inc(&modify);
 
     if (OF_PORT_CONFIG_FLAG_NO_PACKET_IN_TEST(mask, port_mod->version)) {
         port->no_packet_in = OF_PORT_CONFIG_FLAG_NO_PACKET_IN_TEST(config, port_mod->version);
@@ -850,6 +874,8 @@ link_change_cb(struct nl_cache *cache,
     if (port == NULL) {
         return;
     }
+
+    debug_counter_inc(&link_change);
 
     /* Log at INFO only if the interface transitioned between up/down */
     if ((ifflags & IFF_RUNNING) && !(port->ifflags & IFF_RUNNING)) {

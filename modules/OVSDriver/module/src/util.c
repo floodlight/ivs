@@ -42,6 +42,12 @@ static indigo_error_t sys2indigoerr(int err);
 static struct nl_msg *ind_ovs_nlmsg_freelist[IND_OVS_NLMSG_FREELIST_SIZE];
 #endif /* IND_OVS_NLMSG_MEMLEAK_DBG */
 
+DEBUG_COUNTER(netlink_transaction, "ovsdriver.util.netlink_transaction", "Netlink transaction");
+DEBUG_COUNTER(netlink_send_failed, "ovsdriver.util.netlink_send_failed", "Netlink send failed");
+DEBUG_COUNTER(netlink_recv_failed, "ovsdriver.util.netlink_recv_failed", "Netlink recv failed");
+DEBUG_COUNTER(netlink_bad_error_number, "ovsdriver.util.netlink_bad_error_number", "Netlink error is out of range (kernel bug)");
+DEBUG_COUNTER(netlink_error, "ovsdriver.util.netlink_error", "Received an error reply for a Netlink transaction");
+
 uint32_t
 get_entropy(void)
 {
@@ -90,6 +96,8 @@ ind_ovs_transact_nofree(struct nl_msg *msg)
     uint16_t family = nlh->nlmsg_type;
     uint8_t cmd = gnlh->cmd;
 
+    debug_counter_inc(&netlink_transaction);
+
     LOG_VERBOSE("Running transaction:");
     ind_ovs_dump_msg(nlh);
 
@@ -99,12 +107,14 @@ ind_ovs_transact_nofree(struct nl_msg *msg)
     uint32_t seq = nlh->nlmsg_seq;
 #endif
     if (err < 0) {
+        debug_counter_inc(&netlink_send_failed);
         LOG_ERROR("nl_send failed: %s", nl_geterror(err));
         return INDIGO_ERROR_UNKNOWN;
     }
 
     struct nl_msg *reply_msg = ind_ovs_recv_nlmsg(ind_ovs_socket);
     if (reply_msg == NULL) {
+        debug_counter_inc(&netlink_recv_failed);
         LOG_ERROR("ind_ovs_recv_nlmsg failed: %s", strerror(errno));
         return INDIGO_ERROR_UNKNOWN;
     }
@@ -121,10 +131,12 @@ ind_ovs_transact_nofree(struct nl_msg *msg)
      * operation was successful if the kernel returned an invalid errno.
      */
     if (err > 0 || err < -4095) {
+        debug_counter_inc(&netlink_bad_error_number);
         err = 0;
     }
 
     if (err < 0) {
+        debug_counter_inc(&netlink_error);
         LOG_WARN("Transaction failed (%s): %s",
                  ind_ovs_cmd_str(family, cmd), strerror(-err));
         return sys2indigoerr(-err);
@@ -143,6 +155,8 @@ ind_ovs_transact_reply(struct nl_msg *msg, struct nlmsghdr **reply)
     uint16_t family = nlh->nlmsg_type;
     uint8_t cmd = gnlh->cmd;
 
+    debug_counter_inc(&netlink_transaction);
+
     LOG_VERBOSE("Running transaction:");
     ind_ovs_dump_msg(nlmsg_hdr(msg));
 
@@ -152,6 +166,7 @@ ind_ovs_transact_reply(struct nl_msg *msg, struct nlmsghdr **reply)
 #endif
     ind_ovs_nlmsg_freelist_free(msg);
     if (err < 0) {
+        debug_counter_inc(&netlink_send_failed);
         LOG_ERROR("nl_send failed: %s", nl_geterror(err));
         return INDIGO_ERROR_UNKNOWN;
     }
@@ -159,6 +174,7 @@ ind_ovs_transact_reply(struct nl_msg *msg, struct nlmsghdr **reply)
     struct sockaddr_nl nla;
     err = nl_recv(ind_ovs_socket, &nla, (unsigned char **)reply, NULL);
     if (err < 0) {
+        debug_counter_inc(&netlink_recv_failed);
         LOG_ERROR("nl_recv failed: %s", nl_geterror(err));
         return INDIGO_ERROR_UNKNOWN;
     }
@@ -171,6 +187,7 @@ ind_ovs_transact_reply(struct nl_msg *msg, struct nlmsghdr **reply)
         *reply = NULL;
         LOG_WARN("Transaction failed (%s): %s",
                  ind_ovs_cmd_str(family, cmd), strerror(-err));
+        debug_counter_inc(&netlink_error);
         return sys2indigoerr(-err);
     }
 

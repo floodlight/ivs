@@ -46,6 +46,11 @@ static void barrier_timer(void *cookie);
 static struct blocked_cxn blocked_cxns[MAX_BLOCKED_CXNS];
 static bool barrier_timer_active = false;
 
+DEBUG_COUNTER(blocked_cxns_full, "ovsdriver.barrier.blocked_cxns_full",
+              "Early revalidation caused by full blocked_cxns table");
+DEBUG_COUNTER(timer_expired, "ovsdriver.barrier.timer_expired",
+              "Revalidation caused by barrier timer expiration");
+
 void
 ind_ovs_barrier_defer_revalidation(indigo_cxn_id_t cxn_id)
 {
@@ -63,6 +68,7 @@ ind_ovs_barrier_defer_revalidation(indigo_cxn_id_t cxn_id)
     }
 
     if (!blocked_cxn) {
+        debug_counter_inc(&blocked_cxns_full);
         AIM_LOG_WARN("blocked connection table full");
         revalidate();
         /* blocked_cxns table empty, retry */
@@ -135,6 +141,7 @@ static void
 barrier_timer(void *cookie)
 {
     AIM_LOG_VERBOSE("Barrier timer fired");
+    debug_counter_inc(&timer_expired);
     revalidate();
 }
 

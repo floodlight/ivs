@@ -37,6 +37,32 @@ static struct list_head ind_ovs_kflow_buckets[NUM_KFLOW_BUCKETS];
 static struct xbuf ind_ovs_kflow_stats_xbuf;
 static struct stats_writer *ind_ovs_kflow_stats_writer;
 
+DEBUG_COUNTER(add, "ovsdriver.kflow.add", "Kernel flow added");
+DEBUG_COUNTER(add_invalid_port, "ovsdriver.kflow.add_invalid_port",
+              "Kernel flow add failed due to invalid port number");
+DEBUG_COUNTER(add_kflow_limit, "ovsdriver.kflow.add_kflow_limit",
+              "Kernel flow add failed due to per-port limit");
+DEBUG_COUNTER(add_exists, "ovsdriver.kflow.add_exists",
+              "Kernel flow add skipped because it already exists");
+DEBUG_COUNTER(add_pipeline_failed, "ovsdriver.kflow.add_pipeline_failed",
+              "Kernel flow add failed due an error from the forwarding pipeline");
+DEBUG_COUNTER(add_kernel_failed, "ovsdriver.kflow.add_kernel_failed",
+              "Kernel flow add failed due an error from the kernel");
+DEBUG_COUNTER(sync_stats, "ovsdriver.kflow.sync_stats",
+              "Synchronized statistics from a kernel flow");
+DEBUG_COUNTER(sync_stats_failed, "ovsdriver.kflow.sync_stats_failed",
+              "Failed to synchronize statistics from a kernel flow");
+DEBUG_COUNTER(delete, "ovsdriver.kflow.delete", "Kernel flow deleted");
+DEBUG_COUNTER(revalidate, "ovsdriver.kflow.revalidate", "Kernel flow revalidated");
+DEBUG_COUNTER(revalidate_mask_changed, "ovsdriver.kflow.revalidate_mask_changed",
+              "Kernel flow mask changed when revalidating");
+DEBUG_COUNTER(revalidate_actions_changed, "ovsdriver.kflow.revalidate_actions_changed",
+              "Kernel flow actions changed when revalidating");
+DEBUG_COUNTER(revalidate_kernel_failed, "ovsdriver.kflow.revalidate_kernel_failed",
+              "Revalidating a kernel flow add failed due an error from the kernel");
+DEBUG_COUNTER(revalidate_time, "ovsdriver.kflow.revalidate_time",
+              "Time in microseconds spent revalidating kernel flows");
+
 static inline uint32_t
 key_hash(const struct nlattr *key)
 {
@@ -46,6 +72,8 @@ key_hash(const struct nlattr *key)
 indigo_error_t
 ind_ovs_kflow_add(const struct nlattr *key)
 {
+    debug_counter_inc(&add);
+
     /* Check input port accounting */
     struct nlattr *in_port_attr = nla_find(nla_data(key), nla_len(key), OVS_KEY_ATTR_IN_PORT);
     assert(in_port_attr);
@@ -53,11 +81,13 @@ ind_ovs_kflow_add(const struct nlattr *key)
     struct ind_ovs_port *port = ind_ovs_ports[in_port];
     if (port == NULL) {
         /* The port was deleted after the packet was queued to userspace. */
+        debug_counter_inc(&add_invalid_port);
         return INDIGO_ERROR_NONE;
     }
 
     if (!ind_ovs_benchmark_mode && port->num_kflows >= IND_OVS_MAX_KFLOWS_PER_PORT) {
         LOG_WARN("port %d (%s) exceeded allowed number of kernel flows", in_port, port->ifname);
+        debug_counter_inc(&add_kflow_limit);
         return INDIGO_ERROR_RESOURCE;
     }
 
@@ -75,6 +105,7 @@ ind_ovs_kflow_add(const struct nlattr *key)
         struct ind_ovs_kflow *kflow2 = container_of(cur, bucket_links, struct ind_ovs_kflow);
         if (nla_len(kflow2->key) == nla_len(key) &&
             memcmp(nla_data(kflow2->key), nla_data(key), nla_len(key)) == 0) {
+            debug_counter_inc(&add_exists);
             return INDIGO_ERROR_NONE;
         }
     }
@@ -101,6 +132,7 @@ ind_ovs_kflow_add(const struct nlattr *key)
     if (err < 0) {
         aim_free(kflow);
         ind_ovs_nlmsg_freelist_free(msg);
+        debug_counter_inc(&add_pipeline_failed);
         return err;
     }
 
@@ -120,6 +152,7 @@ ind_ovs_kflow_add(const struct nlattr *key)
 
     if (ind_ovs_transact(msg) < 0) {
         AIM_LOG_ERROR("Failed to insert kernel flow");
+        debug_counter_inc(&add_kernel_failed);
         aim_free(kflow->actions);
         aim_free(kflow);
         return INDIGO_ERROR_UNKNOWN;
@@ -152,12 +185,15 @@ ind_ovs_kflow_add(const struct nlattr *key)
 void
 ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow)
 {
+    debug_counter_inc(&sync_stats);
+
     struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_GET);
     nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(kflow->key), nla_data(kflow->key));
 
     struct nlmsghdr *reply;
     if (ind_ovs_transact_reply(msg, &reply) < 0) {
         LOG_WARN("failed to sync flow stats");
+        debug_counter_inc(&sync_stats_failed);
         return;
     }
 
@@ -232,6 +268,8 @@ ind_ovs_kflow_delete(struct ind_ovs_kflow *kflow)
     aim_free(kflow->actions);
     aim_free(kflow->stats_handles);
     aim_free(kflow);
+
+    debug_counter_inc(&delete);
 }
 
 /*
@@ -241,6 +279,8 @@ ind_ovs_kflow_delete(struct ind_ovs_kflow *kflow)
 void
 ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
 {
+    debug_counter_inc(&revalidate);
+
     struct ind_ovs_parsed_key pkey;
     ind_ovs_parse_key(kflow->key, &pkey);
 
@@ -268,6 +308,7 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
 
     if (memcmp(&mask, &kflow->mask, sizeof(mask))) {
         LOG_VERBOSE("Mask changed, deleting kernel flow");
+        debug_counter_inc(&revalidate_mask_changed);
         ind_ovs_nlmsg_freelist_free(msg);
         ind_ovs_kflow_delete(kflow);
         return;
@@ -291,6 +332,8 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
         memcmp(nla_data(actions), kflow->actions, nla_len(actions));
 
     if (actions_changed) {
+        debug_counter_inc(&revalidate_actions_changed);
+
         if (!ind_ovs_disable_megaflows) {
             struct nlattr *mask_attr = nla_nest_start(msg, OVS_FLOW_ATTR_MASK);
             assert(ATTR_BITMAP_TEST(mask.populated, OVS_KEY_ATTR_ETHERTYPE));
@@ -300,6 +343,7 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
 
         if (ind_ovs_transact(msg) < 0) {
             LOG_ERROR("Failed to modify kernel flow, deleting it");
+            debug_counter_inc(&revalidate_kernel_failed);
             ind_ovs_nlmsg_freelist_free(msg);
             ind_ovs_kflow_delete(kflow);
             return;
@@ -339,6 +383,7 @@ ind_ovs_kflow_invalidate_all(void)
     uint64_t elapsed = end_time - start_time;
     LOG_VERBOSE("invalidated %d kernel flows in %d us (%.3f us/flow)",
                 count, elapsed, (float)elapsed/count);
+    debug_counter_add(&revalidate_time, elapsed);
 }
 
 /*
