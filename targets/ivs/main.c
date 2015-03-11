@@ -45,6 +45,7 @@
 #include <pipeline/pipeline.h>
 #include <malloc.h>
 #include <sys/resource.h>
+#include <shared_debug_counter/shared_debug_counter.h>
 
 #define AIM_LOG_MODULE_NAME ivs
 #include <AIM/aim_log.h>
@@ -373,6 +374,8 @@ aim_main(int argc, char* argv[])
     }
 
     AIM_LOG_MSG("Starting %s (%s) pid %d", program_version, AIM_STRINGIFY(BUILD_ID), getpid());
+
+    shared_debug_counter_init();
 
     /* Increase maximum number of file descriptors */
     struct rlimit rlim = {

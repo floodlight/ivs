@@ -112,6 +112,10 @@ DEBUG_COUNTER(kflow_request_error, "ovsdriver.upcall.kflow_request_error", "Erro
 DEBUG_COUNTER(respawn, "ovsdriver.upcall.respawn", "Respawned upcall processes");
 DEBUG_COUNTER(respawn_time, "ovsdriver.upcall.respawn_time", "Total time in microseconds spent respawning upcall processes");
 
+SHARED_DEBUG_COUNTER(upcall, "ovsdriver.upcall", "Upcall from the kernel");
+SHARED_DEBUG_COUNTER(wakeup, "ovsdriver.upcall.wakeup", "Upcall process woken up");
+SHARED_DEBUG_COUNTER(upcall_time, "ovsdriver.upcall.time", "Total time in microseconds spent handling upcalls");
+
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC optimize (4)
 #endif
@@ -127,10 +131,14 @@ ind_ovs_upcall_thread_main(struct ind_ovs_upcall_thread *thread)
             LOG_ERROR("epoll_wait failed: %s", strerror(errno));
             abort();
         } else if (n > 0) {
+            debug_counter_inc(&wakeup);
+            uint64_t start_time = monotonic_us();
             int j;
             for (j = 0; j < n; j++) {
                 ind_ovs_handle_port_upcalls(thread, events[j].data.ptr);
             }
+            uint64_t elapsed = monotonic_us() - start_time;
+            debug_counter_add(&upcall_time, elapsed);
         }
     }
 }
@@ -191,6 +199,8 @@ ind_ovs_handle_port_upcalls(struct ind_ovs_upcall_thread *thread,
             break;
         }
     }
+
+    debug_counter_add(&upcall, count);
 }
 
 static void
