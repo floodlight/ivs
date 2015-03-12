@@ -313,16 +313,11 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname,
 
     port->is_uplink = ind_ovs_uplink_check_by_name(port->ifname);
 
-    /* Ensure port is fully populated before publishing it. */
-    __sync_synchronize();
-
     ind_ovs_ports[port_no] = port;
 
     if ((err = port_status_notify(port_no, OF_PORT_CHANGE_REASON_ADD)) < 0) {
         LOG_WARN("failed to notify controller of port addition");
         debug_counter_inc(&add_notify_failed);
-        /* Can't cleanup the port because it's already visible to other
-         * threads. */
     }
 
     ind_ovs_upcall_register(port);
