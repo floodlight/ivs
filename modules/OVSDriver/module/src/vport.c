@@ -856,6 +856,17 @@ link_change_cb(struct nl_cache *cache,
     const char *ifname = rtnl_link_get_name(link);
     int ifflags = rtnl_link_get_flags(link);
 
+    /* Automatically add uplinks to datapath */
+    if (action == 1 /* NL_ACT_NEW */ &&
+            ind_ovs_uplink_check_by_name(ifname) &&
+            !ind_ovs_port_lookup_by_name(ifname)) {
+        AIM_LOG_VERBOSE("Adding uplink %s", ifname);
+        if (indigo_port_interface_add((char *)ifname, OF_PORT_DEST_NONE, NULL)) {
+            AIM_LOG_ERROR("Failed to add uplink %s", ifname);
+        }
+        return;
+    }
+
     /*
      * Ignore additions/deletions, already handled by
      * ind_ovs_handle_vport_multicast.
