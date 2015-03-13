@@ -84,7 +84,7 @@ static int openflow_version = -1;
 static struct flowtable *flowtables[NUM_TABLES];
 static const indigo_core_table_ops_t table_ops;
 
-static struct ind_ovs_pktin_socket pktin_soc;
+struct ind_ovs_pktin_socket pktin_soc;
 
 static void
 pipeline_standard_init(const char *name)
@@ -169,7 +169,7 @@ pipeline_standard_process(struct ind_ovs_parsed_key *key,
         if (tcam_entry == NULL) {
             if (openflow_version < OF_VERSION_1_3) {
                 uint64_t userdata = IVS_PKTIN_USERDATA(OF_PACKET_IN_REASON_NO_MATCH, 0);
-                uint32_t netlink_port = ind_ovs_pktin_socket_lookup_netlink(&pktin_soc);
+                uint32_t netlink_port = ind_ovs_pktin_socket_netlink_port(&pktin_soc);
                 action_userspace(actx, &userdata, sizeof(uint64_t), netlink_port);
             }
             pipeline_add_stats(stats, &flowtable->missed_stats_handle);

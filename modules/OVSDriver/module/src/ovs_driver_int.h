@@ -297,4 +297,6 @@ extern bool ind_ovs_disable_megaflows;
  */
 extern uint32_t ind_ovs_salt;
 
+extern struct ind_ovs_pktin_socket pktout_soc;
+
 #endif

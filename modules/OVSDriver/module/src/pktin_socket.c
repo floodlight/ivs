@@ -82,14 +82,14 @@ ind_ovs_pktin_socket_ready(int socket_id, void *cookie,
 }
 
 uint32_t
-ind_ovs_pktin_socket_lookup_netlink(struct ind_ovs_pktin_socket *soc)
+ind_ovs_pktin_socket_netlink_port(struct ind_ovs_pktin_socket *soc)
 {
     return nl_socket_get_local_port(soc->pktin_socket);
 }
 
 void
 ind_ovs_pktin_socket_register(struct ind_ovs_pktin_socket *soc,
-                              ind_ovs_pktin_get_f callback,
+                              ind_ovs_pktin_cb_f callback,
                               uint32_t interval, uint32_t burst)
 {
     /* Create the netlink socket */

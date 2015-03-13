@@ -50,7 +50,7 @@ pipeline_standard_translate_actions(
         /* Output actions */
         case IND_OVS_ACTION_CONTROLLER: {
             uint64_t userdata = *XBUF_PAYLOAD(attr, uint64_t);
-            uint32_t netlink_port = ind_ovs_pktin_socket_lookup_netlink(&pktout_soc);
+            uint32_t netlink_port = ind_ovs_pktin_socket_netlink_port(&pktin_soc);
             action_userspace(ctx, &userdata, sizeof(uint64_t), netlink_port);
             break;
         }
