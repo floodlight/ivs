@@ -81,8 +81,16 @@ ind_ovs_pktin_socket_ready(int socket_id, void *cookie,
     nl_recvmsgs_default(soc->pktin_socket);
 }
 
+uint32_t
+ind_ovs_pktin_socket_lookup_netlink(struct ind_ovs_pktin_socket *soc)
+{
+    return nl_socket_get_local_port(soc->pktin_socket);
+}
+
 void
-ind_ovs_pktin_socket_register(struct ind_ovs_pktin_socket *soc)
+ind_ovs_pktin_socket_register(struct ind_ovs_pktin_socket *soc,
+                              ind_ovs_pktin_get_f callback,
+                              uint32_t interval, uint32_t burst)
 {
     /* Create the netlink socket */
     soc->pktin_socket = ind_ovs_create_nlsock();
@@ -104,6 +112,9 @@ ind_ovs_pktin_socket_register(struct ind_ovs_pktin_socket *soc)
         LOG_ERROR("failed to register socket");
         abort();
     }
+
+    soc->callback = callback;
+    aim_ratelimiter_init(&soc->pktin_limiter, interval, burst, NULL);
 
     nl_socket_modify_cb(soc->pktin_socket, NL_CB_VALID, NL_CB_CUSTOM,
                         ind_ovs_pktin_socket_recv, soc);

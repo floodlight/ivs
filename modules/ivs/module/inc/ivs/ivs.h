@@ -134,14 +134,16 @@ struct ind_ovs_port_counters {
     struct stats_handle tx_multicast_stats_handle;
 };
 
-typedef void (*ind_ovs_pktin_get) (uint8_t *data, unsigned int len,
+typedef void (*ind_ovs_pktin_get_f) (uint8_t *data, unsigned int len,
                                    uint8_t reason, uint64_t metadata,
                                    struct ind_ovs_parsed_key *pkey);
 struct ind_ovs_pktin_socket {
     struct nl_sock *pktin_socket; /* Netlink socket for packet-ins */
     aim_ratelimiter_t pktin_limiter; /* Ratelimiter for packet-ins recv'd on this socket */
-    ind_ovs_pktin_get callback; /* Callback to get packet-ins recv'd on this socket */
+    ind_ovs_pktin_get_f callback; /* Callback to get packet-ins recv'd on this socket */
 };
+
+extern struct ind_ovs_pktin_socket pktout_soc;
 
 /*
  * Exported from OVSDriver for use by the pipeline
@@ -157,7 +159,10 @@ void ind_ovs_barrier_defer_revalidation(indigo_cxn_id_t cxn_id);
 bool ind_ovs_uplink_check(of_port_no_t port_no);
 of_port_no_t ind_ovs_uplink_first(void);
 extern uint16_t ind_ovs_inband_vlan;
-void ind_ovs_pktin_socket_register(struct ind_ovs_pktin_socket *soc);
+uint32_t ind_ovs_pktin_socket_lookup_netlink(struct ind_ovs_pktin_socket *soc);
+void ind_ovs_pktin_socket_register(struct ind_ovs_pktin_socket *soc,
+                                   ind_ovs_pktin_get_f callback,
+                                   uint32_t interval, uint32_t burst);
 void ind_ovs_pktin_socket_unregister(struct ind_ovs_pktin_socket *soc);
 indigo_error_t ind_ovs_pktin(of_port_no_t in_port, uint8_t *data,
                              unsigned int len, uint8_t reason, uint64_t metadata,
