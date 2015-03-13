@@ -75,4 +75,7 @@ void pipeline_standard_translate_actions(
     struct action_context *ctx, struct xbuf *actions,
     uint32_t hash, struct xbuf *stats);
 
+/* Netlink socket to be used for receiving pktin's */
+extern struct ind_ovs_pktin_socket pktin_soc;
+
 #endif

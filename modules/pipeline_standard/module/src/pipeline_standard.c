@@ -39,6 +39,12 @@ AIM_LOG_STRUCT_DEFINE(AIM_LOG_OPTIONS_DEFAULT, AIM_LOG_BITS_DEFAULT, NULL, 0);
 
 #define NUM_TABLES 16
 
+/* Overall minimum average interval between packet-ins (in us) */
+#define PKTIN_INTERVAL 3000
+
+/* Overall packet-in burstiness tolerance. */
+#define PKTIN_BURST_SIZE 32
+
 struct flowtable {
     struct tcam *tcam;
     struct stats_handle matched_stats_handle;
@@ -78,6 +84,8 @@ static int openflow_version = -1;
 static struct flowtable *flowtables[NUM_TABLES];
 static const indigo_core_table_ops_t table_ops;
 
+struct ind_ovs_pktin_socket pktin_soc;
+
 static void
 pipeline_standard_init(const char *name)
 {
@@ -105,6 +113,9 @@ pipeline_standard_init(const char *name)
     if (openflow_version == OF_VERSION_1_3) {
         pipeline_standard_group_register();
     }
+
+    ind_ovs_pktin_socket_register(&pktin_soc, NULL, PKTIN_INTERVAL,
+                                  PKTIN_BURST_SIZE);
 }
 
 static void
@@ -122,6 +133,8 @@ pipeline_standard_finish(void)
     if (openflow_version == OF_VERSION_1_3) {
         pipeline_standard_group_unregister();
     }
+
+    ind_ovs_pktin_socket_unregister(&pktin_soc);
 }
 
 indigo_error_t
@@ -156,7 +169,8 @@ pipeline_standard_process(struct ind_ovs_parsed_key *key,
         if (tcam_entry == NULL) {
             if (openflow_version < OF_VERSION_1_3) {
                 uint64_t userdata = IVS_PKTIN_USERDATA(OF_PACKET_IN_REASON_NO_MATCH, 0);
-                action_controller(actx, userdata);
+                uint32_t netlink_port = ind_ovs_pktin_socket_netlink_port(&pktin_soc);
+                action_userspace(actx, &userdata, sizeof(uint64_t), netlink_port);
             }
             pipeline_add_stats(stats, &flowtable->missed_stats_handle);
             break;
