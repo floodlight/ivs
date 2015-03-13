@@ -51,7 +51,7 @@ bool ind_ovs_disable_megaflows = false;
 uint32_t ind_ovs_salt;
 uint16_t ind_ovs_inband_vlan = VLAN_INVALID;
 
-struct ind_ovs_pktin_socket pktout_soc;
+struct ind_ovs_pktin_socket ind_ovs_pktout_soc;
 
 static int
 ind_ovs_create_datapath(const char *name)
@@ -236,7 +236,7 @@ ind_ovs_init(const char *datapath_name)
     ind_ovs_port_init();
     ind_ovs_vlan_stats_init();
     ind_ovs_barrier_init();
-    ind_ovs_pktin_socket_register(&pktout_soc, NULL, PKTIN_INTERVAL,
+    ind_ovs_pktin_socket_register(&ind_ovs_pktout_soc, NULL, PKTIN_INTERVAL,
                                   PKTIN_BURST_SIZE);
 
     if ((ret = ind_ovs_create_datapath(datapath_name)) != 0) {
@@ -264,7 +264,7 @@ ind_ovs_finish(void)
 {
     ind_ovs_port_finish();
     ind_ovs_upcall_finish();
-    ind_ovs_pktin_socket_unregister(&pktout_soc);
+    ind_ovs_pktin_socket_unregister(&ind_ovs_pktout_soc);
     (void) ind_ovs_destroy_datapath();
     ind_ovs_nlmsg_freelist_finish();
 }

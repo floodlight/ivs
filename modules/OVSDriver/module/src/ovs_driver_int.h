@@ -297,6 +297,10 @@ extern bool ind_ovs_disable_megaflows;
  */
 extern uint32_t ind_ovs_salt;
 
-extern struct ind_ovs_pktin_socket pktout_soc;
+/*
+ * Netlink socket to be used for sending pktin's to the controller from
+ * pktout path.
+ */
+extern struct ind_ovs_pktin_socket ind_ovs_pktout_soc;
 
 #endif
