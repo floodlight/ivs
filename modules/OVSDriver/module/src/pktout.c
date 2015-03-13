@@ -226,7 +226,8 @@ translate_openflow_actions(of_list_action_t *actions, struct ind_ovs_parsed_key 
                 case OF_PORT_DEST_CONTROLLER: {
                     uint8_t reason = OF_PACKET_IN_REASON_ACTION;
                     uint64_t userdata = IVS_PKTIN_USERDATA(reason, 0);
-                    action_controller(&ctx, userdata);
+                    uint32_t netlink_port = ind_ovs_pktin_socket_lookup_netlink(&pktout_soc);
+                    action_userspace(&ctx, &userdata, sizeof(uint64_t), netlink_port);
                     break;
                 }
                 case OF_PORT_DEST_ALL:

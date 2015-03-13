@@ -48,9 +48,12 @@ pipeline_standard_translate_actions(
     XBUF_FOREACH(xbuf_data(xbuf), xbuf_length(xbuf), attr) {
         switch (attr->nla_type) {
         /* Output actions */
-        case IND_OVS_ACTION_CONTROLLER:
-            action_controller(ctx, *XBUF_PAYLOAD(attr, uint64_t));
+        case IND_OVS_ACTION_CONTROLLER: {
+            uint64_t userdata = *XBUF_PAYLOAD(attr, uint64_t);
+            uint32_t netlink_port = ind_ovs_pktin_socket_lookup_netlink(&pktout_soc);
+            action_userspace(ctx, &userdata, sizeof(uint64_t), netlink_port);
             break;
+        }
         case IND_OVS_ACTION_OUTPUT:
             action_output(ctx, *XBUF_PAYLOAD(attr, uint32_t));
             break;
