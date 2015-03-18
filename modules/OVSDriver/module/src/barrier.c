@@ -54,6 +54,12 @@ DEBUG_COUNTER(timer_expired, "ovsdriver.barrier.timer_expired",
 void
 ind_ovs_barrier_defer_revalidation(indigo_cxn_id_t cxn_id)
 {
+    /* If invalid cxn_id is passed, revalidate all flows */
+    if (INDIGO_CXN_INVALID(cxn_id)) {
+        ind_ovs_barrier_defer_revalidation_internal();
+        return;
+    }
+
     struct blocked_cxn *blocked_cxn = NULL;
     AIM_LOG_TRACE("deferring revalidation for cxn %d", cxn_id);
 
