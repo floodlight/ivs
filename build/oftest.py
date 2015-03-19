@@ -74,6 +74,7 @@ import signal
 import select
 import platform
 import logging
+import re
 
 # Prevent ratelimiters from causing test failures
 os.environ['INDIGO_BENCHMARK'] = '1'
@@ -263,6 +264,7 @@ class AbatTask(object):
 class AutotestIVS(object):
     def __init__(self, config):
         self.config = config
+        self.results = []
         if os.getenv("ABAT_TASK"):
             print "Running in ABAT."
             self.abat = AbatTask()
@@ -290,6 +292,8 @@ class AutotestIVS(object):
             print "Failing tests:"
             for test in results['FAILED']:
                 print test
+
+        self.outputResultXml()
 
     def runTest(self, test):
         if self.config.test_prefix:
@@ -327,7 +331,37 @@ class AutotestIVS(object):
         if self.abat:
             self.abat.updateTestcase(testName, result)
 
+        self.updateResultXml(testName, result, testLogDir)
+
         return result
+
+    def updateResultXml(self, testName, result, logDir):
+        self.results.append((testName, result, logDir))
+
+    def outputResultXml(self):
+        if not self.config.xml:
+            return
+
+        from xml.etree.ElementTree import Element, SubElement, Comment, tostring
+        from xml.dom import minidom
+        root = Element("testsuite", { 'tests': str(len(self.results)) })
+
+        for name, result, logDir in self.results:
+            def readLog(name):
+                return file(logDir + "/" + name).read()
+
+            classname, testname = name.rsplit(".", 1)
+            testcase = SubElement(root, 'testcase', { 'classname': classname, 'name': testname })
+            if result == 'FAILED':
+                failure = SubElement(testcase, 'failure', { 'type': 'Failure' })
+                failure.text = re.search(r'-{70}(.*?)-{70}', readLog("oft.stdout.log"), re.DOTALL).group(1).strip()
+                system_out = SubElement(testcase, 'system-out')
+                system_out.text = readLog("oft.log")
+                system_err = SubElement(testcase, 'system-err')
+                system_err.text = readLog("ivs.log")
+
+        with open(self.config.xml, 'w') as f:
+            f.write(minidom.parseString(tostring(root)).toprettyxml(indent="  "))
 
 if __name__ == "__main__":
     import argparse
@@ -343,6 +377,7 @@ if __name__ == "__main__":
     ap.add_argument("-V", "--openflow-version", help="OpenFlow version (1.0, 1.3)", default="1.0")
     ap.add_argument("--test-dir", help="Directory containing tests")
     ap.add_argument("--test-prefix", help="Prefix to use when reporting results")
+    ap.add_argument("--xml", help="Write a JUnit XML result file")
 
     config = ap.parse_args()
 
