@@ -63,6 +63,10 @@ AIM_LOG_STRUCT_DEFINE(
 #define BUILD_ID devel
 #endif
 
+#ifndef BUILD_OS
+#define BUILD_OS local
+#endif
+
 void ivs_cli_init(const char *path);
 
 static int
@@ -240,7 +244,7 @@ parse_options(int argc, char **argv)
             break;
 
         case OPT_VERSION:
-            printf("%s (%s)\n", program_version, AIM_STRINGIFY(BUILD_ID));
+            printf("%s (%s %s)\n", program_version, AIM_STRINGIFY(BUILD_ID), AIM_STRINGIFY(BUILD_OS));
             exit(0);
             break;
 
@@ -362,7 +366,9 @@ crash_handler(int signum)
 
     char name[16] = { 0 };
     prctl(PR_GET_NAME, name);
-    AIM_LOG_ERROR("%.16s %s killed by signal %d (%s)", name, AIM_STRINGIFY(BUILD_ID), signum, strsignal(signum));
+    AIM_LOG_ERROR("%.16s %s %s killed by signal %d (%s)",
+                  name, AIM_STRINGIFY(BUILD_ID), AIM_STRINGIFY(BUILD_OS),
+                  signum, strsignal(signum));
 
     /*
      * Log a backtrace
@@ -440,7 +446,7 @@ aim_main(int argc, char* argv[])
         aim_log_pvs_set_all(aim_pvs_syslog_open("ivs", LOG_NDELAY, LOG_DAEMON));
     }
 
-    AIM_LOG_MSG("Starting %s (%s) pid %d", program_version, AIM_STRINGIFY(BUILD_ID), getpid());
+    AIM_LOG_MSG("Starting %s (%s %s) pid %d", program_version, AIM_STRINGIFY(BUILD_ID), AIM_STRINGIFY(BUILD_OS), getpid());
 
     shared_debug_counter_init();
 

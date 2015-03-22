@@ -149,6 +149,10 @@ ifdef BUILD_ID
 GLOBAL_CFLAGS += "-DBUILD_ID=$(BUILD_ID)"
 endif
 
+ifdef BUILD_OS
+GLOBAL_CFLAGS += "-DBUILD_OS=$(BUILD_OS)"
+endif
+
 
 ucli:
 	$(INDIGO)/Tools/uclihandlers.py ucli.c
