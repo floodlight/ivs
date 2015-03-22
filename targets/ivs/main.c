@@ -26,8 +26,8 @@
  *
  *
  *****************************************************************************/
-#include <unistd.h>
 #include <AIM/aim.h>
+#include <unistd.h>
 #include <AIM/aim_pvs_syslog.h>
 #include <BigList/biglist.h>
 #include <indigo/port_manager.h>
@@ -394,6 +394,35 @@ crash_handler(int signum)
             offset += snprintf(buf+offset, buflen-offset, " 0x%"PRIx64, addr);
         }
         AIM_LOG_ERROR("backtrace:%s", buf);
+
+        /* If addr2line is installed, use it to log a human readable backtrace */
+        char *cmd;
+        FILE *tmp = tmpfile();
+        if (asprintf(&cmd, "addr2line -p -f -i -s -e /proc/%d/exe >/proc/self/fd/%d 2>&1", getpid(), fileno(tmp)) >= 0) {
+            FILE *addr2line = popen(cmd, "w");
+            for (i = 0; i < num_frames; i++) {
+                uintptr_t addr = (uintptr_t)bt[i] - 1;
+                fprintf(addr2line, "0x%"PRIx64"\n", addr);
+            }
+            int exitstatus = pclose(addr2line);
+            if (exitstatus != 0) {
+                if (WIFEXITED(exitstatus)) {
+                    if (WEXITSTATUS(exitstatus) == 127) {
+                        /* addr2line not installed */
+                        AIM_LOG_VERBOSE("addr2line is not installed");
+                    } else {
+                        AIM_LOG_ERROR("addr2line failed with exit status %d", WEXITSTATUS(exitstatus));
+                    }
+                }
+            } else {
+                AIM_LOG_ERROR("symbolic backtrace:");
+                char line[1024];
+                while (fgets(line, sizeof(line), tmp) != NULL) {
+                    *strchrnul(line, '\n') = 0; /* trim newline */
+                    AIM_LOG_ERROR("  %s", line);
+                }
+            }
+        }
     }
 
     _exit(0);
