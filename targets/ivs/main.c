@@ -46,6 +46,8 @@
 #include <malloc.h>
 #include <sys/resource.h>
 #include <shared_debug_counter/shared_debug_counter.h>
+#include <sys/prctl.h>
+#include <execinfo.h>
 
 #define AIM_LOG_MODULE_NAME ivs
 #include <AIM/aim_log.h>
@@ -328,9 +330,74 @@ sigterm(int signum)
     }
 }
 
+static void
+set_crash_handler(void (*handler)(int))
+{
+    signal(SIGILL, handler);
+    signal(SIGABRT, handler);
+    signal(SIGFPE, handler);
+    signal(SIGSEGV, handler);
+    signal(SIGBUS, handler);
+}
+
+static void
+crash_handler(int signum)
+{
+    /* It's possible that this signal handler will crash again due to the many
+     * signal-unsafe operations. We want the exit status and core for the
+     * original crash to be unaffected by this. So, we fork off a new process
+     * to log info about the crash and re-raise the signal in the parent.
+     */
+    if (fork() != 0) {
+        signal(signum, SIG_DFL);
+        kill(getpid(), signum);
+        abort(); /* should not be reached */
+    }
+
+    /* Avoid recursion */
+    set_crash_handler(SIG_DFL);
+
+    /* In case of deadlock */
+    alarm(1);
+
+    char name[16] = { 0 };
+    prctl(PR_GET_NAME, name);
+    AIM_LOG_ERROR("%.16s %s killed by signal %d (%s)", name, AIM_STRINGIFY(BUILD_ID), signum, strsignal(signum));
+
+    /*
+     * Log a backtrace
+     *
+     * We aren't using backtrace_symbols(3) because it doesn't know the names
+     * of static functions. Instead, developers should pass the hex backtrace
+     * to addr2line.
+     */
+    {
+        void *bt[20];
+        int num_frames = backtrace(bt, AIM_ARRAYSIZE(bt));
+        int buflen = num_frames * strlen(" 0x0123456789abcdef") + 1;
+        char *buf = aim_malloc(buflen);
+        int offset = 0;
+        int i;
+        for (i = 0; i < num_frames; i++) {
+            /* backtrace(3) returns the address of the next instruction after
+             * the call. This might not even be in the same function. While
+             * hacky, we get much better backtraces by subtracting 1 from the
+             * address to put it in the middle of the actual call instruction.
+             */
+            uintptr_t addr = (uintptr_t)bt[i] - 1;
+            offset += snprintf(buf+offset, buflen-offset, " 0x%"PRIx64, addr);
+        }
+        AIM_LOG_ERROR("backtrace:%s", buf);
+    }
+
+    _exit(0);
+}
+
 int
 aim_main(int argc, char* argv[])
 {
+    set_crash_handler(crash_handler);
+
     AIM_LOG_STRUCT_REGISTER();
 
     /*
