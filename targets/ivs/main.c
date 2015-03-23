@@ -26,8 +26,8 @@
  *
  *
  *****************************************************************************/
-#include <unistd.h>
 #include <AIM/aim.h>
+#include <unistd.h>
 #include <AIM/aim_pvs_syslog.h>
 #include <BigList/biglist.h>
 #include <indigo/port_manager.h>
@@ -46,6 +46,8 @@
 #include <malloc.h>
 #include <sys/resource.h>
 #include <shared_debug_counter/shared_debug_counter.h>
+#include <sys/prctl.h>
+#include <execinfo.h>
 
 #define AIM_LOG_MODULE_NAME ivs
 #include <AIM/aim_log.h>
@@ -59,6 +61,10 @@ AIM_LOG_STRUCT_DEFINE(
 
 #ifndef BUILD_ID
 #define BUILD_ID devel
+#endif
+
+#ifndef BUILD_OS
+#define BUILD_OS local
 #endif
 
 void ivs_cli_init(const char *path);
@@ -238,7 +244,7 @@ parse_options(int argc, char **argv)
             break;
 
         case OPT_VERSION:
-            printf("%s (%s)\n", program_version, AIM_STRINGIFY(BUILD_ID));
+            printf("%s (%s %s)\n", program_version, AIM_STRINGIFY(BUILD_ID), AIM_STRINGIFY(BUILD_OS));
             exit(0);
             break;
 
@@ -328,9 +334,105 @@ sigterm(int signum)
     }
 }
 
+static void
+set_crash_handler(void (*handler)(int))
+{
+    signal(SIGILL, handler);
+    signal(SIGABRT, handler);
+    signal(SIGFPE, handler);
+    signal(SIGSEGV, handler);
+    signal(SIGBUS, handler);
+}
+
+static void
+crash_handler(int signum)
+{
+    /* It's possible that this signal handler will crash again due to the many
+     * signal-unsafe operations. We want the exit status and core for the
+     * original crash to be unaffected by this. So, we fork off a new process
+     * to log info about the crash and re-raise the signal in the parent.
+     */
+    if (fork() != 0) {
+        signal(signum, SIG_DFL);
+        kill(getpid(), signum);
+        abort(); /* should not be reached */
+    }
+
+    /* Avoid recursion */
+    set_crash_handler(SIG_DFL);
+
+    /* In case of deadlock */
+    alarm(1);
+
+    char name[16] = { 0 };
+    prctl(PR_GET_NAME, name);
+    AIM_LOG_ERROR("%.16s %s %s killed by signal %d (%s)",
+                  name, AIM_STRINGIFY(BUILD_ID), AIM_STRINGIFY(BUILD_OS),
+                  signum, strsignal(signum));
+
+    /*
+     * Log a backtrace
+     *
+     * We aren't using backtrace_symbols(3) because it doesn't know the names
+     * of static functions. Instead, developers should pass the hex backtrace
+     * to addr2line.
+     */
+    {
+        void *bt[20];
+        int num_frames = backtrace(bt, AIM_ARRAYSIZE(bt));
+        int buflen = num_frames * strlen(" 0x0123456789abcdef") + 1;
+        char *buf = aim_malloc(buflen);
+        int offset = 0;
+        int i;
+        for (i = 0; i < num_frames; i++) {
+            /* backtrace(3) returns the address of the next instruction after
+             * the call. This might not even be in the same function. While
+             * hacky, we get much better backtraces by subtracting 1 from the
+             * address to put it in the middle of the actual call instruction.
+             */
+            uintptr_t addr = (uintptr_t)bt[i] - 1;
+            offset += snprintf(buf+offset, buflen-offset, " 0x%"PRIx64, addr);
+        }
+        AIM_LOG_ERROR("backtrace:%s", buf);
+
+        /* If addr2line is installed, use it to log a human readable backtrace */
+        char *cmd;
+        FILE *tmp = tmpfile();
+        if (asprintf(&cmd, "addr2line -p -f -i -s -e /proc/%d/exe >/proc/self/fd/%d 2>&1", getpid(), fileno(tmp)) >= 0) {
+            FILE *addr2line = popen(cmd, "w");
+            for (i = 0; i < num_frames; i++) {
+                uintptr_t addr = (uintptr_t)bt[i] - 1;
+                fprintf(addr2line, "0x%"PRIx64"\n", addr);
+            }
+            int exitstatus = pclose(addr2line);
+            if (exitstatus != 0) {
+                if (WIFEXITED(exitstatus)) {
+                    if (WEXITSTATUS(exitstatus) == 127) {
+                        /* addr2line not installed */
+                        AIM_LOG_VERBOSE("addr2line is not installed");
+                    } else {
+                        AIM_LOG_ERROR("addr2line failed with exit status %d", WEXITSTATUS(exitstatus));
+                    }
+                }
+            } else {
+                AIM_LOG_ERROR("symbolic backtrace:");
+                char line[1024];
+                while (fgets(line, sizeof(line), tmp) != NULL) {
+                    *strchrnul(line, '\n') = 0; /* trim newline */
+                    AIM_LOG_ERROR("  %s", line);
+                }
+            }
+        }
+    }
+
+    _exit(0);
+}
+
 int
 aim_main(int argc, char* argv[])
 {
+    set_crash_handler(crash_handler);
+
     AIM_LOG_STRUCT_REGISTER();
 
     /*
@@ -373,7 +475,7 @@ aim_main(int argc, char* argv[])
         aim_log_pvs_set_all(aim_pvs_syslog_open("ivs", LOG_NDELAY, LOG_DAEMON));
     }
 
-    AIM_LOG_MSG("Starting %s (%s) pid %d", program_version, AIM_STRINGIFY(BUILD_ID), getpid());
+    AIM_LOG_MSG("Starting %s (%s %s) pid %d", program_version, AIM_STRINGIFY(BUILD_ID), AIM_STRINGIFY(BUILD_OS), getpid());
 
     shared_debug_counter_init();
 

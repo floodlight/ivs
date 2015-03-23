@@ -23,6 +23,8 @@ cd "$ROOTDIR"
 
 : Build ID: ${BUILD_ID:=devel}
 
+BUILD_OS=centos7-x86_64
+
 BUILDDIR=$(mktemp -d)
 
 mkdir -p $BUILDDIR/SOURCES $BUILDDIR/RPMS
@@ -32,10 +34,10 @@ cp build/build-rhel-packages-inner.sh $BUILDDIR/build-rhel-packages-inner.sh
 cp rhel/ivs-7.0.spec $BUILDDIR/SOURCES
 tar -T <(./build/files.sh) -c -z -f $BUILDDIR/SOURCES/ivs.tar.gz --transform 's,^,ivs/,'
 
-docker.io run -e BUILD_ID=$BUILD_ID -v $BUILDDIR:/rpmbuild bigswitch/ivs-builder:centos7 /rpmbuild/build-rhel-packages-inner.sh
+docker.io run -e BUILD_ID=$BUILD_ID -e BUILD_OS=$BUILD_OS -v $BUILDDIR:/rpmbuild bigswitch/ivs-builder:centos7 /rpmbuild/build-rhel-packages-inner.sh
 
 # Copy built RPMs to pkg/
-OUTDIR=$(readlink -m "pkg/centos7-x86_64/$BUILD_ID")
+OUTDIR=$(readlink -m "pkg/$BUILD_OS/$BUILD_ID")
 rm -rf "$OUTDIR" && mkdir -p "$OUTDIR"
 mv $BUILDDIR/RPMS/x86_64/*.rpm "$OUTDIR"
 git log > "$OUTDIR/gitlog.txt"
