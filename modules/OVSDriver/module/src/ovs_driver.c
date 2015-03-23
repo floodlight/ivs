@@ -32,7 +32,6 @@
 #include "indigo/of_state_manager.h"
 
 static int ind_ovs_create_datapath(const char *name);
-static int ind_ovs_destroy_datapath(void);
 static void setup_inband(void);
 
 /* Log module "ovsdriver" */
@@ -61,37 +60,37 @@ ind_ovs_create_datapath(const char *name)
     assert(ind_ovs_dp_ifindex == 0);
     assert(strlen(name) < 256);
 
-    if ((ind_ovs_dp_ifindex = if_nametoindex(name)) != 0) {
-        /* Destroy existing datapath. */
-        (void) ind_ovs_destroy_datapath();
-    }
-
-    LOG_INFO("Creating kernel datapath %s", name);
-    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_datapath_family, OVS_DP_CMD_NEW);
-    nla_put_string(msg, OVS_DP_ATTR_NAME, name);
-    nla_put_u32(msg, OVS_DP_ATTR_UPCALL_PID, 0);
-    ret = ind_ovs_transact(msg);
-    if (ret != 0) {
-        return ret;
-    }
-
+    /* Check if datapath already exists */
     ind_ovs_dp_ifindex = if_nametoindex(name);
-    assert(ind_ovs_dp_ifindex > 0);
+
+    if (ind_ovs_dp_ifindex != 0) {
+        LOG_INFO("Reusing kernel datapath %s", name);
+
+        /* Remove existing flows from the datapath */
+        struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_DEL);
+        if (ind_ovs_transact(msg)) {
+            LOG_ERROR("Failed to delete existing flows from datapath");
+        }
+    } else {
+        LOG_INFO("Creating kernel datapath %s", name);
+        struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_datapath_family, OVS_DP_CMD_NEW);
+        nla_put_string(msg, OVS_DP_ATTR_NAME, name);
+        nla_put_u32(msg, OVS_DP_ATTR_UPCALL_PID, 0);
+        ret = ind_ovs_transact(msg);
+        if (ret != 0) {
+            return ret;
+        }
+        ind_ovs_dp_ifindex = if_nametoindex(name);
+        assert(ind_ovs_dp_ifindex > 0);
+    }
+
+    ind_ovs_multicast_resync();
 
     if (ind_ovs_inband_vlan != VLAN_INVALID) {
         setup_inband();
     }
 
     return ret;
-}
-
-static int
-ind_ovs_destroy_datapath(void)
-{
-    assert(ind_ovs_dp_ifindex != 0);
-    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_datapath_family, OVS_DP_CMD_DEL);
-    ind_ovs_dp_ifindex = 0;
-    return ind_ovs_transact(msg);
 }
 
 /*
@@ -151,6 +150,10 @@ static void
 setup_inband(void)
 {
     const char *ifname = "inband";
+
+    if (ind_ovs_port_lookup_by_name(ifname)) {
+        return;
+    }
 
     struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_NEW);
     nla_put_u32(msg, OVS_VPORT_ATTR_TYPE, OVS_VPORT_TYPE_INTERNAL);
@@ -249,10 +252,6 @@ ind_ovs_init(const char *datapath_name)
         return ret;
     }
 
-    /* Pretend we received a port created notification for the internal port */
-    of_mac_addr_t local_mac = { { 0, 0, 0, 0, 0, 0 } };
-    ind_ovs_port_added(OVSP_LOCAL, "local", OVS_VPORT_TYPE_INTERNAL, local_mac);
-
     if ((ret = ind_soc_timer_event_register(
         (ind_soc_timer_callback_f)ind_ovs_kflow_expire, NULL, 2345)) != 0) {
         LOG_ERROR("failed to create timer");
@@ -270,7 +269,6 @@ ind_ovs_finish(void)
     ind_ovs_port_finish();
     ind_ovs_upcall_finish();
     ind_ovs_pktin_socket_unregister(&ind_ovs_pktout_soc);
-    (void) ind_ovs_destroy_datapath();
     ind_ovs_nlmsg_freelist_finish();
 }
 

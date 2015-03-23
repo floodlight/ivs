@@ -175,6 +175,10 @@ indigo_error_t indigo_port_interface_add(
     assert(of_port < IND_OVS_MAX_PORTS || of_port == OF_PORT_DEST_NONE);
     assert(strlen(port_name) < 256);
 
+    if (ind_ovs_port_lookup_by_name(port_name)) {
+        return INDIGO_ERROR_NONE;
+    }
+
     struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_NEW);
     nla_put_u32(msg, OVS_VPORT_ATTR_TYPE, OVS_VPORT_TYPE_NETDEV);
     nla_put_string(msg, OVS_VPORT_ATTR_NAME, port_name);
@@ -191,6 +195,10 @@ ind_ovs_port_add_internal(const char *port_name)
 {
     if (strlen(port_name) >= 256) {
         return INDIGO_ERROR_PARAM;
+    }
+
+    if (ind_ovs_port_lookup_by_name(port_name)) {
+        return INDIGO_ERROR_NONE;
     }
 
     struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_NEW);
@@ -248,6 +256,10 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname,
     }
 
     debug_counter_inc(&add);
+
+    if (port_no == OVSP_LOCAL) {
+        ifname = "local";
+    }
 
     struct ind_ovs_port *port = aim_zmalloc(sizeof(*port));
 
