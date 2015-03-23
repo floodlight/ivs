@@ -411,9 +411,7 @@ kflow_sock_ready(int fd, void *cookie,
     }
 
     AIM_LOG_VERBOSE("Received kflow request");
-    if (ind_ovs_kflow_add(key) < 0) {
-        LOG_ERROR("Failed to insert kernel flow");
-    }
+    ind_ovs_kflow_add(key);
 }
 
 void
