@@ -211,38 +211,38 @@ ind_ovs_port_add_internal(const char *port_name)
     return ind_ovs_transact(msg);
 }
 
-indigo_error_t 
+indigo_error_t
 indigo_port_interface_list(indigo_port_info_t** list)
 {
     int i;
-    indigo_port_info_t* head = NULL; 
+    indigo_port_info_t* head = NULL;
 
-    if(list == NULL) { 
-        return INDIGO_ERROR_PARAM; 
+    if(list == NULL) {
+        return INDIGO_ERROR_PARAM;
     }
 
-    for (i = IND_OVS_MAX_PORTS-1; i >= 0; i--) { 
+    for (i = IND_OVS_MAX_PORTS-1; i >= 0; i--) {
         struct ind_ovs_port *port = ind_ovs_ports[i];
-        if(port != NULL) { 
+        if(port != NULL) {
             indigo_port_info_t* pi = aim_zmalloc(sizeof(*pi));
-            strncpy(pi->port_name, port->ifname, sizeof(port->ifname)); 
-            pi->of_port = i; 
-            pi->next = head; 
+            strncpy(pi->port_name, port->ifname, sizeof(port->ifname));
+            pi->of_port = i;
+            pi->next = head;
             head = pi;
         }
     }
-    *list = head; 
-    return 0; 
+    *list = head;
+    return 0;
 }
 
 
 void
 indigo_port_interface_list_destroy(indigo_port_info_t* list)
 {
-    while(list) { 
-        indigo_port_info_t* next = list->next; 
+    while(list) {
+        indigo_port_info_t* next = list->next;
         aim_free(list);
-        list = next; 
+        list = next;
     }
 }
 
