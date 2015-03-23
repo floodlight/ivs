@@ -152,7 +152,6 @@ extern uint32_t ind_ovs_salt;
 struct stats_handle *ind_ovs_rx_vlan_stats_select(uint16_t vlan_vid);
 struct stats_handle *ind_ovs_tx_vlan_stats_select(uint16_t vlan_vid);
 struct ind_ovs_port_counters *ind_ovs_port_stats_select(of_port_no_t port_no);
-uint32_t ind_ovs_port_lookup_netlink(of_port_no_t port_no);
 void ind_ovs_barrier_defer_revalidation(indigo_cxn_id_t cxn_id);
 bool ind_ovs_uplink_check(of_port_no_t port_no);
 of_port_no_t ind_ovs_uplink_first(void);

@@ -115,7 +115,6 @@ struct ind_ovs_port {
     unsigned is_uplink : 1;
     uint32_t num_kflows; /* Number of kflows with this in_port */
     struct nl_sock *notify_socket; /* Netlink socket for upcalls */
-    struct nl_sock *pktin_socket; /* Netlink socket for packet-ins */
     aim_ratelimiter_t upcall_log_limiter;
     aim_ratelimiter_t pktin_limiter;
     struct ind_ovs_upcall_thread *upcall_thread;
