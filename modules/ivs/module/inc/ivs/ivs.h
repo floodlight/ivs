@@ -79,7 +79,6 @@
     field(OVS_KEY_ATTR_ICMP,      icmp,      struct ovs_key_icmp) \
     field(OVS_KEY_ATTR_ICMPV6,    icmpv6,    struct ovs_key_icmpv6) \
     field(OVS_KEY_ATTR_ARP,       arp,       struct ovs_key_arp) \
-    field(OVS_KEY_ATTR_ND,        nd,        struct ovs_key_nd) \
     field(OVS_KEY_ATTR_TCP_FLAGS, tcp_flags, uint16_t)
 
 #define OVS_TUNNEL_KEY_FIELDS \
@@ -113,7 +112,6 @@ struct ind_ovs_parsed_key {
         struct ovs_key_icmp icmp;
         struct ovs_key_icmpv6 icmpv6;
         struct ovs_key_arp arp;
-        struct ovs_key_nd nd;
     };
     uint16_t tcp_flags;
     struct {
