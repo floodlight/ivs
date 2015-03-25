@@ -18,10 +18,36 @@
  ****************************************************************/
 
 /*
- *
+ * This module allows the user to see logs from the forwarding pipeline for a
+ * subset of packets.
  */
 
 #ifndef PACKET_TRACE_H
 #define PACKET_TRACE_H
+
+#include <stdint.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <AIM/aim_bitmap.h>
+
+void packet_trace_init(const char *name);
+
+void packet_trace_begin(uint32_t in_port);
+void packet_trace_end(void);
+void packet_trace_internal(const char *fmt, va_list vargs);
+void packet_trace_set_fd_bitmap(aim_bitmap_t *bitmap);
+
+extern bool packet_trace_enabled;
+
+static inline void
+packet_trace(const char *fmt, ...)
+{
+    if (__builtin_expect(packet_trace_enabled, false)) {
+        va_list vargs;
+        va_start(vargs, fmt);
+        packet_trace_internal(fmt, vargs);
+        va_end(vargs);
+    }
+}
 
 #endif
