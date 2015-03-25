@@ -48,6 +48,7 @@
 #include <shared_debug_counter/shared_debug_counter.h>
 #include <sys/prctl.h>
 #include <execinfo.h>
+#include <packet_trace/packet_trace.h>
 
 #define AIM_LOG_MODULE_NAME ivs
 #include <AIM/aim_log.h>
@@ -723,6 +724,8 @@ aim_main(int argc, char* argv[])
 
     /* Start handling upcalls */
     ind_ovs_enable();
+
+    packet_trace_init(datapath_name);
 
     ind_soc_select_and_run(-1);
 

@@ -36,6 +36,7 @@
 #include <sys/prctl.h>
 #include "SocketManager/socketmanager.h"
 #include "murmur/murmur.h"
+#include <packet_trace/packet_trace.h>
 
 #define DEFAULT_NUM_UPCALL_THREADS 4
 #define MAX_UPCALL_THREADS 16
@@ -571,6 +572,8 @@ ind_ovs_upcall_thread_init(struct ind_ovs_upcall_thread *thread)
             AIM_BITMAP_SET(fds, nl_socket_get_fd(port->notify_socket));
         }
     }
+
+    packet_trace_set_fd_bitmap(fds);
 
     /* Close all other file descriptors */
     for (i = 0; i < max_fds; i++) {
