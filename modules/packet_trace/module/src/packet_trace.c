@@ -20,7 +20,11 @@
 #include <packet_trace/packet_trace.h>
 #include <AIM/aim.h>
 #include <AIM/aim_list.h>
+#include <linux/un.h>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <SocketManager/socketmanager.h>
+#include <errno.h>
 
 #define AIM_LOG_MODULE_NAME packet_trace
 #include <AIM/aim_log.h>
@@ -28,11 +32,15 @@
 AIM_LOG_STRUCT_DEFINE(AIM_LOG_OPTIONS_DEFAULT, AIM_LOG_BITS_DEFAULT, NULL, 0);
 
 #define MAX_PORTS 1024
+#define READ_BUFFER_SIZE 1024
+#define LISTEN_BACKLOG 5
 
 struct client {
     struct list_links links;
     int fd;
     aim_bitmap_t ports;
+    int read_buffer_offset;
+    char read_buffer[READ_BUFFER_SIZE];
 };
 
 struct packet {
@@ -40,32 +48,51 @@ struct packet {
 };
 
 static bool check_subscribed(struct client *client);
+static void listen_callback(int socket_id, void *cookie, int read_ready, int write_ready, int error_seen);
+static void client_callback(int socket_id, void *cookie, int read_ready, int write_ready, int error_seen);
+static void destroy_client(struct client *client);
 
 bool packet_trace_enabled;
 static LIST_DEFINE(clients);
 static aim_pvs_t *pvs;
 static struct packet packet;
+static int listen_socket;
 
 void
 packet_trace_init(const char *name)
 {
     pvs = aim_pvs_buffer_create();
 
-    struct client *client = aim_zmalloc(sizeof(*client));
-    client->fd = STDERR_FILENO;
-    aim_bitmap_alloc(&client->ports, MAX_PORTS);
-    list_push(&clients, &client->links);
+    char path[UNIX_PATH_MAX];
+    snprintf(path, sizeof(path), "/var/run/ivs-packet-trace.%s.sock", name);
 
-    /* TODO allow user to select subset of ports */
-    AIM_BITMAP_SET_ALL(&client->ports);
+    unlink(path);
 
-    /* TODO create and register listening socket */
-}
+    listen_socket = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (listen_socket < 0) {
+        perror("socket (packet_trace)");
+        abort();
+    }
 
-void
-packet_trace_finish(void)
-{
-    /* TODO cleanup socket */
+    struct sockaddr_un saddr;
+    memset(&saddr, 0, sizeof(saddr));
+    saddr.sun_family = AF_UNIX;
+    strcpy(saddr.sun_path, path);
+
+    if (bind(listen_socket, (struct sockaddr *)&saddr, sizeof(saddr)) < 0) {
+        perror("bind (packet_trace)");
+        abort();
+    }
+
+    if (listen(listen_socket, LISTEN_BACKLOG) < 0) {
+        perror("listen (packet_trace)");
+        abort();
+    }
+
+    indigo_error_t rv = ind_soc_socket_register(listen_socket, listen_callback, NULL);
+    if (rv < 0) {
+        AIM_DIE("Failed to register packet_trace socket: %s", indigo_strerror(rv));
+    }
 }
 
 void
@@ -128,8 +155,117 @@ packet_trace_internal(const char *fmt, va_list vargs)
     aim_printf(pvs, "\n");
 }
 
+void
+packet_trace_set_fd_bitmap(aim_bitmap_t *bitmap)
+{
+    list_links_t *cur;
+    LIST_FOREACH(&clients, cur) {
+        struct client *client = container_of(cur, links, struct client);
+        AIM_BITMAP_SET(bitmap, client->fd);
+    }
+}
+
 static bool
 check_subscribed(struct client *client)
 {
     return AIM_BITMAP_GET(&client->ports, packet.in_port);
+}
+
+static void
+listen_callback(
+    int socket_id,
+    void *cookie,
+    int read_ready,
+    int write_ready,
+    int error_seen)
+{
+    AIM_LOG_TRACE("Accepting packet_trace client");
+
+    int fd;
+    if ((fd = accept(listen_socket, NULL, NULL)) < 0) {
+        AIM_LOG_ERROR("Failed to accept on packet_trace socket: %s", strerror(errno));
+        return;
+    }
+
+    struct client *client = aim_zmalloc(sizeof(*client));
+    list_push(&clients, &client->links);
+    client->fd = fd;
+    aim_bitmap_alloc(&client->ports, MAX_PORTS);
+
+    /* TODO allow user to select subset of ports */
+    AIM_BITMAP_SET_ALL(&client->ports);
+
+    indigo_error_t rv = ind_soc_socket_register(fd, client_callback, client);
+    if (rv < 0) {
+        AIM_LOG_ERROR("Failed to register packet_trace client socket: %s", indigo_strerror(rv));
+        return;
+    }
+}
+
+static void
+client_callback(
+    int socket_id,
+    void *cookie,
+    int read_ready,
+    int write_ready,
+    int error_seen)
+{
+    struct client *client = cookie;
+    AIM_ASSERT(socket_id == client->fd);
+
+    if (error_seen) {
+        int socket_error = 0;
+        socklen_t len = sizeof(socket_error);
+        getsockopt(socket_id, SOL_SOCKET, SO_ERROR, &socket_error, &len);
+        AIM_LOG_TRACE("Error seen on packet_trace socket: %s", strerror(socket_error));
+        destroy_client(client);
+        return;
+    }
+
+    if (read_ready) {
+        int c;
+        if ((c = read(client->fd, client->read_buffer+client->read_buffer_offset,
+                      READ_BUFFER_SIZE - client->read_buffer_offset)) < 0) {
+            AIM_LOG_ERROR("read failed: %s", strerror(errno));
+            return;
+        }
+
+        client->read_buffer_offset += c;
+
+        if (c == 0) {
+            /* Peer has shutdown their write side */
+            destroy_client(client);
+            return;
+        }
+
+        /* Process each complete line */
+        char *newline;
+        char *start = client->read_buffer;
+        int remaining = client->read_buffer_offset;
+        while ((newline = memchr(start, '\n', remaining))) {
+            *newline = '\0';
+            /* TODO process line */
+            remaining -= newline - start + 1;
+            start = newline + 1;
+        }
+
+        /* Move incomplete line (which may be empty) to the beginning of the read buffer */
+        if (client->read_buffer != start) {
+            memmove(client->read_buffer, start, remaining);
+            client->read_buffer_offset = remaining;
+        } else if (client->read_buffer_offset == READ_BUFFER_SIZE) {
+            AIM_LOG_WARN("Disconnecting packet_trace client due to too-long line");
+            destroy_client(client);
+            return;
+        }
+    }
+}
+
+static void
+destroy_client(struct client *client)
+{
+    ind_soc_socket_unregister(client->fd);
+    close(client->fd);
+    list_remove(&client->links);
+    aim_free(client);
 }
