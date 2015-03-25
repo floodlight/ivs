@@ -42,4 +42,7 @@ void pipeline_standard_match_to_cfr(const of_match_t *match, struct pipeline_sta
 /* Log a readable version of the CFR */
 void pipeline_standard_dump_cfr(const struct pipeline_standard_cfr *cfr);
 
+/* packet_trace a readable version of the CFR */
+void pipeline_standard_trace_cfr(const struct pipeline_standard_cfr *cfr);
+
 #endif

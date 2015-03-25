@@ -28,6 +28,7 @@
 #include <indigo/indigo.h>
 #include <indigo/of_state_manager.h>
 #include <murmur/murmur.h>
+#include <packet_trace/packet_trace.h>
 #include "cfr.h"
 #include "action.h"
 #include "group.h"
@@ -146,8 +147,8 @@ pipeline_standard_process(struct ind_ovs_parsed_key *key,
     struct pipeline_standard_cfr cfr;
     pipeline_standard_key_to_cfr(key, &cfr);
 
-    AIM_LOG_VERBOSE("CFR:");
-    pipeline_standard_dump_cfr(&cfr);
+    packet_trace("packet fields:");
+    pipeline_standard_trace_cfr(&cfr);
 
     struct pipeline_standard_cfr cfr_mask;
     memset(&cfr_mask, 0, sizeof(cfr_mask));
@@ -157,26 +158,38 @@ pipeline_standard_process(struct ind_ovs_parsed_key *key,
 
     uint8_t table_id = 0;
     if (flowtables[table_id] == NULL) {
-        AIM_LOG_VERBOSE("table 0 missing, dropping packet");
+        packet_trace("table 0 missing, dropping packet");
         return INDIGO_ERROR_NONE;
     }
 
     while (table_id != (uint8_t)-1) {
+        packet_trace("table %u", table_id);
         struct flowtable *flowtable = flowtables[table_id];
         AIM_ASSERT(flowtable != NULL);
 
         struct tcam_entry *tcam_entry = tcam_match_and_mask(flowtable->tcam, &cfr, &cfr_mask);
         if (tcam_entry == NULL) {
             if (openflow_version < OF_VERSION_1_3) {
+                packet_trace("table miss, sending to controller");
                 uint64_t userdata = IVS_PKTIN_USERDATA(OF_PACKET_IN_REASON_NO_MATCH, 0);
                 uint32_t netlink_port = ind_ovs_pktin_socket_netlink_port(&pktin_soc);
                 action_userspace(actx, &userdata, sizeof(uint64_t), netlink_port);
+            } else {
+                packet_trace("table miss, dropping");
             }
             pipeline_add_stats(stats, &flowtable->missed_stats_handle);
             break;
         }
 
         struct flowtable_entry *entry = container_of(tcam_entry, tcam_entry, struct flowtable_entry);
+
+        if (packet_trace_enabled) {
+            packet_trace("hit flowtable entry");
+            packet_trace("fields:");
+            pipeline_standard_trace_cfr((const struct pipeline_standard_cfr *)entry->tcam_entry.key);
+            packet_trace("mask:");
+            pipeline_standard_trace_cfr((const struct pipeline_standard_cfr *)entry->tcam_entry.mask);
+        }
 
         if (entry->table_miss) {
             pipeline_add_stats(stats, &flowtable->missed_stats_handle);
