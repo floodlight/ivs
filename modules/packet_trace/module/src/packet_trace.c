@@ -51,6 +51,7 @@ static bool check_subscribed(struct client *client);
 static void listen_callback(int socket_id, void *cookie, int read_ready, int write_ready, int error_seen);
 static void client_callback(int socket_id, void *cookie, int read_ready, int write_ready, int error_seen);
 static void destroy_client(struct client *client);
+static void process_command(struct client *client, char *command);
 
 bool packet_trace_enabled;
 static LIST_DEFINE(clients);
@@ -192,9 +193,6 @@ listen_callback(
     client->fd = fd;
     aim_bitmap_alloc(&client->ports, MAX_PORTS);
 
-    /* TODO allow user to select subset of ports */
-    AIM_BITMAP_SET_ALL(&client->ports);
-
     indigo_error_t rv = ind_soc_socket_register(fd, client_callback, client);
     if (rv < 0) {
         AIM_LOG_ERROR("Failed to register packet_trace client socket: %s", indigo_strerror(rv));
@@ -244,7 +242,7 @@ client_callback(
         int remaining = client->read_buffer_offset;
         while ((newline = memchr(start, '\n', remaining))) {
             *newline = '\0';
-            /* TODO process line */
+            process_command(client, start);
             remaining -= newline - start + 1;
             start = newline + 1;
         }
@@ -268,4 +266,57 @@ destroy_client(struct client *client)
     close(client->fd);
     list_remove(&client->links);
     aim_free(client);
+}
+
+static void
+reply(struct client *client, const char *fmt, ...)
+{
+    va_list vargs;
+    va_start(vargs, fmt);
+    dprintf(client->fd, fmt, vargs);
+    va_end(vargs);
+}
+
+static void
+process_add_command(struct client *client, const char **argv, int argc)
+{
+    if (!strcmp(argv[0], "port")) {
+        if (argc != 2) {
+            reply(client, "expected 2 arguments\n");
+            return;
+        }
+        uint32_t port = atoi(argv[1]);
+        if (port >= MAX_PORTS) {
+            reply(client, "invalid port number\n");
+        } else {
+            AIM_BITMAP_SET(&client->ports, port);
+        }
+    } else if (!strcmp(argv[0], "all")) {
+        if (argc != 1) {
+            reply(client, "expected 1 argument\n");
+            return;
+        }
+        AIM_BITMAP_SET_ALL(&client->ports);
+    } else {
+        reply(client, "unexpected filter type\n");
+    }
+}
+
+static void
+process_command(struct client *client, char *command)
+{
+    aim_tokens_t *tokens = aim_strsplit(command, " ");
+
+    if (tokens->count < 1) {
+        /* ignore empty line */
+    } else {
+        const char *cmd = tokens->tokens[0];
+        if (!strcmp(cmd, "add")) {
+            process_add_command(client, tokens->tokens+1, tokens->count-1);
+        } else {
+            reply(client, "unknown command\n");
+        }
+    }
+
+    aim_tokens_free(tokens);
 }
