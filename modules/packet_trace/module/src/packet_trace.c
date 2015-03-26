@@ -26,6 +26,7 @@
 #include <SocketManager/socketmanager.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <ivs/ivs.h>
 
 #define AIM_LOG_MODULE_NAME packet_trace
 #include <AIM/aim_log.h>
@@ -272,6 +273,7 @@ destroy_client(struct client *client)
     close(client->fd);
     list_remove(&client->links);
     aim_free(client);
+    ind_ovs_barrier_defer_revalidation(-1);
 }
 
 static void
@@ -296,6 +298,7 @@ process_add_command(struct client *client, const char **argv, int argc)
             reply(client, "invalid port number\n");
         } else {
             AIM_BITMAP_SET(&client->ports, port);
+            ind_ovs_barrier_defer_revalidation(-1);
         }
     } else if (!strcmp(argv[0], "all")) {
         if (argc != 1) {
@@ -303,6 +306,7 @@ process_add_command(struct client *client, const char **argv, int argc)
             return;
         }
         AIM_BITMAP_SET_ALL(&client->ports);
+        ind_ovs_barrier_defer_revalidation(-1);
     } else {
         reply(client, "unexpected filter type\n");
     }
