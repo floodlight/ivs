@@ -110,17 +110,6 @@ ind_ovs_port_lookup_by_name(const char *ifname)
     return NULL;
 }
 
-uint32_t
-ind_ovs_port_lookup_netlink(of_port_no_t port_no)
-{
-    struct ind_ovs_port *port = ind_ovs_port_lookup(port_no);
-    if (port == NULL) {
-        return 0;
-    }
-
-    return nl_socket_get_local_port(port->pktin_socket);
-}
-
 /* TODO populate more fields of the port desc */
 indigo_error_t indigo_port_features_get(
     of_features_reply_t *features)
@@ -211,38 +200,38 @@ ind_ovs_port_add_internal(const char *port_name)
     return ind_ovs_transact(msg);
 }
 
-indigo_error_t 
+indigo_error_t
 indigo_port_interface_list(indigo_port_info_t** list)
 {
     int i;
-    indigo_port_info_t* head = NULL; 
+    indigo_port_info_t* head = NULL;
 
-    if(list == NULL) { 
-        return INDIGO_ERROR_PARAM; 
+    if(list == NULL) {
+        return INDIGO_ERROR_PARAM;
     }
 
-    for (i = IND_OVS_MAX_PORTS-1; i >= 0; i--) { 
+    for (i = IND_OVS_MAX_PORTS-1; i >= 0; i--) {
         struct ind_ovs_port *port = ind_ovs_ports[i];
-        if(port != NULL) { 
+        if(port != NULL) {
             indigo_port_info_t* pi = aim_zmalloc(sizeof(*pi));
-            strncpy(pi->port_name, port->ifname, sizeof(port->ifname)); 
-            pi->of_port = i; 
-            pi->next = head; 
+            strncpy(pi->port_name, port->ifname, sizeof(port->ifname));
+            pi->of_port = i;
+            pi->next = head;
             head = pi;
         }
     }
-    *list = head; 
-    return 0; 
+    *list = head;
+    return 0;
 }
 
 
 void
 indigo_port_interface_list_destroy(indigo_port_info_t* list)
 {
-    while(list) { 
-        indigo_port_info_t* next = list->next; 
+    while(list) {
+        indigo_port_info_t* next = list->next;
         aim_free(list);
-        list = next; 
+        list = next;
     }
 }
 
@@ -280,16 +269,6 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname,
         goto cleanup_port;
     }
 
-    port->pktin_socket = ind_ovs_create_nlsock();
-    if (port->pktin_socket == NULL) {
-        goto cleanup_port;
-    }
-
-    if (nl_socket_set_nonblocking(port->pktin_socket) < 0) {
-        LOG_ERROR("failed to set netlink socket nonblocking");
-        goto cleanup_port;
-    }
-
     struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_SET);
     nla_put_u32(msg, OVS_VPORT_ATTR_PORT_NO, port_no);
     nla_put_u32(msg, OVS_VPORT_ATTR_UPCALL_PID,
@@ -321,7 +300,6 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname,
     }
 
     ind_ovs_upcall_register(port);
-    ind_ovs_pktin_register(port);
     LOG_INFO("Added %s %s", port->is_uplink ? "uplink" : "port", port->ifname);
     ind_ovs_barrier_defer_revalidation_internal();
     return;
@@ -331,9 +309,6 @@ cleanup_port:
     assert(ind_ovs_ports[port_no] == NULL);
     if (port->notify_socket) {
         nl_socket_free(port->notify_socket);
-    }
-    if (port->pktin_socket) {
-        nl_socket_free(port->pktin_socket);
     }
     free_port_counters(&port->pcounters);
     aim_free(port);
@@ -367,7 +342,6 @@ ind_ovs_port_deleted(uint32_t port_no)
 
     debug_counter_inc(&delete);
 
-    ind_ovs_pktin_unregister(port);
     ind_ovs_upcall_unregister(port);
 
     if (port_status_notify(port_no, OF_PORT_CHANGE_REASON_DELETE) < 0) {
@@ -378,7 +352,6 @@ ind_ovs_port_deleted(uint32_t port_no)
     LOG_INFO("Deleted %s %s", port->is_uplink ? "uplink" : "port", port->ifname);
 
     nl_socket_free(port->notify_socket);
-    nl_socket_free(port->pktin_socket);
     free_port_counters(&port->pcounters);
     aim_free(port);
     ind_ovs_ports[port_no] = NULL;

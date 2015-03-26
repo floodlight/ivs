@@ -48,15 +48,6 @@ action_context_init(struct action_context *ctx,
  * Output actions
  */
 
-/* Send the packet back to an upcall thread with the given userdata */
-void
-action_controller(struct action_context *ctx, uint64_t userdata)
-{
-    uint32_t netlink_port = ind_ovs_port_lookup_netlink(ctx->current_key.in_port);
-
-    action_userspace(ctx, &userdata, sizeof(uint64_t), netlink_port);
-}
-
 /* Send the packet back to an upcall thread with the given userdata
    on the specified netlink socket */
 void
@@ -97,17 +88,10 @@ action_output_in_port(struct action_context *ctx)
 
 /*
  * Randomly send the packet back to an upcall thread with the given userdata
+ * on the specified netlink socket
  *
  * The probability is a fraction of UINT32_MAX.
  */
-void
-action_sample_to_controller(struct action_context *ctx, uint64_t userdata, uint32_t probability)
-{
-    uint32_t netlink_port = ind_ovs_port_lookup_netlink(ctx->current_key.in_port);
-
-    action_sample_to_userspace(ctx, &userdata, sizeof(uint64_t), netlink_port, probability);
-}
-
 void
 action_sample_to_userspace(struct action_context *ctx, void *userdata, int datalen,
                            uint32_t netlink_port, uint32_t probability)
