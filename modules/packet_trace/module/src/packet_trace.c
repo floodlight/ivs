@@ -25,6 +25,7 @@
 #include <sys/socket.h>
 #include <SocketManager/socketmanager.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #define AIM_LOG_MODULE_NAME packet_trace
 #include <AIM/aim_log.h>
@@ -186,6 +187,11 @@ listen_callback(
     if ((fd = accept(listen_socket, NULL, NULL)) < 0) {
         AIM_LOG_ERROR("Failed to accept on packet_trace socket: %s", strerror(errno));
         return;
+    }
+
+    int soc_flags = fcntl(fd, F_GETFL, 0);
+    if (soc_flags == -1 || fcntl(fd, F_SETFL, soc_flags | O_NONBLOCK) == -1) {
+        AIM_LOG_WARN("Failed to set non-blocking flag for socket: %s", strerror(errno));
     }
 
     struct client *client = aim_zmalloc(sizeof(*client));
