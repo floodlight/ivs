@@ -125,7 +125,7 @@ packet_trace_end(void)
     }
 
     char *buf = aim_pvs_buffer_get(pvs);
-    int len = aim_pvs_buffer_size(pvs);
+    int len = strlen(buf);
     aim_pvs_buffer_reset(pvs);
 
     list_links_t *cur;
