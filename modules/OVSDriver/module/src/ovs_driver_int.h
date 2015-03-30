@@ -186,7 +186,8 @@ struct ind_ovs_port *ind_ovs_port_lookup_by_name(const char *ifname);
 /* Interface of the uplink submodule */
 bool ind_ovs_uplink_check_by_name(const char *name);
 bool ind_ovs_uplink_check(of_port_no_t port_no);
-of_port_no_t ind_ovs_uplink_first(void);
+of_port_no_t ind_ovs_uplink_select(void);
+void ind_ovs_uplink_reselect(void);
 
 /* Interface of the upcall submodule */
 void ind_ovs_upcall_init(void);

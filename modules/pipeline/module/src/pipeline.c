@@ -143,7 +143,7 @@ pipeline_process(struct ind_ovs_parsed_key *key,
             /* fall through */
         } else if (key->in_port == IVS_INBAND_PORT) {
             AIM_LOG_VERBOSE("Sending in-band management packet from internal port to uplink");
-            uint32_t port = ind_ovs_uplink_first();
+            uint32_t port = ind_ovs_uplink_select();
             if (port != OF_PORT_DEST_NONE) {
                 action_push_vlan(actx);
                 action_set_vlan_vid(actx, ind_ovs_inband_vlan);
