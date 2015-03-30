@@ -55,8 +55,6 @@ struct ind_ovs_pktin_socket ind_ovs_pktout_soc;
 static int
 ind_ovs_create_datapath(const char *name)
 {
-    int ret;
-
     assert(ind_ovs_dp_ifindex == 0);
     assert(strlen(name) < 256);
 
@@ -76,7 +74,7 @@ ind_ovs_create_datapath(const char *name)
         struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_datapath_family, OVS_DP_CMD_NEW);
         nla_put_string(msg, OVS_DP_ATTR_NAME, name);
         nla_put_u32(msg, OVS_DP_ATTR_UPCALL_PID, 0);
-        ret = ind_ovs_transact(msg);
+        int ret = ind_ovs_transact(msg);
         if (ret != 0) {
             return ret;
         }
@@ -90,7 +88,7 @@ ind_ovs_create_datapath(const char *name)
         setup_inband();
     }
 
-    return ret;
+    return 0;
 }
 
 /*
