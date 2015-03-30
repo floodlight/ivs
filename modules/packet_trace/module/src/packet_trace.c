@@ -62,6 +62,12 @@ static struct packet packet;
 static int listen_socket;
 
 void
+__packet_trace_module_init__(void)
+{
+    AIM_LOG_STRUCT_REGISTER();
+}
+
+void
 packet_trace_init(const char *name)
 {
     pvs = aim_pvs_buffer_create();
@@ -103,7 +109,7 @@ packet_trace_begin(uint32_t in_port)
 {
     packet.in_port = in_port;
 
-    packet_trace_enabled = false;
+    packet_trace_enabled = AIM_LOG_ENABLED_FAST(VERBOSE);
 
     list_links_t *cur;
     LIST_FOREACH(&clients, cur) {
@@ -151,9 +157,27 @@ packet_trace_end(void)
     aim_free(buf);
 }
 
+static void
+packet_trace_internal_log(const char *fmt, va_list vargs)
+{
+    va_list vargs2;
+    va_copy(vargs2, vargs);
+    char newfmt[strlen(fmt) + 32];
+    snprintf(newfmt, sizeof(newfmt)-1, "[packet_trace] %s", fmt);
+    aim_log_common(
+        AIM_LOG_STRUCT_POINTER, AIM_LOG_FLAG_VERBOSE,
+        NULL, 0, __func__, __FILE__, __LINE__,
+        newfmt, vargs);
+    va_end(vargs2);
+}
+
 void
 packet_trace_internal(const char *fmt, va_list vargs)
 {
+    if (__builtin_expect(AIM_LOG_ENABLED_FAST(VERBOSE), false)) {
+        packet_trace_internal_log(fmt, vargs);
+    }
+
     aim_vprintf(pvs, fmt, vargs);
     aim_printf(pvs, "\n");
 }
