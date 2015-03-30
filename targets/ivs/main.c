@@ -488,6 +488,15 @@ aim_main(int argc, char* argv[])
         AIM_LOG_WARN("Failed to increase RLIMIT_NOFILE");
     }
 
+    /* Add uplink names from command line */
+    {
+        biglist_t *element;
+        char *str;
+        BIGLIST_FOREACH_DATA(element, uplinks, char *, str) {
+            ind_ovs_uplink_add(str);
+        }
+    }
+
     /* Initialize all modules */
 
     if (ind_soc_init(&soc_cfg) < 0) {
@@ -575,7 +584,6 @@ aim_main(int argc, char* argv[])
             if (indigo_port_interface_add(str, port_no, NULL)) {
                 AIM_LOG_ERROR("Failed to add uplink %s", str);
             }
-            ind_ovs_uplink_add(str);
             port_no++;
         }
     }

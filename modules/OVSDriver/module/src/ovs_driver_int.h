@@ -198,6 +198,7 @@ void ind_ovs_upcall_respawn(void);
 
 /* Interface of the multicast submodule */
 void ind_ovs_multicast_init(void);
+void ind_ovs_multicast_resync(void);
 
 /* Interface of the group submodule */
 void ind_ovs_group_module_init(void);

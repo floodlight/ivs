@@ -145,13 +145,22 @@ ind_ovs_handle_multicast(void)
         AIM_LOG_WARN("Multicast socket overrun");
         debug_counter_inc(&overrun);
 
-        /* Request dump of vports */
-        struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_GET);
-        nlmsg_hdr(msg)->nlmsg_flags |= NLM_F_DUMP;
-        if (nl_send_auto(ind_ovs_multicast_socket, msg) < 0) {
-            AIM_LOG_ERROR("Failed to request vport dump");
-        }
-        ind_ovs_nlmsg_freelist_free(msg);
+        ind_ovs_multicast_resync();
+    }
+}
+
+void
+ind_ovs_multicast_resync(void)
+{
+    /* Request dump of vports */
+    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_GET);
+    nlmsg_hdr(msg)->nlmsg_flags |= NLM_F_DUMP;
+    if (nl_send_auto(ind_ovs_multicast_socket, msg) < 0) {
+        AIM_LOG_ERROR("Failed to request vport dump");
+    }
+    ind_ovs_nlmsg_freelist_free(msg);
+    if (nl_recvmsgs_default(ind_ovs_multicast_socket) < 0) {
+        AIM_LOG_ERROR("Failed to receive vport dump");
     }
 }
 
