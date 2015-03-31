@@ -26,6 +26,7 @@
 #include <action/action.h>
 #include <indigo/of_state_manager.h>
 #include <pipeline/pipeline.h>
+#include <packet_trace/packet_trace.h>
 #include "group.h"
 
 #define AIM_LOG_MODULE_NAME pipeline_standard
@@ -115,6 +116,7 @@ pipeline_standard_translate_actions(
             action_set_ipv6_ecn(ctx, *XBUF_PAYLOAD(attr, uint8_t));
             break;
         case IND_OVS_ACTION_DEC_NW_TTL:
+            packet_trace("action: dec-ttl");
             /* Special cased because it can drop the packet */
             if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV4)) {
                 ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV4);
@@ -196,7 +198,10 @@ process_group(
     struct action_context *ctx, struct group *group,
     uint32_t hash, struct xbuf *stats)
 {
+    packet_trace("group %u type %u", group->id, group->type);
+
     if (group->value.num_buckets == 0) {
+        packet_trace("empty group");
         return;
     }
 

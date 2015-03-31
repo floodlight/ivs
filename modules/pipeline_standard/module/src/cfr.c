@@ -21,6 +21,7 @@
 #include <byteswap.h>
 #include <linux/if_ether.h>
 #include <arpa/inet.h>
+#include <packet_trace/packet_trace.h>
 #include "cfr.h"
 
 #define AIM_LOG_MODULE_NAME pipeline_standard
@@ -240,6 +241,37 @@ pipeline_standard_dump_cfr(const struct pipeline_standard_cfr *cfr)
     }
 
 #define output(fmt, ...) AIM_LOG_VERBOSE("  " fmt, ##__VA_ARGS__)
+
+    output("dl_dst=%{mac}", cfr->dl_dst);
+    output("dl_src=%{mac}", cfr->dl_src);
+    output("in_port=%u", cfr->in_port);
+    output("dl_type=0x%04x", ntohs(cfr->dl_type));
+    output("dl_vlan=0x%04x", ntohs(cfr->dl_vlan));
+    output("nw_tos=0x%x", cfr->nw_tos);
+    output("nw_proto=0x%x", cfr->nw_proto);
+    output("nw_src=%{ipv4a}", ntohl(cfr->nw_src));
+    output("nw_dst=%{ipv4a}", ntohl(cfr->nw_dst));
+    output("tp_src=%u", ntohs(cfr->tp_src));
+    output("tp_dst=%u", ntohs(cfr->tp_dst));
+
+    char src[INET6_ADDRSTRLEN], dst[INET6_ADDRSTRLEN];
+    inet_ntop(AF_INET6, cfr->ipv6_src, src, INET6_ADDRSTRLEN);
+    inet_ntop(AF_INET6, cfr->ipv6_dst, dst, INET6_ADDRSTRLEN);
+    output("ipv6_src=%s", src);
+    output("ipv6_dst=%s", dst);
+
+#undef output
+}
+
+void
+pipeline_standard_trace_cfr(const struct pipeline_standard_cfr *cfr)
+{
+    if (!packet_trace_enabled) {
+        /* Exit early if we wouldn't log anything */
+        return;
+    }
+
+#define output(fmt, ...) packet_trace("  " fmt, ##__VA_ARGS__)
 
     output("dl_dst=%{mac}", cfr->dl_dst);
     output("dl_src=%{mac}", cfr->dl_src);

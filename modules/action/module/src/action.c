@@ -21,6 +21,7 @@
 #include <byteswap.h>
 #include <linux/if_ether.h>
 #include <netlink/genl/genl.h>
+#include <packet_trace/packet_trace.h>
 
 static void commit_set_field_actions(struct action_context *ctx);
 
@@ -56,6 +57,8 @@ action_userspace(struct action_context *ctx, void *userdata, int datalen,
 {
     commit_set_field_actions(ctx);
 
+    packet_trace("action: userspace");
+
     struct nlattr *action_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_USERSPACE);
     nla_put_u32(ctx->msg, OVS_USERSPACE_ATTR_PID, netlink_port);
     nla_put(ctx->msg, OVS_USERSPACE_ATTR_USERDATA, datalen, userdata);
@@ -68,6 +71,7 @@ void
 action_output(struct action_context *ctx, uint32_t port_no)
 {
     commit_set_field_actions(ctx);
+    packet_trace("action: output port %u", port_no);
     nla_put_u32(ctx->msg, OVS_ACTION_ATTR_OUTPUT, port_no);
 }
 
@@ -75,13 +79,15 @@ void
 action_output_local(struct action_context *ctx)
 {
     commit_set_field_actions(ctx);
-    nla_put_u32(ctx->msg, OVS_ACTION_ATTR_OUTPUT, 0);
+    packet_trace("action: output local");
+    nla_put_u32(ctx->msg, OVS_ACTION_ATTR_OUTPUT, OVSP_LOCAL);
 }
 
 void
 action_output_in_port(struct action_context *ctx)
 {
     commit_set_field_actions(ctx);
+    packet_trace("action: output in_port");
     nla_put_u32(ctx->msg, OVS_ACTION_ATTR_OUTPUT, ctx->current_key.in_port);
     MASK(in_port);
 }
@@ -97,6 +103,7 @@ action_sample_to_userspace(struct action_context *ctx, void *userdata, int datal
                            uint32_t netlink_port, uint32_t probability)
 {
     commit_set_field_actions(ctx);
+    packet_trace("action: sample probability %u", probability);
 
     struct nlattr *sample_attr = nla_nest_start(ctx->msg, OVS_ACTION_ATTR_SAMPLE);
     nla_put_u32(ctx->msg, OVS_SAMPLE_ATTR_PROBABILITY, probability);
@@ -122,6 +129,7 @@ action_sample_to_userspace(struct action_context *ctx, void *userdata, int datal
 void
 action_set_eth_dst(struct action_context *ctx, of_mac_addr_t mac)
 {
+    packet_trace("action: set-eth-dst %{mac}", &mac);
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_ETHERNET)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_ETHERNET);
         memcpy(ctx->current_key.ethernet.eth_dst, &mac, sizeof(of_mac_addr_t));
@@ -131,6 +139,7 @@ action_set_eth_dst(struct action_context *ctx, of_mac_addr_t mac)
 void
 action_set_eth_src(struct action_context *ctx, of_mac_addr_t mac)
 {
+    packet_trace("action: set-eth-src %{mac}", &mac);
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_ETHERNET)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_ETHERNET);
         memcpy(ctx->current_key.ethernet.eth_src, &mac, sizeof(of_mac_addr_t));
@@ -140,6 +149,7 @@ action_set_eth_src(struct action_context *ctx, of_mac_addr_t mac)
 void
 action_set_eth_dst_scalar(struct action_context *ctx, uint32_t mac_lo, uint16_t mac_hi)
 {
+    packet_trace("action: set-eth-dst %02x%04x", mac_hi, mac_lo);
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_ETHERNET)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_ETHERNET);
         unsigned char *buf = ctx->current_key.ethernet.eth_dst;
@@ -151,6 +161,7 @@ action_set_eth_dst_scalar(struct action_context *ctx, uint32_t mac_lo, uint16_t 
 void
 action_set_eth_src_scalar(struct action_context *ctx, uint32_t mac_lo, uint16_t mac_hi)
 {
+    packet_trace("action: set-eth-src %02x%04x", mac_hi, mac_lo);
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_ETHERNET)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_ETHERNET);
         unsigned char *buf = ctx->current_key.ethernet.eth_src;
@@ -166,6 +177,7 @@ action_set_eth_src_scalar(struct action_context *ctx, uint32_t mac_lo, uint16_t 
 void
 action_set_vlan_vid(struct action_context *ctx, uint16_t vlan_vid)
 {
+    packet_trace("action: set-vlan-vid %u", vlan_vid);
     ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_VLAN);
     uint16_t cur_tci;
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_VLAN)) {
@@ -180,6 +192,7 @@ action_set_vlan_vid(struct action_context *ctx, uint16_t vlan_vid)
 void
 action_set_vlan_pcp(struct action_context *ctx, uint8_t vlan_pcp)
 {
+    packet_trace("action: set-vlan-pcp %u", vlan_pcp);
     ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_VLAN);
     uint16_t cur_tci;
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_VLAN)) {
@@ -194,6 +207,7 @@ action_set_vlan_pcp(struct action_context *ctx, uint8_t vlan_pcp)
 void
 action_pop_vlan(struct action_context *ctx)
 {
+    packet_trace("action: pop-vlan");
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_VLAN)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_VLAN);
         ATTR_BITMAP_CLEAR(ctx->current_key.populated, OVS_KEY_ATTR_VLAN);
@@ -203,6 +217,7 @@ action_pop_vlan(struct action_context *ctx)
 void
 action_push_vlan(struct action_context *ctx)
 {
+    packet_trace("action: push-vlan");
     if (!ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_VLAN)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_VLAN);
         ATTR_BITMAP_SET(ctx->current_key.populated, OVS_KEY_ATTR_VLAN);
@@ -214,6 +229,7 @@ void
 action_pop_vlan_raw(struct action_context *ctx)
 {
     commit_set_field_actions(ctx);
+    packet_trace("action: pop-vlan-raw");
     nla_put_flag(ctx->msg, OVS_ACTION_ATTR_POP_VLAN);
 }
 
@@ -221,6 +237,7 @@ void
 action_push_vlan_raw(struct action_context *ctx, uint16_t vlan_tci)
 {
     commit_set_field_actions(ctx);
+    packet_trace("action: push-vlan-raw 0x%x", vlan_tci);
 
     struct ovs_action_push_vlan vlan = {
         .vlan_tpid = htons(ETH_P_8021Q),
@@ -236,6 +253,7 @@ action_push_vlan_raw(struct action_context *ctx, uint16_t vlan_tci)
 void
 action_set_ipv4_dst(struct action_context *ctx, uint32_t ipv4)
 {
+    packet_trace("action: set-ipv4-dst %{ipv4a}", ipv4);
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV4)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV4);
         ctx->current_key.ipv4.ipv4_dst = htonl(ipv4);
@@ -245,6 +263,7 @@ action_set_ipv4_dst(struct action_context *ctx, uint32_t ipv4)
 void
 action_set_ipv4_src(struct action_context *ctx, uint32_t ipv4)
 {
+    packet_trace("action: set-ipv4-src %{ipv4a}", ipv4);
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV4)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV4);
         ctx->current_key.ipv4.ipv4_src = htonl(ipv4);
@@ -254,6 +273,7 @@ action_set_ipv4_src(struct action_context *ctx, uint32_t ipv4)
 void
 action_set_ipv4_dscp(struct action_context *ctx, uint8_t ip_dscp)
 {
+    packet_trace("action: set-ipv4-dscp %u", ip_dscp);
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV4)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV4);
         ctx->current_key.ipv4.ipv4_tos &= (uint8_t)(~IP_DSCP_MASK);
@@ -264,6 +284,7 @@ action_set_ipv4_dscp(struct action_context *ctx, uint8_t ip_dscp)
 void
 action_set_ipv4_ecn(struct action_context *ctx, uint8_t ip_ecn)
 {
+    packet_trace("action: set-ipv4-ecn %u", ip_ecn);
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV4)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV4);
         ctx->current_key.ipv4.ipv4_tos &= (uint8_t)(~IP_ECN_MASK);
@@ -274,6 +295,7 @@ action_set_ipv4_ecn(struct action_context *ctx, uint8_t ip_ecn)
 void
 action_set_ipv4_ttl(struct action_context *ctx, uint8_t ttl)
 {
+    packet_trace("action: set-ipv4-ttl %u", ttl);
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV4)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV4);
         ctx->current_key.ipv4.ipv4_ttl = ttl;
@@ -287,6 +309,7 @@ action_set_ipv4_ttl(struct action_context *ctx, uint8_t ttl)
 void
 action_set_ipv6_dst(struct action_context *ctx, of_ipv6_t ipv6)
 {
+    packet_trace("action: set-ipv6-dst %{ipv6a}", &ipv6);
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV6)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV6);
         memcpy(ctx->current_key.ipv6.ipv6_dst, &ipv6, sizeof(of_ipv6_t));
@@ -296,6 +319,7 @@ action_set_ipv6_dst(struct action_context *ctx, of_ipv6_t ipv6)
 void
 action_set_ipv6_src(struct action_context *ctx, of_ipv6_t ipv6)
 {
+    packet_trace("action: set-ipv6-src %{ipv6a}", &ipv6);
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV6)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV6);
         memcpy(ctx->current_key.ipv6.ipv6_src, &ipv6, sizeof(of_ipv6_t));
@@ -305,6 +329,7 @@ action_set_ipv6_src(struct action_context *ctx, of_ipv6_t ipv6)
 void
 action_set_ipv6_dscp(struct action_context *ctx, uint8_t ip_dscp)
 {
+    packet_trace("action: set-ipv6-dscp %u", ip_dscp);
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV6)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV6);
         ctx->current_key.ipv6.ipv6_tclass &= (uint8_t)(~IP_DSCP_MASK);
@@ -315,6 +340,7 @@ action_set_ipv6_dscp(struct action_context *ctx, uint8_t ip_dscp)
 void
 action_set_ipv6_ecn(struct action_context *ctx, uint8_t ip_ecn)
 {
+    packet_trace("action: set-ipv6-ecn %u", ip_ecn);
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV6)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV6);
         ctx->current_key.ipv6.ipv6_tclass &= (uint8_t)(~IP_ECN_MASK);
@@ -325,6 +351,7 @@ action_set_ipv6_ecn(struct action_context *ctx, uint8_t ip_ecn)
 void
 action_set_ipv6_ttl(struct action_context *ctx, uint8_t ttl)
 {
+    packet_trace("action: set-ipv6-ttl %u", ttl);
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV6)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV6);
         ctx->current_key.ipv6.ipv6_hlimit = ttl;
@@ -334,6 +361,7 @@ action_set_ipv6_ttl(struct action_context *ctx, uint8_t ttl)
 void
 action_set_ipv6_flabel(struct action_context *ctx, uint32_t flabel)
 {
+    packet_trace("action: set-ipv6-flabel %u", flabel);
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_IPV6)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_IPV6);
         ctx->current_key.ipv6.ipv6_label = htonl(flabel);
@@ -347,6 +375,7 @@ action_set_ipv6_flabel(struct action_context *ctx, uint32_t flabel)
 void
 action_set_tcp_src(struct action_context *ctx, uint16_t tcp_src)
 {
+    packet_trace("action: set-tcp-src %u", tcp_src);
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_TCP)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_TCP);
         ctx->current_key.tcp.tcp_src = htons(tcp_src);
@@ -356,6 +385,7 @@ action_set_tcp_src(struct action_context *ctx, uint16_t tcp_src)
 void
 action_set_tcp_dst(struct action_context *ctx, uint16_t tcp_dst)
 {
+    packet_trace("action: set-tcp-dst %u", tcp_dst);
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_TCP)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_TCP);
         ctx->current_key.tcp.tcp_dst = htons(tcp_dst);
@@ -369,6 +399,7 @@ action_set_tcp_dst(struct action_context *ctx, uint16_t tcp_dst)
 void
 action_set_udp_src(struct action_context *ctx, uint16_t udp_src)
 {
+    packet_trace("action: set-udp-src %u", udp_src);
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_UDP)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_UDP);
         ctx->current_key.udp.udp_src = htons(udp_src);
@@ -378,6 +409,7 @@ action_set_udp_src(struct action_context *ctx, uint16_t udp_src)
 void
 action_set_udp_dst(struct action_context *ctx, uint16_t udp_dst)
 {
+    packet_trace("action: set-udp-dst %u", udp_dst);
     if (ATTR_BITMAP_TEST(ctx->current_key.populated, OVS_KEY_ATTR_UDP)) {
         ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_UDP);
         ctx->current_key.udp.udp_dst = htons(udp_dst);
@@ -391,6 +423,7 @@ action_set_udp_dst(struct action_context *ctx, uint16_t udp_dst)
 void
 action_set_priority(struct action_context *ctx, uint32_t priority)
 {
+    packet_trace("action: set-priority %u", priority);
     ATTR_BITMAP_SET(ctx->modified_attrs, OVS_KEY_ATTR_PRIORITY);
     ctx->current_key.priority = priority;
 }

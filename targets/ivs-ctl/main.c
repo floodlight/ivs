@@ -56,6 +56,7 @@ static void help(void)
     fprintf(stderr, "  cli ...: run an internal CLI command\n");
     fprintf(stderr, "  dump-flows: print information about each kernel flow\n");
     fprintf(stderr, "  list-ports: print the name of each port\n");
+    fprintf(stderr, "  trace: explains the forwarding decision for each new flow\n");
 }
 
 static void
@@ -540,6 +541,65 @@ list_ports(const char *datapath)
     nlmsg_free(msg);
 }
 
+static void
+trace(int argc, char **argv)
+{
+    char path[UNIX_PATH_MAX];
+    snprintf(path, sizeof(path), "/var/run/ivs-packet-trace.%s.sock", datapath_name);
+
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd < 0) {
+        perror("socket");
+        exit(1);
+    }
+
+    struct sockaddr_un saddr;
+    memset(&saddr, 0, sizeof(saddr));
+    saddr.sun_family = AF_UNIX;
+    strcpy(saddr.sun_path, path);
+
+    if (connect(fd, (struct sockaddr *)&saddr, sizeof(saddr)) < 0) {
+        perror("connect");
+        exit(1);
+    }
+
+    FILE *f = fdopen(fd, "r+");
+    if (f == NULL) {
+        perror("fdopen");
+        exit(1);
+    }
+
+    if (argc > 0) {
+        fprintf(f, "add ");
+        int i;
+        for (i = 0; i < argc; i++) {
+            fprintf(f, "%s ", argv[i]);
+        }
+        fprintf(f, "\n");
+    } else {
+        fprintf(f, "add all\n");
+    }
+
+    fflush(f);
+
+    char buf[1024];
+    while (1) {
+        int c = read(fd, buf, sizeof(buf));
+        if (c < 0) {
+            if (errno != EINTR) {
+                perror("read");
+                exit(1);
+            }
+        } else if (c == 0) {
+            break;
+        } else {
+            fwrite(buf, c, 1, stdout);
+        }
+    }
+
+    fclose(f);
+}
+
 static struct nl_sock *
 create_genl_socket(void)
 {
@@ -629,6 +689,8 @@ main(int argc, char *argv[])
             return 1;
         }
         list_ports(datapath_name);
+    } else if (!strcmp(cmd, "trace")) {
+        trace(argc-1, argv+1);
     } else {
         fprintf(stderr, "Unknown command '%s' (try help)\n", cmd);
         return 1;

@@ -23,6 +23,7 @@
 
 #include <ivs/ivs.h>
 #include <loci/loci.h>
+#include <packet_trace/packet_trace.h>
 
 #define AIM_LOG_MODULE_NAME pipeline
 #include <AIM/aim_log.h>
@@ -127,22 +128,25 @@ pipeline_process(struct ind_ovs_parsed_key *key,
 {
     AIM_TRUE_OR_DIE(current_pipeline != NULL);
 
+    mask->in_port = -1;
+    packet_trace_begin(key->in_port);
+
     mask->populated = key->populated;
     ATTR_BITMAP_SET(mask->populated, OVS_KEY_ATTR_ETHERTYPE);
 
     if (ind_ovs_inband_vlan != VLAN_INVALID) {
-        mask->in_port = -1;
         if (ind_ovs_uplink_check(key->in_port)) {
             mask->vlan = -1;
             if (VLAN_VID(ntohs(key->vlan)) == ind_ovs_inband_vlan) {
-                AIM_LOG_VERBOSE("Sending in-band management packet from uplink to internal port");
+                packet_trace("Sending in-band management packet from uplink to internal port");
                 action_pop_vlan(actx);
                 action_output(actx, IVS_INBAND_PORT);
+                packet_trace_end();
                 return INDIGO_ERROR_NONE;
             }
             /* fall through */
         } else if (key->in_port == IVS_INBAND_PORT) {
-            AIM_LOG_VERBOSE("Sending in-band management packet from internal port to uplink");
+            packet_trace("Sending in-band management packet from internal port to uplink");
             uint32_t port = ind_ovs_uplink_select();
             if (port != OF_PORT_DEST_NONE) {
                 action_push_vlan(actx);
@@ -152,14 +156,17 @@ pipeline_process(struct ind_ovs_parsed_key *key,
                 }
                 action_output(actx, port);
             } else {
-                AIM_LOG_VERBOSE("No available uplink");
+                packet_trace("No available uplink");
             }
+            packet_trace_end();
             return INDIGO_ERROR_NONE;
         }
         /* fall through */
     }
 
-    return current_pipeline->ops->process(key, mask, stats, actx);
+    indigo_error_t rv = current_pipeline->ops->process(key, mask, stats, actx);
+    packet_trace_end();
+    return rv;
 }
 
 void
