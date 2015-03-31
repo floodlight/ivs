@@ -25,6 +25,8 @@
 /* List of string interface names */
 static biglist_t *uplinks = NULL;
 
+static of_port_no_t current_uplink = OF_PORT_DEST_NONE;
+
 void
 ind_ovs_uplink_add(const char *name)
 {
@@ -55,15 +57,44 @@ ind_ovs_uplink_check(of_port_no_t port_no)
 }
 
 of_port_no_t
-ind_ovs_uplink_first(void)
+ind_ovs_uplink_select(void)
 {
+    return current_uplink;
+}
+
+static bool
+is_valid_uplink(uint32_t port_no)
+{
+    if (port_no > IND_OVS_MAX_PORTS) {
+        return false;
+    }
+    struct ind_ovs_port *port = ind_ovs_ports[port_no];
+    return port && port->is_uplink && port->ifflags & IFF_RUNNING;
+}
+
+/*
+ * Called whenever an uplink is added, removed, or link status changed.
+ * May select a new port to be returned by ind_ovs_uplink_select.
+ */
+void
+ind_ovs_uplink_reselect(void)
+{
+    /* Sticky - keep current uplink if it's still good */
+    if (is_valid_uplink(current_uplink)) {
+        AIM_LOG_VERBOSE("Keeping same uplink");
+        return;
+    }
+
+    /* Pick first valid uplink */
     int i;
     for (i = 0; i < IND_OVS_MAX_PORTS; i++) {
-        struct ind_ovs_port *port = ind_ovs_ports[i];
-        if (port && port->is_uplink && port->ifflags & IFF_RUNNING) {
-            return i;
+        if (is_valid_uplink(i)) {
+            current_uplink = i;
+            AIM_LOG_VERBOSE("Selected uplink %s", ind_ovs_ports[i]->ifname);
+            return;
         }
     }
 
-    return OF_PORT_DEST_NONE;
+    current_uplink = OF_PORT_DEST_NONE;
+    AIM_LOG_VERBOSE("No uplinks available");
 }

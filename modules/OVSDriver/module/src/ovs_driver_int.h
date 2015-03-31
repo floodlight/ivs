@@ -115,7 +115,6 @@ struct ind_ovs_port {
     unsigned is_uplink : 1;
     uint32_t num_kflows; /* Number of kflows with this in_port */
     struct nl_sock *notify_socket; /* Netlink socket for upcalls */
-    struct nl_sock *pktin_socket; /* Netlink socket for packet-ins */
     aim_ratelimiter_t upcall_log_limiter;
     aim_ratelimiter_t pktin_limiter;
     struct ind_ovs_upcall_thread *upcall_thread;
@@ -179,7 +178,7 @@ void ind_ovs_kflow_module_init(void);
 /* Management of the port set */
 void ind_ovs_port_init(void);
 void ind_ovs_port_finish(void);
-void ind_ovs_port_added(uint32_t port_no, const char *ifname, enum ovs_vport_type type, of_mac_addr_t mac_addr);
+void ind_ovs_port_added(uint32_t port_no, const char *ifname, enum ovs_vport_type type);
 void ind_ovs_port_deleted(uint32_t port_no);
 struct ind_ovs_port *ind_ovs_port_lookup(of_port_no_t port_no);
 struct ind_ovs_port *ind_ovs_port_lookup_by_name(const char *ifname);
@@ -187,7 +186,8 @@ struct ind_ovs_port *ind_ovs_port_lookup_by_name(const char *ifname);
 /* Interface of the uplink submodule */
 bool ind_ovs_uplink_check_by_name(const char *name);
 bool ind_ovs_uplink_check(of_port_no_t port_no);
-of_port_no_t ind_ovs_uplink_first(void);
+of_port_no_t ind_ovs_uplink_select(void);
+void ind_ovs_uplink_reselect(void);
 
 /* Interface of the upcall submodule */
 void ind_ovs_upcall_init(void);
@@ -199,6 +199,7 @@ void ind_ovs_upcall_respawn(void);
 
 /* Interface of the multicast submodule */
 void ind_ovs_multicast_init(void);
+void ind_ovs_multicast_resync(void);
 
 /* Interface of the group submodule */
 void ind_ovs_group_module_init(void);

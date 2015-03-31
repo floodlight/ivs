@@ -22,11 +22,7 @@
 #include "indigo/port_manager.h"
 #include "indigo/of_state_manager.h"
 #include "indigo/types.h"
-#include <linux/if_ether.h>
-#include <linux/if_packet.h>
-#include <ifaddrs.h>
 #include <stdbool.h>
-#include <sys/epoll.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -61,24 +57,8 @@ ind_ovs_handle_vport_multicast(struct nlmsghdr *nlh)
     assert(attrs[OVS_VPORT_ATTR_TYPE]);
     enum ovs_vport_type type = nla_get_u32(attrs[OVS_VPORT_ATTR_TYPE]);
 
-    of_mac_addr_t mac_addr = of_mac_addr_all_zeros;
-    struct ifaddrs *ifaddr, *ifa;
-    if (getifaddrs(&ifaddr) != -1) {
-        for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-            if (!strcmp(ifname, ifa->ifa_name)) {
-                struct sockaddr_ll *sa = (struct sockaddr_ll *)ifa->ifa_addr;
-                if (sa != NULL && sa->sll_family == AF_PACKET) {
-                    memcpy(mac_addr.addr, &sa->sll_addr, OF_MAC_ADDR_BYTES);
-                    LOG_VERBOSE("Using MAC from interface %s", ifa->ifa_name);
-                    break;
-                }
-            }
-        }
-    }
-    freeifaddrs(ifaddr);
-
     if (gnlh->cmd == OVS_VPORT_CMD_NEW) {
-        ind_ovs_port_added(port_no, ifname, type, mac_addr);
+        ind_ovs_port_added(port_no, ifname, type);
     } else if (gnlh->cmd == OVS_VPORT_CMD_DEL) {
         ind_ovs_port_deleted(port_no);
     }
@@ -145,13 +125,22 @@ ind_ovs_handle_multicast(void)
         AIM_LOG_WARN("Multicast socket overrun");
         debug_counter_inc(&overrun);
 
-        /* Request dump of vports */
-        struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_GET);
-        nlmsg_hdr(msg)->nlmsg_flags |= NLM_F_DUMP;
-        if (nl_send_auto(ind_ovs_multicast_socket, msg) < 0) {
-            AIM_LOG_ERROR("Failed to request vport dump");
-        }
-        ind_ovs_nlmsg_freelist_free(msg);
+        ind_ovs_multicast_resync();
+    }
+}
+
+void
+ind_ovs_multicast_resync(void)
+{
+    /* Request dump of vports */
+    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_GET);
+    nlmsg_hdr(msg)->nlmsg_flags |= NLM_F_DUMP;
+    if (nl_send_auto(ind_ovs_multicast_socket, msg) < 0) {
+        AIM_LOG_ERROR("Failed to request vport dump");
+    }
+    ind_ovs_nlmsg_freelist_free(msg);
+    if (nl_recvmsgs_default(ind_ovs_multicast_socket) < 0) {
+        AIM_LOG_ERROR("Failed to receive vport dump");
     }
 }
 
