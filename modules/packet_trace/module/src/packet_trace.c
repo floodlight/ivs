@@ -227,6 +227,7 @@ listen_callback(
     indigo_error_t rv = ind_soc_socket_register(fd, client_callback, client);
     if (rv < 0) {
         AIM_LOG_ERROR("Failed to register packet_trace client socket: %s", indigo_strerror(rv));
+        destroy_client(client);
         return;
     }
 }
