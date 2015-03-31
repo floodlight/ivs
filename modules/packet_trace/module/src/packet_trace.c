@@ -164,7 +164,7 @@ packet_trace_internal_log(const char *fmt, va_list vargs)
     va_copy(vargs2, vargs);
     char newfmt[strlen(fmt) + 32];
     snprintf(newfmt, sizeof(newfmt)-1, "[packet_trace] %s", fmt);
-    aim_log_common(
+    aim_log_vcommon(
         AIM_LOG_STRUCT_POINTER, AIM_LOG_FLAG_VERBOSE,
         NULL, 0, __func__, __FILE__, __LINE__,
         newfmt, vargs);
