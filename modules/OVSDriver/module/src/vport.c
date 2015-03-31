@@ -246,7 +246,7 @@ indigo_port_interface_list_destroy(indigo_port_info_t* list)
 
 void
 ind_ovs_port_added(uint32_t port_no, const char *ifname,
-                   enum ovs_vport_type type, of_mac_addr_t mac_addr)
+                   enum ovs_vport_type type)
 {
     indigo_error_t err;
 
@@ -256,6 +256,15 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname,
     }
 
     debug_counter_inc(&add);
+
+    of_mac_addr_t mac_addr = of_mac_addr_all_zeros;
+    struct rtnl_link *link = rtnl_link_get_by_name(link_cache, ifname);
+    if (link) {
+        struct nl_addr *addr = rtnl_link_get_addr(link);
+        void *data = nl_addr_get_binary_addr(addr);
+        AIM_ASSERT(nl_addr_get_len(addr) == sizeof(mac_addr));
+        memcpy(&mac_addr, data, sizeof(mac_addr));
+    }
 
     if (port_no == OVSP_LOCAL) {
         ifname = "local";

@@ -178,7 +178,7 @@ void ind_ovs_kflow_module_init(void);
 /* Management of the port set */
 void ind_ovs_port_init(void);
 void ind_ovs_port_finish(void);
-void ind_ovs_port_added(uint32_t port_no, const char *ifname, enum ovs_vport_type type, of_mac_addr_t mac_addr);
+void ind_ovs_port_added(uint32_t port_no, const char *ifname, enum ovs_vport_type type);
 void ind_ovs_port_deleted(uint32_t port_no);
 struct ind_ovs_port *ind_ovs_port_lookup(of_port_no_t port_no);
 struct ind_ovs_port *ind_ovs_port_lookup_by_name(const char *ifname);
