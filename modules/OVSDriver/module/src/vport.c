@@ -26,6 +26,9 @@
 #include <errno.h>
 #include <netlink/cache.h>
 #include <netlink/route/link.h>
+#include <linux/if_ether.h>
+#include <linux/if_packet.h>
+#include <ifaddrs.h>
 
 #ifndef _LINUX_IF_H
 /* Some versions of libnetlink include linux/if.h, which conflicts with net/if.h. */
@@ -246,7 +249,7 @@ indigo_port_interface_list_destroy(indigo_port_info_t* list)
 
 void
 ind_ovs_port_added(uint32_t port_no, const char *ifname,
-                   enum ovs_vport_type type, of_mac_addr_t mac_addr)
+                   enum ovs_vport_type type)
 {
     indigo_error_t err;
 
@@ -256,6 +259,22 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname,
     }
 
     debug_counter_inc(&add);
+
+    of_mac_addr_t mac_addr = of_mac_addr_all_zeros;
+    struct ifaddrs *ifaddr, *ifa;
+    if (getifaddrs(&ifaddr) != -1) {
+        for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+            if (!strcmp(ifname, ifa->ifa_name)) {
+                struct sockaddr_ll *sa = (struct sockaddr_ll *)ifa->ifa_addr;
+                if (sa != NULL && sa->sll_family == AF_PACKET) {
+                    memcpy(mac_addr.addr, &sa->sll_addr, OF_MAC_ADDR_BYTES);
+                    LOG_VERBOSE("Using MAC from interface %s", ifa->ifa_name);
+                    break;
+                }
+            }
+        }
+    }
+    freeifaddrs(ifaddr);
 
     if (port_no == OVSP_LOCAL) {
         ifname = "local";
