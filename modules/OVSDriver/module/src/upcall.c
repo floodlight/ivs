@@ -103,7 +103,7 @@ static void ind_ovs_handle_one_upcall(struct ind_ovs_upcall_thread *thread, stru
 static void ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread, struct ind_ovs_port *port, struct nl_msg *msg, struct nlattr **attrs);
 static bool ind_ovs_upcall_seen_key(struct ind_ovs_upcall_thread *thread, struct nlattr *key);
 static void ind_ovs_upcall_request_kflow(struct ind_ovs_upcall_thread *thread, struct nlattr *key);
-static void ind_ovs_upcall_thread_init(struct ind_ovs_upcall_thread *thread);
+static void ind_ovs_upcall_thread_init(struct ind_ovs_upcall_thread *thread, int parent_pid);
 
 static int ind_ovs_num_upcall_threads;
 static struct ind_ovs_upcall_thread *ind_ovs_upcall_threads[MAX_UPCALL_THREADS];
@@ -515,11 +515,12 @@ ind_ovs_upcall_respawn(void)
 
         AIM_LOG_VERBOSE("Spawning upcall process %d", i);
 
+        int parent_pid = getpid();
         int child_pid = fork();
         if (child_pid < 0) {
             AIM_DIE("Failed to spawn upcall process: %s", strerror(errno));
         } else if (child_pid == 0) {
-            ind_ovs_upcall_thread_init(thread);
+            ind_ovs_upcall_thread_init(thread, parent_pid);
             ind_ovs_upcall_thread_main(thread);
             AIM_LOG_INFO("Upcall process %d exiting", i);
             exit(0);
@@ -534,7 +535,7 @@ ind_ovs_upcall_respawn(void)
 }
 
 static void
-ind_ovs_upcall_thread_init(struct ind_ovs_upcall_thread *thread)
+ind_ovs_upcall_thread_init(struct ind_ovs_upcall_thread *thread, int parent_pid)
 {
     char threadname[16];
     snprintf(threadname, sizeof(threadname), "ivs upcall %d", thread->index);
@@ -543,6 +544,11 @@ ind_ovs_upcall_thread_init(struct ind_ovs_upcall_thread *thread)
     /* Ask the kernel to send us a SIGKILL if the main process dies */
     if (prctl(PR_SET_PDEATHSIG, SIGKILL, 0, 0, 0) < 0) {
         AIM_DIE("prctl(PR_SET_PDEATHSIG) failed: %s", strerror(errno));
+    }
+
+    /* Check if the parent exited before we did PR_SET_PDEATHSIG */
+    if (kill(parent_pid, 0) < 0) {
+        raise(SIGKILL);
     }
 
     thread->epfd = epoll_create(1);
