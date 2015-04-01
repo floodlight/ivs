@@ -156,17 +156,7 @@ packet_trace_end(void)
             continue;
         }
         AIM_LOG_TRACE("writing to client %d (%d bytes)", client->fd, len);
-        int written = 0;
-        while (written < len) {
-            int c = write(client->fd, buf+written, len-written);
-            if (c < 0) {
-                break;
-            } else if (c == 0) {
-                break;
-            } else {
-                written += c;
-            }
-        }
+        (void) send(client->fd, buf, len, MSG_NOSIGNAL);
     }
 
     aim_free(buf);
