@@ -569,17 +569,12 @@ trace(int argc, char **argv)
         exit(1);
     }
 
-    if (argc > 0) {
-        fprintf(f, "add ");
-        int i;
-        for (i = 0; i < argc; i++) {
-            fprintf(f, "%s ", argv[i]);
-        }
-        fprintf(f, "\n");
-    } else {
-        fprintf(f, "add all\n");
+    fprintf(f, "add ");
+    int i;
+    for (i = 0; i < argc; i++) {
+        fprintf(f, "%s ", argv[i]);
     }
-
+    fprintf(f, "\n");
     fflush(f);
 
     char buf[1024];

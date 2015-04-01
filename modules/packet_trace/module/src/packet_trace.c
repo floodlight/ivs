@@ -27,6 +27,9 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <ivs/ivs.h>
+#include <sys/prctl.h>
+#include <sys/time.h>
+#include <time.h>
 
 #define AIM_LOG_MODULE_NAME packet_trace
 #include <AIM/aim_log.h>
@@ -120,7 +123,19 @@ packet_trace_begin(uint32_t in_port)
         }
     }
 
-    packet_trace("--------------------------------------------------------------");
+    if (packet_trace_enabled) {
+        struct timeval timeval;
+        struct tm *loctime;
+        char lt[128];
+        gettimeofday(&timeval, NULL);
+        loctime = localtime(&timeval.tv_sec);
+        strftime(lt, sizeof(lt), "%m-%d %T", loctime);
+
+        char name[16] = { 0 };
+        prctl(PR_GET_NAME, name);
+
+        packet_trace("--- %s.%06d %.16s", lt, (int)timeval.tv_usec, name);
+    }
 }
 
 void
@@ -141,17 +156,7 @@ packet_trace_end(void)
             continue;
         }
         AIM_LOG_TRACE("writing to client %d (%d bytes)", client->fd, len);
-        int written = 0;
-        while (written < len) {
-            int c = write(client->fd, buf+written, len-written);
-            if (c < 0) {
-                break;
-            } else if (c == 0) {
-                break;
-            } else {
-                written += c;
-            }
-        }
+        (void) send(client->fd, buf, len, MSG_NOSIGNAL);
     }
 
     aim_free(buf);
@@ -313,6 +318,13 @@ reply(struct client *client, const char *fmt, ...)
 static void
 process_add_command(struct client *client, const char **argv, int argc)
 {
+    if (argc == 0) {
+        /* Empty filter expression */
+        AIM_BITMAP_SET_ALL(&client->ports);
+        ind_ovs_barrier_defer_revalidation(-1);
+        return;
+    }
+
     if (!strcmp(argv[0], "port")) {
         if (argc != 2) {
             reply(client, "expected 2 arguments\n");
@@ -325,13 +337,6 @@ process_add_command(struct client *client, const char **argv, int argc)
             AIM_BITMAP_SET(&client->ports, port);
             ind_ovs_barrier_defer_revalidation(-1);
         }
-    } else if (!strcmp(argv[0], "all")) {
-        if (argc != 1) {
-            reply(client, "expected 1 argument\n");
-            return;
-        }
-        AIM_BITMAP_SET_ALL(&client->ports);
-        ind_ovs_barrier_defer_revalidation(-1);
     } else {
         reply(client, "unexpected filter type\n");
     }
