@@ -328,6 +328,13 @@ reply(struct client *client, const char *fmt, ...)
 static void
 process_add_command(struct client *client, const char **argv, int argc)
 {
+    if (argc == 0) {
+        /* Empty filter expression */
+        AIM_BITMAP_SET_ALL(&client->ports);
+        ind_ovs_barrier_defer_revalidation(-1);
+        return;
+    }
+
     if (!strcmp(argv[0], "port")) {
         if (argc != 2) {
             reply(client, "expected 2 arguments\n");
@@ -340,13 +347,6 @@ process_add_command(struct client *client, const char **argv, int argc)
             AIM_BITMAP_SET(&client->ports, port);
             ind_ovs_barrier_defer_revalidation(-1);
         }
-    } else if (!strcmp(argv[0], "all")) {
-        if (argc != 1) {
-            reply(client, "expected 1 argument\n");
-            return;
-        }
-        AIM_BITMAP_SET_ALL(&client->ports);
-        ind_ovs_barrier_defer_revalidation(-1);
     } else {
         reply(client, "unexpected filter type\n");
     }
