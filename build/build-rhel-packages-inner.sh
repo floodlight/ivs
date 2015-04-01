@@ -5,6 +5,7 @@ SPEC="/rpmbuild/SOURCES/ivs-7.0.spec"
 OUTER_UID=$(stat -c '%u' $SPEC)
 OUTER_GID=$(stat -c '%g' $SPEC)
 trap "chown -R $OUTER_UID:$OUTER_GID /rpmbuild" EXIT
+export PATH=/usr/lib64/ccache:$PATH
 chown -R root:root /rpmbuild
 
 rpmbuild -bb $SPEC
