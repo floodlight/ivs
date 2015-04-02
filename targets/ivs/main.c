@@ -348,19 +348,25 @@ set_crash_handler(void (*handler)(int))
 static void
 crash_handler(int signum)
 {
+    /* Avoid recursion */
+    set_crash_handler(SIG_DFL);
+
+    /* Unblock signal that killed us */
+    sigset_t sigset;
+    sigemptyset(&sigset);
+    sigaddset(&sigset, signum);
+    sigprocmask(SIG_UNBLOCK, &sigset, NULL);
+
     /* It's possible that this signal handler will crash again due to the many
      * signal-unsafe operations. We want the exit status and core for the
      * original crash to be unaffected by this. So, we fork off a new process
      * to log info about the crash and re-raise the signal in the parent.
      */
     if (fork() != 0) {
-        signal(signum, SIG_DFL);
-        kill(getpid(), signum);
-        abort(); /* should not be reached */
+        raise(signum);
+        AIM_LOG_ERROR("Did not die from raise(%d)", signum);
+        _exit(1); /* Should not be reached */
     }
-
-    /* Avoid recursion */
-    set_crash_handler(SIG_DFL);
 
     /* In case of deadlock */
     alarm(1);
