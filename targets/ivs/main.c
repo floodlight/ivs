@@ -385,7 +385,7 @@ crash_handler(int signum)
      * to addr2line.
      */
     {
-        void *bt[20];
+        void *bt[64];
         int num_frames = backtrace(bt, AIM_ARRAYSIZE(bt));
         int buflen = num_frames * strlen(" 0x0123456789abcdef") + 1;
         char *buf = aim_malloc(buflen);
