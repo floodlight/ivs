@@ -264,6 +264,7 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname,
         void *data = nl_addr_get_binary_addr(addr);
         AIM_ASSERT(nl_addr_get_len(addr) == sizeof(mac_addr));
         memcpy(&mac_addr, data, sizeof(mac_addr));
+        rtnl_link_put(link);
     }
 
     if (port_no == OVSP_LOCAL) {
@@ -504,6 +505,7 @@ port_stats_iterator(struct nl_msg *msg, void *arg)
             of_port_stats_prop_ethernet_init(&prop, props.version, -1, 1);
             if (of_list_port_stats_prop_append_bind(&props, &prop) < 0) {
                 LOG_ERROR("too many port stats replies");
+                rtnl_link_put(link);
                 return NL_STOP;
             }
             of_port_stats_prop_ethernet_rx_frame_err_set(&prop,
