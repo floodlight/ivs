@@ -407,7 +407,8 @@ crash_handler(int signum)
         FILE *tmp = tmpfile();
         if (asprintf(&cmd, "addr2line -p -f -i -s -e /proc/%d/exe >/proc/self/fd/%d 2>&1", getpid(), fileno(tmp)) >= 0) {
             FILE *addr2line = popen(cmd, "w");
-            for (i = 0; i < num_frames; i++) {
+            /* Start at 1 to skip the crash_handler frame */
+            for (i = 1; i < num_frames; i++) {
                 uintptr_t addr = (uintptr_t)bt[i] - 1;
                 fprintf(addr2line, "0x%"PRIx64"\n", addr);
             }
@@ -426,7 +427,9 @@ crash_handler(int signum)
                 char line[1024];
                 while (fgets(line, sizeof(line), tmp) != NULL) {
                     *strchrnul(line, '\n') = 0; /* trim newline */
-                    AIM_LOG_ERROR("  %s", line);
+                    if (strcmp(line, "?? ??:0")) {
+                        AIM_LOG_ERROR("  %s", line);
+                    }
                 }
             }
         }
