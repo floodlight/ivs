@@ -348,19 +348,25 @@ set_crash_handler(void (*handler)(int))
 static void
 crash_handler(int signum)
 {
+    /* Avoid recursion */
+    set_crash_handler(SIG_DFL);
+
+    /* Unblock signal that killed us */
+    sigset_t sigset;
+    sigemptyset(&sigset);
+    sigaddset(&sigset, signum);
+    sigprocmask(SIG_UNBLOCK, &sigset, NULL);
+
     /* It's possible that this signal handler will crash again due to the many
      * signal-unsafe operations. We want the exit status and core for the
      * original crash to be unaffected by this. So, we fork off a new process
      * to log info about the crash and re-raise the signal in the parent.
      */
     if (fork() != 0) {
-        signal(signum, SIG_DFL);
-        kill(getpid(), signum);
-        abort(); /* should not be reached */
+        raise(signum);
+        AIM_LOG_ERROR("Did not die from raise(%d)", signum);
+        _exit(1); /* Should not be reached */
     }
-
-    /* Avoid recursion */
-    set_crash_handler(SIG_DFL);
 
     /* In case of deadlock */
     alarm(1);
@@ -379,7 +385,7 @@ crash_handler(int signum)
      * to addr2line.
      */
     {
-        void *bt[20];
+        void *bt[64];
         int num_frames = backtrace(bt, AIM_ARRAYSIZE(bt));
         int buflen = num_frames * strlen(" 0x0123456789abcdef") + 1;
         char *buf = aim_malloc(buflen);
@@ -401,7 +407,8 @@ crash_handler(int signum)
         FILE *tmp = tmpfile();
         if (asprintf(&cmd, "addr2line -p -f -i -s -e /proc/%d/exe >/proc/self/fd/%d 2>&1", getpid(), fileno(tmp)) >= 0) {
             FILE *addr2line = popen(cmd, "w");
-            for (i = 0; i < num_frames; i++) {
+            /* Start at 1 to skip the crash_handler frame */
+            for (i = 1; i < num_frames; i++) {
                 uintptr_t addr = (uintptr_t)bt[i] - 1;
                 fprintf(addr2line, "0x%"PRIx64"\n", addr);
             }
@@ -420,7 +427,9 @@ crash_handler(int signum)
                 char line[1024];
                 while (fgets(line, sizeof(line), tmp) != NULL) {
                     *strchrnul(line, '\n') = 0; /* trim newline */
-                    AIM_LOG_ERROR("  %s", line);
+                    if (strcmp(line, "?? ??:0")) {
+                        AIM_LOG_ERROR("  %s", line);
+                    }
                 }
             }
         }
