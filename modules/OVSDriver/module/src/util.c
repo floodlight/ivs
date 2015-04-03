@@ -231,6 +231,8 @@ ind_ovs_create_nlsock(void)
 
     nl_socket_disable_auto_ack(sk);
 
+    nl_socket_set_nonblocking(sk);
+
     return sk;
 }
 
