@@ -110,7 +110,7 @@ ind_ovs_recv_multicast(struct nl_msg *msg, void *arg)
     return NL_OK;
 }
 
-static void
+void
 ind_ovs_handle_multicast(void)
 {
     struct nl_cb *cb = nl_socket_get_cb(ind_ovs_multicast_socket);
