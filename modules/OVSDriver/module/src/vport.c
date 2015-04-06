@@ -286,11 +286,6 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname,
         goto cleanup_port;
     }
 
-    if (nl_socket_set_nonblocking(port->notify_socket) < 0) {
-        LOG_ERROR("failed to set netlink socket nonblocking");
-        goto cleanup_port;
-    }
-
     struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_SET);
     nla_put_u32(msg, OVS_VPORT_ATTR_PORT_NO, port_no);
     nla_put_u32(msg, OVS_VPORT_ATTR_UPCALL_PID,

@@ -99,13 +99,6 @@ ind_ovs_pktin_socket_register(struct ind_ovs_pktin_socket *soc,
         return;
     }
 
-    /* Set it to non-blocking */
-    if (nl_socket_set_nonblocking(soc->pktin_socket) < 0) {
-        LOG_ERROR("failed to set netlink socket nonblocking");
-        nl_socket_free(soc->pktin_socket);
-        return;
-    }
-
     /* Register with socket manager */
     if (ind_soc_socket_register(nl_socket_get_fd(soc->pktin_socket),
                                 ind_ovs_pktin_socket_ready, soc) < 0) {
