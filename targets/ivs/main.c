@@ -357,6 +357,9 @@ crash_handler(int signum)
     sigaddset(&sigset, signum);
     sigprocmask(SIG_UNBLOCK, &sigset, NULL);
 
+    /* In case of deadlock */
+    alarm(1);
+
     /* It's possible that this signal handler will crash again due to the many
      * signal-unsafe operations. We want the exit status and core for the
      * original crash to be unaffected by this. So, we fork off a new process
@@ -367,9 +370,6 @@ crash_handler(int signum)
         AIM_LOG_ERROR("Did not die from raise(%d)", signum);
         _exit(1); /* Should not be reached */
     }
-
-    /* In case of deadlock */
-    alarm(1);
 
     char name[16] = { 0 };
     prctl(PR_GET_NAME, name);

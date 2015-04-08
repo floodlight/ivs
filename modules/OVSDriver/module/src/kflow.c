@@ -344,7 +344,6 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
         if (ind_ovs_transact(msg) < 0) {
             LOG_ERROR("Failed to modify kernel flow, deleting it");
             debug_counter_inc(&revalidate_kernel_failed);
-            ind_ovs_nlmsg_freelist_free(msg);
             ind_ovs_kflow_delete(kflow);
             return;
         }
