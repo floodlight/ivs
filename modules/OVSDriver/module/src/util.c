@@ -401,6 +401,8 @@ ind_ovs_nlmsg_freelist_free(struct nl_msg *msg)
             nlmsg_hdr(msg)->nlmsg_len = nlmsg_total_size(0);
             ind_ovs_nlmsg_freelist[i] = msg;
             return;
+        } else if (ind_ovs_nlmsg_freelist[i] == msg) {
+            AIM_DIE("netlink message already in the freelist");
         }
     }
 #endif /* IND_OVS_NLMSG_MEMLEAK_DBG */
