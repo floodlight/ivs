@@ -593,4 +593,13 @@ ind_ovs_upcall_thread_init(struct ind_ovs_upcall_thread *thread, int parent_pid)
     /* Reset signal handlers */
     signal(SIGHUP, SIG_DFL);
     signal(SIGTERM, SIG_DFL);
+
+    errno = 0;
+    if (nice(-20) == -1 && errno != 0) {
+        AIM_LOG_WARN("nice(-20) failed: %s", strerror(errno));
+    }
+
+    if (mlockall(MCL_CURRENT) < 0) {
+        AIM_LOG_WARN("mlockall failed: %s", strerror(errno));
+    }
 }
