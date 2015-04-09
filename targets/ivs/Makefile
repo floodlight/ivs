@@ -135,7 +135,7 @@ GLOBAL_CFLAGS += -fprofile-use -fprofile-correction
 LDFLAGS += -fprofile-use -fprofile-correction
 endif
 
-GLOBAL_LINK_LIBS += -lpthread -lrt -lm
+GLOBAL_LINK_LIBS += -lpthread -lrt -lm -lcap
 
 LIBNL_CFLAGS := $(shell pkg-config --cflags libnl-3.0)
 LIBNL_CFLAGS += $(shell pkg-config --cflags --silence-errors libnl-genl-3.0)
