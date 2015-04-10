@@ -37,6 +37,9 @@
 #include "SocketManager/socketmanager.h"
 #include "murmur/murmur.h"
 #include <packet_trace/packet_trace.h>
+#include <sys/mman.h>
+#include <pwd.h>
+#include <sys/capability.h>
 
 #define DEFAULT_NUM_UPCALL_THREADS 4
 #define MAX_UPCALL_THREADS 16
@@ -107,6 +110,7 @@ static void ind_ovs_upcall_thread_init(struct ind_ovs_upcall_thread *thread, int
 
 static int ind_ovs_num_upcall_threads;
 static struct ind_ovs_upcall_thread *ind_ovs_upcall_threads[MAX_UPCALL_THREADS];
+static int nobody_uid;
 
 DEBUG_COUNTER(kflow_request, "ovsdriver.upcall.kflow_request", "Kernel flow requested by upcall process");
 DEBUG_COUNTER(kflow_request_error, "ovsdriver.upcall.kflow_request_error", "Error on kernel flow request socket");
@@ -465,6 +469,13 @@ ind_ovs_upcall_init(void)
 
         ind_ovs_upcall_threads[i] = thread;
     }
+
+    struct passwd *nobody = getpwnam("nobody");
+    if (nobody) {
+        nobody_uid = nobody->pw_uid;
+    } else {
+        AIM_DIE("no user named \"nobody\" found");
+    }
 }
 
 void
@@ -535,6 +546,35 @@ ind_ovs_upcall_respawn(void)
 }
 
 static void
+drop_privileges(void)
+{
+    if (prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0) < 0) {
+        AIM_DIE("prctl(PR_SET_KEEPCAPS) failed");
+    }
+
+    if (setuid(nobody_uid) < 0) {
+        AIM_DIE("setuid(nobody) failed: %s", strerror(errno));
+    }
+
+    cap_t caps = cap_init();
+    const cap_value_t cap_vector[] = { CAP_NET_ADMIN };
+
+    if (cap_set_flag(caps, CAP_EFFECTIVE, AIM_ARRAYSIZE(cap_vector), cap_vector, CAP_SET) < 0) {
+        AIM_DIE("cap_set_flag failed: %s", strerror(errno));
+    }
+
+    if (cap_set_flag(caps, CAP_PERMITTED, AIM_ARRAYSIZE(cap_vector), cap_vector, CAP_SET) < 0) {
+        AIM_DIE("cap_set_flag failed: %s", strerror(errno));
+    }
+
+    if (cap_set_proc(caps) < 0) {
+        AIM_DIE("cap_set_proc failed: %s", strerror(errno));
+    }
+
+    cap_free(caps);
+}
+
+static void
 ind_ovs_upcall_thread_init(struct ind_ovs_upcall_thread *thread, int parent_pid)
 {
     char threadname[16];
@@ -593,4 +633,15 @@ ind_ovs_upcall_thread_init(struct ind_ovs_upcall_thread *thread, int parent_pid)
     /* Reset signal handlers */
     signal(SIGHUP, SIG_DFL);
     signal(SIGTERM, SIG_DFL);
+
+    errno = 0;
+    if (nice(-20) == -1 && errno != 0) {
+        AIM_LOG_WARN("nice(-20) failed: %s", strerror(errno));
+    }
+
+    if (mlockall(MCL_CURRENT) < 0) {
+        AIM_LOG_WARN("mlockall failed: %s", strerror(errno));
+    }
+
+    drop_privileges();
 }
