@@ -40,6 +40,7 @@
 #include <sys/mman.h>
 #include <pwd.h>
 #include <sys/capability.h>
+#include <sys/signalfd.h>
 
 #define DEFAULT_NUM_UPCALL_THREADS 4
 #define MAX_UPCALL_THREADS 16
@@ -107,10 +108,12 @@ static void ind_ovs_handle_packet_miss(struct ind_ovs_upcall_thread *thread, str
 static bool ind_ovs_upcall_seen_key(struct ind_ovs_upcall_thread *thread, struct nlattr *key);
 static void ind_ovs_upcall_request_kflow(struct ind_ovs_upcall_thread *thread, struct nlattr *key);
 static void ind_ovs_upcall_thread_init(struct ind_ovs_upcall_thread *thread, int parent_pid);
+static void ind_ovs_upcall_respawn_child(struct ind_ovs_upcall_thread *thread);
 
 static int ind_ovs_num_upcall_threads;
 static struct ind_ovs_upcall_thread *ind_ovs_upcall_threads[MAX_UPCALL_THREADS];
 static int nobody_uid;
+static int sigfd;
 
 DEBUG_COUNTER(kflow_request, "ovsdriver.upcall.kflow_request", "Kernel flow requested by upcall process");
 DEBUG_COUNTER(kflow_request_error, "ovsdriver.upcall.kflow_request_error", "Error on kernel flow request socket");
@@ -419,6 +422,50 @@ kflow_sock_ready(int fd, void *cookie,
     ind_ovs_kflow_add(key);
 }
 
+static void
+signalfd_sock_ready(int fd, void *cookie,
+                    int ready_ready, int write_ready, int error_seen)
+{
+    struct signalfd_siginfo siginfo;
+
+    ssize_t nbytes = read(sigfd, &siginfo, sizeof(siginfo));
+    if (nbytes < 0) {
+        AIM_LOG_ERROR("Error on signalfd socket: %s", strerror(errno));
+        return;
+    }
+
+    AIM_ASSERT(nbytes == sizeof(siginfo));
+
+    if (siginfo.ssi_signo != SIGCHLD) {
+        AIM_LOG_ERROR("Received unhandled signal");
+        return;
+    }
+
+    /*
+     * Multiple children terminating before we read a SIGCHLD with signalfd()
+     * will be compressed into a single SIGCHLD.
+     * So we need to check which upcall children have been terminated.
+     */
+    while (1) {
+        int status;
+        pid_t pid = waitpid(-1, &status, WNOHANG);
+        if (pid <= 0) {
+            break;
+        }
+
+        /* Respawn upcall thread with child 'pid' */
+        int i;
+        for (i = 0; i < ind_ovs_num_upcall_threads; i++) {
+            struct ind_ovs_upcall_thread *thread = ind_ovs_upcall_threads[i];
+            if (thread->pid == pid) {
+                AIM_LOG_VERBOSE("Upcall process %d terminated, Respawning", i);
+                ind_ovs_upcall_respawn_child(thread);
+                break;
+            }
+        }
+    }
+}
+
 void
 ind_ovs_upcall_init(void)
 {
@@ -476,6 +523,32 @@ ind_ovs_upcall_init(void)
     } else {
         AIM_DIE("no user named \"nobody\" found");
     }
+
+    /* build the list of signals that we're interested in (just SIGCHLD) */
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGCHLD);
+
+    /*
+     * block SIGCHLD from being handled in the normal way
+     * otherwise, the signalfd does not work
+     */
+    if (sigprocmask(SIG_BLOCK, &mask, NULL) < 0) {
+        AIM_DIE("sigprocmask failed to block SIGCHLD");
+    }
+
+    /*
+     * create the file descriptor that will be readable when
+     * SIGCHLD happens, i.e. when a child upcall process terminates
+     */
+    sigfd = signalfd(-1, &mask, SFD_NONBLOCK);
+    if (sigfd < 0) {
+        AIM_DIE("Failed to create signalfd: %s", strerror(errno));
+    }
+
+    if (ind_soc_socket_register(sigfd, signalfd_sock_ready, NULL) < 0) {
+        AIM_DIE("Failed to register signalfd socket with SocketManager");
+    }
 }
 
 void
@@ -487,8 +560,10 @@ ind_ovs_upcall_enable(void)
 void
 ind_ovs_upcall_finish(void)
 {
-    int i, j;
+    ind_soc_socket_unregister(sigfd);
+    close(sigfd);
 
+    int i, j;
     for (i = 0; i < ind_ovs_num_upcall_threads; i++) {
         struct ind_ovs_upcall_thread *thread = ind_ovs_upcall_threads[i];
         close(thread->epfd);
@@ -506,6 +581,22 @@ ind_ovs_upcall_finish(void)
     }
 }
 
+static void
+ind_ovs_upcall_respawn_child(struct ind_ovs_upcall_thread *thread)
+{
+    int parent_pid = getpid();
+    int child_pid = fork();
+    if (child_pid < 0) {
+        AIM_DIE("Failed to spawn upcall process: %s", strerror(errno));
+    } else if (child_pid == 0) {
+        ind_ovs_upcall_thread_init(thread, parent_pid);
+        ind_ovs_upcall_thread_main(thread);
+        exit(0);
+    }
+
+    thread->pid = child_pid;
+}
+
 void
 ind_ovs_upcall_respawn(void)
 {
@@ -519,25 +610,14 @@ ind_ovs_upcall_respawn(void)
 
         if (thread->pid != 0) {
             AIM_LOG_VERBOSE("Killing upcall process %d pid %d", i, thread->pid);
-            kill(thread->pid, SIGKILL);
-            waitpid(thread->pid, NULL, 0);
+            int pid = thread->pid;
             thread->pid = 0;
+            kill(pid, SIGKILL);
+            waitpid(pid, NULL, 0);
         }
 
         AIM_LOG_VERBOSE("Spawning upcall process %d", i);
-
-        int parent_pid = getpid();
-        int child_pid = fork();
-        if (child_pid < 0) {
-            AIM_DIE("Failed to spawn upcall process: %s", strerror(errno));
-        } else if (child_pid == 0) {
-            ind_ovs_upcall_thread_init(thread, parent_pid);
-            ind_ovs_upcall_thread_main(thread);
-            AIM_LOG_INFO("Upcall process %d exiting", i);
-            exit(0);
-        }
-
-        thread->pid = child_pid;
+        ind_ovs_upcall_respawn_child(thread);
     }
 
     uint64_t elapsed = monotonic_us() - start_time;
