@@ -20,6 +20,7 @@
 #include "ovs_driver_int.h"
 #include "murmur/murmur.h"
 #include <pthread.h>
+#include <SocketManager/socketmanager.h>
 
 #define IND_OVS_KFLOW_EXPIRATION_MS 2345
 #define NUM_KFLOW_BUCKETS 8192
@@ -36,6 +37,10 @@ static struct list_head ind_ovs_kflows;
 static struct list_head ind_ovs_kflow_buckets[NUM_KFLOW_BUCKETS];
 static struct xbuf ind_ovs_kflow_stats_xbuf;
 static struct stats_writer *ind_ovs_kflow_stats_writer;
+static struct nl_sock *kflow_expire_socket;
+
+static bool kflow_expire_task_continue;
+static bool kflow_expire_task_running;
 
 DEBUG_COUNTER(add, "ovsdriver.kflow.add", "Kernel flow added");
 DEBUG_COUNTER(add_invalid_port, "ovsdriver.kflow.add_invalid_port",
@@ -385,34 +390,109 @@ ind_ovs_kflow_invalidate_all(void)
     debug_counter_add(&revalidate_time, elapsed);
 }
 
+static int
+kflow_expire(struct nl_msg *msg, void *arg)
+{
+    uint64_t cur_time = monotonic_us()/1000;
+
+    struct nlmsghdr *nlh = nlmsg_hdr(msg);
+    struct nlattr *attrs[OVS_FLOW_ATTR_MAX+1];
+    if (genlmsg_parse(nlh, sizeof(struct ovs_header),
+                      attrs, OVS_FLOW_ATTR_MAX, NULL) < 0) {
+        abort();
+    }
+
+    struct nlattr *key = attrs[OVS_FLOW_ATTR_KEY];
+    uint32_t hash = key_hash(key);
+    struct list_head *bucket = &ind_ovs_kflow_buckets[hash % NUM_KFLOW_BUCKETS];
+    struct list_links *cur;
+    LIST_FOREACH(bucket, cur) {
+        struct ind_ovs_kflow *kflow = container_of(cur, bucket_links, struct ind_ovs_kflow);
+        if (nla_len(kflow->key) == nla_len(key) &&
+            memcmp(nla_data(kflow->key), nla_data(key), nla_len(key)) == 0) {
+
+            /* Don't bother checking kflows that can't have expired yet. */
+            if ((cur_time - kflow->last_used) < IND_OVS_KFLOW_EXPIRATION_MS) {
+                return NL_OK;
+            }
+
+            /* Might have expired, ask the kernel for the real last_used time. */
+            ind_ovs_kflow_sync_stats(kflow);
+
+            if ((cur_time - kflow->last_used) >= IND_OVS_KFLOW_EXPIRATION_MS) {
+                LOG_VERBOSE("expiring kflow");
+                ind_ovs_kflow_delete(kflow);
+            }
+            break;
+        }
+    }
+
+    return NL_OK;
+}
+
+static int
+kflow_expire_recv(struct nl_sock *sk, struct sockaddr_nl *nla,
+                  unsigned char **buf, struct ucred **creds)
+{
+    if (ind_soc_should_yield()) {
+        kflow_expire_task_continue = true;
+        return 0;
+    }
+
+    return nl_recv(sk, nla, buf, creds);
+}
+
 /*
  * Delete all kflows that haven't been used in more than
  * IND_OVS_KFLOW_EXPIRATION_MS milliseconds.
  *
  * This has the side effect of synchronizing stats.
- *
- * TODO do this more efficiently, spread out over multiple steps.
+ */
+static ind_soc_task_status_t
+kflow_expire_task(void *cookie)
+{
+    AIM_ASSERT(kflow_expire_socket != NULL);
+    kflow_expire_task_running = true;
+
+    struct nl_msg *msg = nlmsg_alloc();
+    struct ovs_header *hdr = genlmsg_put(msg, NL_AUTO_PORT, NL_AUTO_SEQ,
+                                         ovs_flow_family, sizeof(*hdr),
+                                         NLM_F_DUMP, OVS_FLOW_CMD_GET,
+                                         OVS_FLOW_VERSION);
+    hdr->dp_ifindex = ind_ovs_dp_ifindex;
+    if (nl_send_auto(kflow_expire_socket, msg) < 0) {
+        abort();
+    }
+
+    nl_socket_modify_cb(kflow_expire_socket, NL_CB_VALID, NL_CB_CUSTOM,
+                        kflow_expire, NULL);
+    nl_cb_overwrite_recv(nl_socket_get_cb(kflow_expire_socket), kflow_expire_recv);
+    nl_recvmsgs_default(kflow_expire_socket);
+
+    nlmsg_free(msg);
+
+    if (kflow_expire_task_continue) {
+        kflow_expire_task_continue = false;
+        return IND_SOC_TASK_CONTINUE;
+    }
+
+    kflow_expire_task_running = false;
+    return IND_SOC_TASK_FINISHED;
+}
+
+/*
+ * Register a long running task to delete expired kflows.
  */
 void
 ind_ovs_kflow_expire(void)
 {
-    uint64_t cur_time = monotonic_us()/1000;
-    struct list_links *cur, *next;
-    LIST_FOREACH_SAFE(&ind_ovs_kflows, cur, next) {
-        struct ind_ovs_kflow *kflow = container_of(cur, global_links, struct ind_ovs_kflow);
+    /* Check if a previous task is already running */
+    if (kflow_expire_task_running) {
+        return;
+    }
 
-        /* Don't bother checking kflows that can't have expired yet. */
-        if ((cur_time - kflow->last_used) < IND_OVS_KFLOW_EXPIRATION_MS) {
-            continue;
-        }
-
-        /* Might have expired, ask the kernel for the real last_used time. */
-        ind_ovs_kflow_sync_stats(kflow);
-
-        if ((cur_time - kflow->last_used) >= IND_OVS_KFLOW_EXPIRATION_MS) {
-            LOG_VERBOSE("expiring kflow");
-            ind_ovs_kflow_delete(kflow);
-        }
+    if (ind_soc_task_register(kflow_expire_task, NULL, IND_SOC_NORMAL_PRIORITY) < 0) {
+        AIM_DIE("Failed to create long running task for kflow expiration");
     }
 }
 
@@ -495,4 +575,7 @@ ind_ovs_kflow_module_init(void)
     xbuf_init(&ind_ovs_kflow_stats_xbuf);
 
     ind_ovs_kflow_stats_writer = stats_writer_create();
+
+    kflow_expire_socket = ind_ovs_create_nlsock();
+    AIM_ASSERT(kflow_expire_socket != NULL);
 }
