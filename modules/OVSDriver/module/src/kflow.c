@@ -436,7 +436,7 @@ kflow_expire_recv(struct nl_sock *sk, struct sockaddr_nl *nla,
                   unsigned char **buf, struct ucred **creds)
 {
     if (ind_soc_should_yield()) {
-        return 0;
+        return -NLE_AGAIN;
     }
 
     return nl_recv(sk, nla, buf, creds);
@@ -476,7 +476,7 @@ kflow_expire_task(void *cookie)
     nl_cb_overwrite_recv(nl_socket_get_cb(kflow_expire_socket), kflow_expire_recv);
 
 continue_running:
-    if (nl_recvmsgs_report(kflow_expire_socket, nl_socket_get_cb(kflow_expire_socket)) == 0) {
+    if (nl_recvmsgs_report(kflow_expire_socket, nl_socket_get_cb(kflow_expire_socket)) == -NLE_AGAIN) {
         return IND_SOC_TASK_CONTINUE;
     }
 
