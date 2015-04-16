@@ -20,6 +20,7 @@
 #include "ovs_driver_int.h"
 #include "murmur/murmur.h"
 #include <pthread.h>
+#include <SocketManager/socketmanager.h>
 
 #define IND_OVS_KFLOW_EXPIRATION_MS 2345
 #define NUM_KFLOW_BUCKETS 8192
@@ -36,6 +37,9 @@ static struct list_head ind_ovs_kflows;
 static struct list_head ind_ovs_kflow_buckets[NUM_KFLOW_BUCKETS];
 static struct xbuf ind_ovs_kflow_stats_xbuf;
 static struct stats_writer *ind_ovs_kflow_stats_writer;
+static struct nl_sock *kflow_expire_socket;
+
+static bool kflow_expire_task_running;
 
 DEBUG_COUNTER(add, "ovsdriver.kflow.add", "Kernel flow added");
 DEBUG_COUNTER(add_invalid_port, "ovsdriver.kflow.add_invalid_port",
@@ -69,6 +73,24 @@ key_hash(const struct nlattr *key)
     return murmur_hash(nla_data(key), nla_len(key), ind_ovs_salt);
 }
 
+static struct ind_ovs_kflow *
+kflow_lookup(const struct nlattr *key)
+{
+    uint32_t hash = key_hash(key);
+
+    struct list_head *bucket = &ind_ovs_kflow_buckets[hash % NUM_KFLOW_BUCKETS];
+    struct list_links *cur;
+    LIST_FOREACH(bucket, cur) {
+        struct ind_ovs_kflow *kflow = container_of(cur, bucket_links, struct ind_ovs_kflow);
+        if (nla_len(kflow->key) == nla_len(key) &&
+            memcmp(nla_data(kflow->key), nla_data(key), nla_len(key)) == 0) {
+            return kflow;
+        }
+    }
+
+    return NULL;
+}
+
 indigo_error_t
 ind_ovs_kflow_add(const struct nlattr *key)
 {
@@ -91,23 +113,15 @@ ind_ovs_kflow_add(const struct nlattr *key)
         return INDIGO_ERROR_RESOURCE;
     }
 
-    uint32_t hash = key_hash(key);
-
     /*
      * Check that the kernel flow table doesn't already include this flow.
      * In the time between the packet being queued to userspace and the kflow
      * being inserted many more packets matching this kflow could have been
      * enqueued.
      */
-    struct list_head *bucket = &ind_ovs_kflow_buckets[hash % NUM_KFLOW_BUCKETS];
-    struct list_links *cur;
-    LIST_FOREACH(bucket, cur) {
-        struct ind_ovs_kflow *kflow2 = container_of(cur, bucket_links, struct ind_ovs_kflow);
-        if (nla_len(kflow2->key) == nla_len(key) &&
-            memcmp(nla_data(kflow2->key), nla_data(key), nla_len(key)) == 0) {
-            debug_counter_inc(&add_exists);
-            return INDIGO_ERROR_NONE;
-        }
+    if (kflow_lookup(key) != NULL) {
+        debug_counter_inc(&add_exists);
+        return INDIGO_ERROR_NONE;
     }
 
     struct ind_ovs_parsed_key pkey;
@@ -172,6 +186,9 @@ ind_ovs_kflow_add(const struct nlattr *key)
     kflow->num_stats_handles = num_stats_handles;
     kflow->stats_handles = aim_memdup(stats_handles, num_stats_handles * sizeof(*stats_handles));
 
+    uint32_t hash = key_hash(key);
+    struct list_head *bucket = &ind_ovs_kflow_buckets[hash % NUM_KFLOW_BUCKETS];
+
     list_push(&ind_ovs_kflows, &kflow->global_links);
     list_push(bucket, &kflow->bucket_links);
 
@@ -182,30 +199,12 @@ ind_ovs_kflow_add(const struct nlattr *key)
     return INDIGO_ERROR_NONE;
 }
 
-void
-ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow)
+static void
+kflow_sync_stats(struct ind_ovs_kflow *kflow, struct nlattr *stats_attr,
+                 struct nlattr *used_attr)
 {
     debug_counter_inc(&sync_stats);
 
-    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_GET);
-    nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(kflow->key), nla_data(kflow->key));
-
-    struct nlmsghdr *reply;
-    if (ind_ovs_transact_reply(msg, &reply) < 0) {
-        LOG_WARN("failed to sync flow stats");
-        debug_counter_inc(&sync_stats_failed);
-        return;
-    }
-
-    struct nlattr *attrs[OVS_FLOW_ATTR_MAX+1];
-    if (genlmsg_parse(reply, sizeof(struct ovs_header),
-                      attrs, OVS_FLOW_ATTR_MAX,
-                      NULL) < 0) {
-        LOG_ERROR("failed to parse datapath message");
-        abort();
-    }
-
-    struct nlattr *stats_attr = attrs[OVS_FLOW_ATTR_STATS];
     if (stats_attr) {
         struct ovs_flow_stats *stats = nla_data(stats_attr);
 
@@ -225,16 +224,36 @@ ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow)
         }
     }
 
-    struct nlattr *used_attr = attrs[OVS_FLOW_ATTR_USED];
     if (used_attr) {
         uint64_t used = nla_get_u64(used_attr);
         if (used > kflow->last_used) {
             kflow->last_used = used;
-        } else {
-            //LOG_WARN("kflow used time went backwards");
         }
     }
+}
 
+void
+ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow)
+{
+    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_GET);
+    nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(kflow->key), nla_data(kflow->key));
+
+    struct nlmsghdr *reply;
+    if (ind_ovs_transact_reply(msg, &reply) < 0) {
+        LOG_WARN("failed to sync flow stats");
+        debug_counter_inc(&sync_stats_failed);
+        return;
+    }
+
+    struct nlattr *attrs[OVS_FLOW_ATTR_MAX+1];
+    if (genlmsg_parse(reply, sizeof(struct ovs_header),
+                      attrs, OVS_FLOW_ATTR_MAX,
+                      NULL) < 0) {
+        LOG_ERROR("failed to parse datapath message");
+        abort();
+    }
+
+    kflow_sync_stats(kflow, attrs[OVS_FLOW_ATTR_STATS], attrs[OVS_FLOW_ATTR_USED]);
     aim_free(reply);
 }
 
@@ -385,35 +404,94 @@ ind_ovs_kflow_invalidate_all(void)
     debug_counter_add(&revalidate_time, elapsed);
 }
 
-/*
- * Delete all kflows that haven't been used in more than
- * IND_OVS_KFLOW_EXPIRATION_MS milliseconds.
- *
- * This has the side effect of synchronizing stats.
- *
- * TODO do this more efficiently, spread out over multiple steps.
- */
-void
-ind_ovs_kflow_expire(void)
+static int
+kflow_expire(struct nl_msg *msg, void *arg)
 {
     uint64_t cur_time = monotonic_us()/1000;
-    struct list_links *cur, *next;
-    LIST_FOREACH_SAFE(&ind_ovs_kflows, cur, next) {
-        struct ind_ovs_kflow *kflow = container_of(cur, global_links, struct ind_ovs_kflow);
 
-        /* Don't bother checking kflows that can't have expired yet. */
-        if ((cur_time - kflow->last_used) < IND_OVS_KFLOW_EXPIRATION_MS) {
-            continue;
-        }
+    struct nlmsghdr *nlh = nlmsg_hdr(msg);
+    struct nlattr *attrs[OVS_FLOW_ATTR_MAX+1];
+    if (genlmsg_parse(nlh, sizeof(struct ovs_header),
+                      attrs, OVS_FLOW_ATTR_MAX, NULL) < 0) {
+        abort();
+    }
 
+    struct ind_ovs_kflow *kflow = kflow_lookup(attrs[OVS_FLOW_ATTR_KEY]);
+    if (kflow) {
         /* Might have expired, ask the kernel for the real last_used time. */
-        ind_ovs_kflow_sync_stats(kflow);
+        kflow_sync_stats(kflow, attrs[OVS_FLOW_ATTR_STATS], attrs[OVS_FLOW_ATTR_USED]);
 
         if ((cur_time - kflow->last_used) >= IND_OVS_KFLOW_EXPIRATION_MS) {
             LOG_VERBOSE("expiring kflow");
             ind_ovs_kflow_delete(kflow);
         }
     }
+
+    return NL_OK;
+}
+
+static int
+kflow_expire_recv(struct nl_sock *sk, struct sockaddr_nl *nla,
+                  unsigned char **buf, struct ucred **creds)
+{
+    if (ind_soc_should_yield()) {
+        return -NLE_AGAIN;
+    }
+
+    return nl_recv(sk, nla, buf, creds);
+}
+
+/*
+ * Delete all kflows that haven't been used in more than
+ * IND_OVS_KFLOW_EXPIRATION_MS milliseconds.
+ *
+ * This has the side effect of synchronizing stats.
+ */
+static ind_soc_task_status_t
+kflow_expire_task(void *cookie)
+{
+    if (nl_recvmsgs_report(kflow_expire_socket, nl_socket_get_cb(kflow_expire_socket)) == -NLE_AGAIN) {
+        return IND_SOC_TASK_CONTINUE;
+    }
+
+    kflow_expire_task_running = false;
+    return IND_SOC_TASK_FINISHED;
+}
+
+/*
+ * Register a long running task to delete expired kflows.
+ */
+void
+ind_ovs_kflow_expire(void)
+{
+    /* Check if a previous task is already running */
+    if (kflow_expire_task_running) {
+        return;
+    }
+
+    if (ind_soc_task_register(kflow_expire_task, NULL, IND_SOC_NORMAL_PRIORITY) < 0) {
+        AIM_DIE("Failed to create long running task for kflow expiration");
+    }
+
+    AIM_ASSERT(kflow_expire_socket != NULL);
+
+    struct nl_msg *msg = nlmsg_alloc();
+    struct ovs_header *hdr = genlmsg_put(msg, NL_AUTO_PORT, NL_AUTO_SEQ,
+                                         ovs_flow_family, sizeof(*hdr),
+                                         NLM_F_DUMP, OVS_FLOW_CMD_GET,
+                                         OVS_FLOW_VERSION);
+    hdr->dp_ifindex = ind_ovs_dp_ifindex;
+    if (nl_send_auto(kflow_expire_socket, msg) < 0) {
+        abort();
+    }
+
+    nlmsg_free(msg);
+
+    nl_socket_modify_cb(kflow_expire_socket, NL_CB_VALID, NL_CB_CUSTOM,
+                        kflow_expire, NULL);
+    nl_cb_overwrite_recv(nl_socket_get_cb(kflow_expire_socket), kflow_expire_recv);
+
+    kflow_expire_task_running = true;
 }
 
 /* Overwrite the bits in 'key' where 'mask' is 0 with random values */
@@ -495,4 +573,7 @@ ind_ovs_kflow_module_init(void)
     xbuf_init(&ind_ovs_kflow_stats_xbuf);
 
     ind_ovs_kflow_stats_writer = stats_writer_create();
+
+    kflow_expire_socket = ind_ovs_create_nlsock();
+    AIM_ASSERT(kflow_expire_socket != NULL);
 }
