@@ -412,11 +412,6 @@ kflow_expire(struct nl_msg *msg, void *arg)
         if (nla_len(kflow->key) == nla_len(key) &&
             memcmp(nla_data(kflow->key), nla_data(key), nla_len(key)) == 0) {
 
-            /* Don't bother checking kflows that can't have expired yet. */
-            if ((cur_time - kflow->last_used) < IND_OVS_KFLOW_EXPIRATION_MS) {
-                return NL_OK;
-            }
-
             /* Might have expired, sync stats and update the real last_used time. */
             kflow_sync_stats(kflow, attrs[OVS_FLOW_ATTR_STATS], attrs[OVS_FLOW_ATTR_USED]);
 
@@ -451,31 +446,6 @@ kflow_expire_recv(struct nl_sock *sk, struct sockaddr_nl *nla,
 static ind_soc_task_status_t
 kflow_expire_task(void *cookie)
 {
-    AIM_ASSERT(kflow_expire_socket != NULL);
-
-    if (kflow_expire_task_running) {
-        goto continue_running;
-    }
-
-    kflow_expire_task_running = true;
-
-    struct nl_msg *msg = nlmsg_alloc();
-    struct ovs_header *hdr = genlmsg_put(msg, NL_AUTO_PORT, NL_AUTO_SEQ,
-                                         ovs_flow_family, sizeof(*hdr),
-                                         NLM_F_DUMP, OVS_FLOW_CMD_GET,
-                                         OVS_FLOW_VERSION);
-    hdr->dp_ifindex = ind_ovs_dp_ifindex;
-    if (nl_send_auto(kflow_expire_socket, msg) < 0) {
-        abort();
-    }
-
-    nlmsg_free(msg);
-
-    nl_socket_modify_cb(kflow_expire_socket, NL_CB_VALID, NL_CB_CUSTOM,
-                        kflow_expire, NULL);
-    nl_cb_overwrite_recv(nl_socket_get_cb(kflow_expire_socket), kflow_expire_recv);
-
-continue_running:
     if (nl_recvmsgs_report(kflow_expire_socket, nl_socket_get_cb(kflow_expire_socket)) == -NLE_AGAIN) {
         return IND_SOC_TASK_CONTINUE;
     }
@@ -498,6 +468,26 @@ ind_ovs_kflow_expire(void)
     if (ind_soc_task_register(kflow_expire_task, NULL, IND_SOC_NORMAL_PRIORITY) < 0) {
         AIM_DIE("Failed to create long running task for kflow expiration");
     }
+
+    AIM_ASSERT(kflow_expire_socket != NULL);
+
+    struct nl_msg *msg = nlmsg_alloc();
+    struct ovs_header *hdr = genlmsg_put(msg, NL_AUTO_PORT, NL_AUTO_SEQ,
+                                         ovs_flow_family, sizeof(*hdr),
+                                         NLM_F_DUMP, OVS_FLOW_CMD_GET,
+                                         OVS_FLOW_VERSION);
+    hdr->dp_ifindex = ind_ovs_dp_ifindex;
+    if (nl_send_auto(kflow_expire_socket, msg) < 0) {
+        abort();
+    }
+
+    nlmsg_free(msg);
+
+    nl_socket_modify_cb(kflow_expire_socket, NL_CB_VALID, NL_CB_CUSTOM,
+                        kflow_expire, NULL);
+    nl_cb_overwrite_recv(nl_socket_get_cb(kflow_expire_socket), kflow_expire_recv);
+
+    kflow_expire_task_running = true;
 }
 
 /* Overwrite the bits in 'key' where 'mask' is 0 with random values */
