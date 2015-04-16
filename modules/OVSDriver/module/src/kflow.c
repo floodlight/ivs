@@ -186,30 +186,12 @@ ind_ovs_kflow_add(const struct nlattr *key)
     return INDIGO_ERROR_NONE;
 }
 
-void
-ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow)
+static void
+kflow_sync_stats(struct ind_ovs_kflow *kflow, struct nlattr *stats_attr,
+                 struct nlattr *used_attr)
 {
     debug_counter_inc(&sync_stats);
 
-    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_GET);
-    nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(kflow->key), nla_data(kflow->key));
-
-    struct nlmsghdr *reply;
-    if (ind_ovs_transact_reply(msg, &reply) < 0) {
-        LOG_WARN("failed to sync flow stats");
-        debug_counter_inc(&sync_stats_failed);
-        return;
-    }
-
-    struct nlattr *attrs[OVS_FLOW_ATTR_MAX+1];
-    if (genlmsg_parse(reply, sizeof(struct ovs_header),
-                      attrs, OVS_FLOW_ATTR_MAX,
-                      NULL) < 0) {
-        LOG_ERROR("failed to parse datapath message");
-        abort();
-    }
-
-    struct nlattr *stats_attr = attrs[OVS_FLOW_ATTR_STATS];
     if (stats_attr) {
         struct ovs_flow_stats *stats = nla_data(stats_attr);
 
@@ -229,16 +211,36 @@ ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow)
         }
     }
 
-    struct nlattr *used_attr = attrs[OVS_FLOW_ATTR_USED];
     if (used_attr) {
         uint64_t used = nla_get_u64(used_attr);
         if (used > kflow->last_used) {
             kflow->last_used = used;
-        } else {
-            //LOG_WARN("kflow used time went backwards");
         }
     }
+}
 
+void
+ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow)
+{
+    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_GET);
+    nla_put(msg, OVS_FLOW_ATTR_KEY, nla_len(kflow->key), nla_data(kflow->key));
+
+    struct nlmsghdr *reply;
+    if (ind_ovs_transact_reply(msg, &reply) < 0) {
+        LOG_WARN("failed to sync flow stats");
+        debug_counter_inc(&sync_stats_failed);
+        return;
+    }
+
+    struct nlattr *attrs[OVS_FLOW_ATTR_MAX+1];
+    if (genlmsg_parse(reply, sizeof(struct ovs_header),
+                      attrs, OVS_FLOW_ATTR_MAX,
+                      NULL) < 0) {
+        LOG_ERROR("failed to parse datapath message");
+        abort();
+    }
+
+    kflow_sync_stats(kflow, attrs[OVS_FLOW_ATTR_STATS], attrs[OVS_FLOW_ATTR_USED]);
     aim_free(reply);
 }
 
@@ -416,7 +418,7 @@ kflow_expire(struct nl_msg *msg, void *arg)
             }
 
             /* Might have expired, ask the kernel for the real last_used time. */
-            ind_ovs_kflow_sync_stats(kflow);
+            kflow_sync_stats(kflow, attrs[OVS_FLOW_ATTR_STATS], attrs[OVS_FLOW_ATTR_USED]);
 
             if ((cur_time - kflow->last_used) >= IND_OVS_KFLOW_EXPIRATION_MS) {
                 LOG_VERBOSE("expiring kflow");
