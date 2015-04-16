@@ -417,7 +417,7 @@ kflow_expire(struct nl_msg *msg, void *arg)
                 return NL_OK;
             }
 
-            /* Might have expired, ask the kernel for the real last_used time. */
+            /* Might have expired, sync stats and update the real last_used time. */
             kflow_sync_stats(kflow, attrs[OVS_FLOW_ATTR_STATS], attrs[OVS_FLOW_ATTR_USED]);
 
             if ((cur_time - kflow->last_used) >= IND_OVS_KFLOW_EXPIRATION_MS) {
@@ -452,6 +452,11 @@ static ind_soc_task_status_t
 kflow_expire_task(void *cookie)
 {
     AIM_ASSERT(kflow_expire_socket != NULL);
+
+    if (kflow_expire_task_running) {
+        goto continue_running;
+    }
+
     kflow_expire_task_running = true;
 
     struct nl_msg *msg = nlmsg_alloc();
@@ -464,14 +469,14 @@ kflow_expire_task(void *cookie)
         abort();
     }
 
+    nlmsg_free(msg);
+
     nl_socket_modify_cb(kflow_expire_socket, NL_CB_VALID, NL_CB_CUSTOM,
                         kflow_expire, NULL);
     nl_cb_overwrite_recv(nl_socket_get_cb(kflow_expire_socket), kflow_expire_recv);
-    int n = nl_recvmsgs_report(kflow_expire_socket, nl_socket_get_cb(kflow_expire_socket));
 
-    nlmsg_free(msg);
-
-    if (n == 0) {
+continue_running:
+    if (nl_recvmsgs_report(kflow_expire_socket, nl_socket_get_cb(kflow_expire_socket)) == 0) {
         return IND_SOC_TASK_CONTINUE;
     }
 
