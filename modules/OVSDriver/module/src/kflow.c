@@ -73,6 +73,24 @@ key_hash(const struct nlattr *key)
     return murmur_hash(nla_data(key), nla_len(key), ind_ovs_salt);
 }
 
+static struct ind_ovs_kflow *
+kflow_lookup(const struct nlattr *key)
+{
+    uint32_t hash = key_hash(key);
+
+    struct list_head *bucket = &ind_ovs_kflow_buckets[hash % NUM_KFLOW_BUCKETS];
+    struct list_links *cur;
+    LIST_FOREACH(bucket, cur) {
+        struct ind_ovs_kflow *kflow = container_of(cur, bucket_links, struct ind_ovs_kflow);
+        if (nla_len(kflow->key) == nla_len(key) &&
+            memcmp(nla_data(kflow->key), nla_data(key), nla_len(key)) == 0) {
+            return kflow;
+        }
+    }
+
+    return NULL;
+}
+
 indigo_error_t
 ind_ovs_kflow_add(const struct nlattr *key)
 {
@@ -95,23 +113,15 @@ ind_ovs_kflow_add(const struct nlattr *key)
         return INDIGO_ERROR_RESOURCE;
     }
 
-    uint32_t hash = key_hash(key);
-
     /*
      * Check that the kernel flow table doesn't already include this flow.
      * In the time between the packet being queued to userspace and the kflow
      * being inserted many more packets matching this kflow could have been
      * enqueued.
      */
-    struct list_head *bucket = &ind_ovs_kflow_buckets[hash % NUM_KFLOW_BUCKETS];
-    struct list_links *cur;
-    LIST_FOREACH(bucket, cur) {
-        struct ind_ovs_kflow *kflow2 = container_of(cur, bucket_links, struct ind_ovs_kflow);
-        if (nla_len(kflow2->key) == nla_len(key) &&
-            memcmp(nla_data(kflow2->key), nla_data(key), nla_len(key)) == 0) {
-            debug_counter_inc(&add_exists);
-            return INDIGO_ERROR_NONE;
-        }
+    if (kflow_lookup(key) != NULL) {
+        debug_counter_inc(&add_exists);
+        return INDIGO_ERROR_NONE;
     }
 
     struct ind_ovs_parsed_key pkey;
@@ -175,6 +185,9 @@ ind_ovs_kflow_add(const struct nlattr *key)
 
     kflow->num_stats_handles = num_stats_handles;
     kflow->stats_handles = aim_memdup(stats_handles, num_stats_handles * sizeof(*stats_handles));
+
+    uint32_t hash = key_hash(key);
+    struct list_head *bucket = &ind_ovs_kflow_buckets[hash % NUM_KFLOW_BUCKETS];
 
     list_push(&ind_ovs_kflows, &kflow->global_links);
     list_push(bucket, &kflow->bucket_links);
@@ -403,23 +416,14 @@ kflow_expire(struct nl_msg *msg, void *arg)
         abort();
     }
 
-    struct nlattr *key = attrs[OVS_FLOW_ATTR_KEY];
-    uint32_t hash = key_hash(key);
-    struct list_head *bucket = &ind_ovs_kflow_buckets[hash % NUM_KFLOW_BUCKETS];
-    struct list_links *cur;
-    LIST_FOREACH(bucket, cur) {
-        struct ind_ovs_kflow *kflow = container_of(cur, bucket_links, struct ind_ovs_kflow);
-        if (nla_len(kflow->key) == nla_len(key) &&
-            memcmp(nla_data(kflow->key), nla_data(key), nla_len(key)) == 0) {
+    struct ind_ovs_kflow *kflow = kflow_lookup(attrs[OVS_FLOW_ATTR_KEY]);
+    if (kflow) {
+        /* Might have expired, ask the kernel for the real last_used time. */
+        kflow_sync_stats(kflow, attrs[OVS_FLOW_ATTR_STATS], attrs[OVS_FLOW_ATTR_USED]);
 
-            /* Might have expired, sync stats and update the real last_used time. */
-            kflow_sync_stats(kflow, attrs[OVS_FLOW_ATTR_STATS], attrs[OVS_FLOW_ATTR_USED]);
-
-            if ((cur_time - kflow->last_used) >= IND_OVS_KFLOW_EXPIRATION_MS) {
-                LOG_VERBOSE("expiring kflow");
-                ind_ovs_kflow_delete(kflow);
-            }
-            break;
+        if ((cur_time - kflow->last_used) >= IND_OVS_KFLOW_EXPIRATION_MS) {
+            LOG_VERBOSE("expiring kflow");
+            ind_ovs_kflow_delete(kflow);
         }
     }
 
