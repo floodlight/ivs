@@ -39,7 +39,6 @@ static struct xbuf ind_ovs_kflow_stats_xbuf;
 static struct stats_writer *ind_ovs_kflow_stats_writer;
 static struct nl_sock *kflow_expire_socket;
 
-static bool kflow_expire_task_continue;
 static bool kflow_expire_task_running;
 
 DEBUG_COUNTER(add, "ovsdriver.kflow.add", "Kernel flow added");
@@ -435,7 +434,6 @@ kflow_expire_recv(struct nl_sock *sk, struct sockaddr_nl *nla,
                   unsigned char **buf, struct ucred **creds)
 {
     if (ind_soc_should_yield()) {
-        kflow_expire_task_continue = true;
         return 0;
     }
 
@@ -467,12 +465,11 @@ kflow_expire_task(void *cookie)
     nl_socket_modify_cb(kflow_expire_socket, NL_CB_VALID, NL_CB_CUSTOM,
                         kflow_expire, NULL);
     nl_cb_overwrite_recv(nl_socket_get_cb(kflow_expire_socket), kflow_expire_recv);
-    nl_recvmsgs_default(kflow_expire_socket);
+    int n = nl_recvmsgs_report(kflow_expire_socket, nl_socket_get_cb(kflow_expire_socket));
 
     nlmsg_free(msg);
 
-    if (kflow_expire_task_continue) {
-        kflow_expire_task_continue = false;
+    if (n == 0) {
         return IND_SOC_TASK_CONTINUE;
     }
 
