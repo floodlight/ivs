@@ -87,8 +87,8 @@ static void
 reset_lua(void)
 {
     if (lua) {
-        lua_close(lua);
         pipeline_lua_table_reset();
+        lua_close(lua);
     }
 
     lua = luaL_newstate();
