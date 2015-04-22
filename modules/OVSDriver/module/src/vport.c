@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <netlink/cache.h>
 #include <netlink/route/link.h>
+#include <netlink/route/qdisc.h>
 
 #ifndef _LINUX_IF_H
 /* Some versions of libnetlink include linux/if.h, which conflicts with net/if.h. */
@@ -701,7 +702,92 @@ indigo_port_queue_config_get(
     return INDIGO_ERROR_NONE;
 }
 
-/* Currently returns an empty reply */
+/*
+ * Return the minor version of parent class as the queue_id
+ * For Root qdisc return TC_H_ROOT
+ */
+static uint32_t
+qdisc_get_queue_id(struct nl_object *qdisc)
+{
+    uint32_t parent = rtnl_tc_get_parent(TC_CAST(qdisc));
+    if (parent == TC_H_ROOT) {
+        return TC_H_ROOT;
+    }
+
+    uint32_t minor = TC_H_MIN(parent);
+    if (minor > 0) {
+        --minor;
+    }
+
+    return minor;
+}
+
+static void
+queue_stats_fill(of_queue_stats_entry_t *list, struct nl_object *qdisc,
+                 of_port_no_t port_no, uint32_t queue_id)
+{
+    of_queue_stats_entry_t entry[1];
+    of_queue_stats_entry_init(entry, list->version, -1, 1);
+    if (of_list_queue_stats_entry_append_bind(list, entry) < 0) {
+        AIM_DIE("unexpected error appending to queue_stats");
+    }
+
+    of_queue_stats_entry_port_no_set(entry, port_no);
+    of_queue_stats_entry_queue_id_set(entry, queue_id);
+
+    of_queue_stats_entry_tx_packets_set(entry, rtnl_tc_get_stat(TC_CAST(qdisc), RTNL_TC_PACKETS));
+    of_queue_stats_entry_tx_bytes_set(entry, rtnl_tc_get_stat(TC_CAST(qdisc), RTNL_TC_BYTES));
+    of_queue_stats_entry_tx_errors_set(entry, rtnl_tc_get_stat(TC_CAST(qdisc), RTNL_TC_DROPS));
+}
+
+static indigo_error_t
+queue_stats_get(of_port_no_t port_no, uint32_t req_queue_id,
+                struct nl_cache *all_qdiscs, of_queue_stats_entry_t *list)
+{
+    struct ind_ovs_port *port = ind_ovs_port_lookup(port_no);
+    if (port == NULL) {
+        return INDIGO_ERROR_NONE;
+    }
+
+    /* There are no queue's for local port */
+    if (port_no == OVSP_LOCAL) {
+        return INDIGO_ERROR_NONE;
+    }
+
+    /* Search qdisc cache by interface index */
+    struct rtnl_link *link = rtnl_link_get_by_name(link_cache, port->ifname);
+    if (link == NULL) {
+        AIM_DIE("failed to retrieve link");
+    }
+
+    int ifindex = rtnl_link_get_ifindex(link);
+    rtnl_link_put(link);
+    if (ifindex == 0) {
+        AIM_LOG_ERROR("failed to get ifindex for %s", port->ifname);
+        return INDIGO_ERROR_UNKNOWN;
+    }
+
+    bool dump_all = req_queue_id == OF_QUEUE_ALL_BY_VERSION(queue_id);
+
+    struct nl_object *qdisc;
+    for (qdisc = nl_cache_get_first(all_qdiscs); qdisc; qdisc = nl_cache_get_next(qdisc)) {
+        if (rtnl_tc_get_ifindex(TC_CAST(qdisc)) == ifindex) {
+            uint32_t queue_id = qdisc_get_queue_id(qdisc);
+            /* Skip the root qdisc */
+            if (queue_id == TC_H_ROOT) continue;
+
+            if (dump_all) {
+                queue_stats_fill(list, qdisc, port_no, queue_id);
+            } else if (req_queue_id == queue_id) {
+                queue_stats_fill(list, qdisc, port_no, queue_id);
+                break;
+            }
+        }
+    }
+
+    return INDIGO_ERROR_NONE;
+}
+
 indigo_error_t
 indigo_port_queue_stats_get(
     of_queue_stats_request_t *queue_stats_request,
@@ -716,6 +802,56 @@ indigo_port_queue_stats_get(
     of_queue_stats_request_xid_get(queue_stats_request, &xid);
     of_queue_stats_reply_xid_set(queue_stats_reply, xid);
 
+    int rv;
+    struct nl_sock *sk = nl_socket_alloc();
+    if (sk == NULL) {
+        AIM_DIE("failed to allocate netlink socket");
+    }
+
+    if ((rv = nl_connect(sk, NETLINK_ROUTE)) < 0) {
+        AIM_DIE("failed to connect netlink socket: %s", nl_geterror(rv));
+    }
+
+    struct nl_cache *all_qdiscs;
+    if (rtnl_qdisc_alloc_cache(sk, &all_qdiscs) < 0) {
+        AIM_DIE("error while retrieving qdisc cfg");
+    }
+
+    /* Check if the cache is empty */
+    if (nl_cache_is_empty(all_qdiscs)) {
+        goto done;
+    }
+
+    of_queue_stats_entry_t list;
+    of_queue_stats_reply_entries_bind(queue_stats_reply, &list);
+
+    of_port_no_t req_of_port_num;
+    of_queue_stats_request_port_no_get(queue_stats_request, &req_of_port_num);
+    bool dump_all = req_of_port_num == OF_PORT_DEST_ALL_BY_VERSION(queue_stats_request->version);
+
+    uint32_t req_queue_id;
+    of_queue_stats_request_queue_id_get(queue_stats_request, &req_queue_id);
+
+    indigo_error_t err = INDIGO_ERROR_NONE;
+    if (dump_all) {
+        int i;
+        for (i = 0; i < IND_OVS_MAX_PORTS; i++) {
+            if (ind_ovs_ports[i]) {
+                err = queue_stats_get(i, req_queue_id, all_qdiscs, &list);
+            }
+        }
+    } else {
+        err = queue_stats_get(req_of_port_num, req_queue_id, all_qdiscs, &list);
+    }
+
+    if (err != INDIGO_ERROR_NONE) {
+        of_queue_stats_reply_delete(queue_stats_reply);
+        queue_stats_reply = NULL;
+    }
+
+done:
+    nl_cache_free(all_qdiscs);
+    nl_socket_free(sk);
     *queue_stats_reply_ptr = queue_stats_reply;
     return INDIGO_ERROR_NONE;
 }
