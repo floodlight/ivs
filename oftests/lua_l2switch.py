@@ -17,13 +17,13 @@ Testcases for the l2switch sample Lua code
 """
 
 import time
-import xdrlib
 import ofp
 
 from oftest.testutils import *
 from oftest.parse import parse_mac, parse_ip
 
 import lua_common
+import l2switch_xdr
 
 def parse_mac_words(mac):
     a = parse_mac(mac)
@@ -32,21 +32,13 @@ def parse_mac_words(mac):
 def insert_l2(self, vlan, mac, port):
     mac_hi, mac_lo = parse_mac_words(mac)
 
-    # TODO replace with code generated from floodlight/xdr
-    packer = xdrlib.Packer()
-    packer.pack_uint(vlan)
-    packer.pack_uint(mac_hi)
-    packer.pack_uint(mac_lo)
-    key_data = packer.get_buffer()
-
-    packer = xdrlib.Packer()
-    packer.pack_uint(port)
-    value_data = packer.get_buffer()
+    key = l2switch_xdr.l2_key(vlan=vlan, mac_hi=mac_hi, mac_lo=mac_lo)
+    value = l2switch_xdr.l2_value(port=port)
 
     msg = ofp.message.bsn_gentable_entry_add(
         table_id=self.gentable_ids['l2'],
-        key=[ofp.bsn_tlv.data(key_data)],
-        value=[ofp.bsn_tlv.data(value_data)])
+        key=[ofp.bsn_tlv.data(key.pack())],
+        value=[ofp.bsn_tlv.data(value.pack())])
     self.controller.message_send(msg)
 
 def insert_vlan(self, vlan, ports):
@@ -54,19 +46,13 @@ def insert_vlan(self, vlan, ports):
     for port in ports:
         port_bitmap |= (1 << port)
 
-    # TODO replace with code generated from floodlight/xdr
-    packer = xdrlib.Packer()
-    packer.pack_uint(vlan)
-    key_data = packer.get_buffer()
-
-    packer = xdrlib.Packer()
-    packer.pack_uint(port_bitmap)
-    value_data = packer.get_buffer()
+    key = l2switch_xdr.vlan_key(vlan=vlan)
+    value = l2switch_xdr.vlan_value(port_bitmap=port_bitmap)
 
     msg = ofp.message.bsn_gentable_entry_add(
         table_id=self.gentable_ids['vlan'],
-        key=[ofp.bsn_tlv.data(key_data)],
-        value=[ofp.bsn_tlv.data(value_data)])
+        key=[ofp.bsn_tlv.data(key.pack())],
+        value=[ofp.bsn_tlv.data(value.pack())])
     self.controller.message_send(msg)
 
 class L2Forwarding(lua_common.BaseTest):
@@ -74,7 +60,7 @@ class L2Forwarding(lua_common.BaseTest):
     Test various forwarding cases
     """
 
-    sources = ["l2switch"]
+    sources = ["l2switch_xdr", "l2switch"]
 
     def runTest(self):
         insert_vlan(self, vlan=1, ports=[1, 2])
@@ -146,7 +132,7 @@ class ManyPackets(lua_common.BaseTest):
     Send a bunch of packets through the switch
     """
 
-    sources = ["l2switch"]
+    sources = ["l2switch_xdr", "l2switch"]
 
     def runTest(self):
         insert_vlan(self, vlan=1, ports=[1, 2])
