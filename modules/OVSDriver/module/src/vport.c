@@ -772,7 +772,14 @@ indigo_port_queue_stats_get(
 
     of_port_no_t req_of_port_num;
     of_queue_stats_request_port_no_get(queue_stats_request, &req_of_port_num);
-    bool dump_all_ports = req_of_port_num == OF_PORT_DEST_ALL_BY_VERSION(queue_stats_request->version);
+
+    /* For OF 1.0 OFPP_ALL refers to all ports, in later versions it is OFPP_ANY */
+    bool dump_all_ports;
+    if (queue_stats_request->version == OF_VERSION_1_0) {
+        dump_all_ports = req_of_port_num == OF_PORT_DEST_ALL_BY_VERSION(queue_stats_request->version);
+    } else {
+        dump_all_ports = req_of_port_num == OF_PORT_DEST_NONE_BY_VERSION(queue_stats_request->version);
+    }
 
     /* There are no queue's for local port */
     if (req_of_port_num == OVSP_LOCAL) {
