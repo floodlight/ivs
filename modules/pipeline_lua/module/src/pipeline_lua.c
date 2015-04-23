@@ -19,6 +19,7 @@
 
 #include <pipeline/pipeline.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <ivs/ivs.h>
 #include <loci/loci.h>
@@ -284,12 +285,23 @@ commit_lua_upload(indigo_cxn_id_t cxn_id, of_object_t *msg)
         lua_getglobal(lua, "sandbox");
         lua_setfenv(lua, -2);
 
-        if (lua_pcall(lua, 0, 0, 0) != 0) {
+        if (lua_pcall(lua, 0, 1, 0) != 0) {
             AIM_LOG_ERROR("Failed to execute code %s: %s", chunk->filename, lua_tostring(lua, -1));
             indigo_cxn_send_error_reply(
                 cxn_id, msg, OF_ERROR_TYPE_BAD_REQUEST, OF_REQUEST_FAILED_EPERM);
             goto cleanup;
         }
+
+        /* Save the return value in the "modules" table, used by require */
+        char *module_name = aim_strdup(chunk->filename);
+        char *dot = strrchr(module_name, '.');
+        if (dot) *dot = 0; /* strip file extension */
+        lua_getglobal(lua, "modules");
+        lua_pushstring(lua, module_name);
+        lua_pushvalue(lua, -3); /* return value from pcall */
+        lua_rawset(lua, -3); /* modules[filename] = return_value */
+        lua_pop(lua, 2); /* pop modules and return value */
+        free(module_name);
     }
 
     checksum = new_checksum;

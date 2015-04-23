@@ -128,8 +128,12 @@ function command(request_data, request_data_length, reply_data, reply_data_lengt
     return writer.offset()
 end
 
+-- Map from filename to return value from module initialization
+modules = {}
+sandbox.modules = modules
+
 function sandbox.require(name)
-    return sandbox[name]
+    return modules[name] or sandbox[name]
 end
 
 function sandbox.loadstring(s, name)
