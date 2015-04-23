@@ -719,7 +719,10 @@ indigo_port_queue_config_get(
 }
 
 /*
- * Return the minor version of parent class as the queue_id
+ * queue 0 maps to class 1, queue 1 maps to class 2 and so on.
+ * Hence, subtract one from the minor version of parent class
+ * and return as the queue_id
+ *
  * For Root qdisc return TC_H_ROOT
  */
 static uint32_t
@@ -822,7 +825,9 @@ indigo_port_queue_stats_get(
 
 
         struct ind_ovs_port *port = ind_ovs_port_lookup_by_ifindex(rtnl_tc_get_ifindex(TC_CAST(qdisc)));
-        AIM_ASSERT(port != NULL);
+        /* It's possible that there are qdiscs on interfaces not attached to IVS */
+        if (port == NULL) continue;
+
         of_port_no_t port_no = port->dp_port_no;
 
         if ((dump_all_ports && (dump_all_queues || req_queue_id == queue_id)) ||
