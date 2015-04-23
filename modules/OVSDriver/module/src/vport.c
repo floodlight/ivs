@@ -829,13 +829,10 @@ indigo_port_queue_stats_get(
         if (port == NULL) continue;
 
         of_port_no_t port_no = port->dp_port_no;
-
-        if ((dump_all_ports && (dump_all_queues || req_queue_id == queue_id)) ||
-            (req_of_port_num == port_no && dump_all_queues)) {
+        bool dump_port = dump_all_ports || (req_of_port_num == port_no);
+        bool dump_queue = dump_all_queues || (req_queue_id == queue_id);
+        if (dump_port && dump_queue) {
             queue_stats_fill(&list, qdisc, port_no, queue_id);
-        } else if (req_of_port_num == port_no && req_queue_id == queue_id) {
-            queue_stats_fill(&list, qdisc, port_no, queue_id);
-            break;
         }
     }
 
