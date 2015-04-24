@@ -47,3 +47,9 @@ pipeline_lua_log_error(const char *str)
 {
     AIM_LOG_ERROR("%s", str);
 }
+
+bool
+pipeline_lua_log_verbose_enabled(void)
+{
+    return AIM_LOG_ENABLED_FAST(VERBOSE);
+}

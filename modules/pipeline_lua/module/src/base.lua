@@ -147,10 +147,14 @@ void pipeline_lua_log_verbose(const char *str);
 void pipeline_lua_log_info(const char *str);
 void pipeline_lua_log_warn(const char *str);
 void pipeline_lua_log_error(const char *str);
+
+bool pipeline_lua_log_verbose_enabled(void);
 ]]
 
 function log_verbose(...)
-    C.pipeline_lua_log_verbose(string.format(...))
+    if C.pipeline_lua_log_verbose_enabled() then
+        C.pipeline_lua_log_verbose(string.format(...))
+    end
 end
 
 function log_info(...)
