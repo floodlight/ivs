@@ -37,8 +37,6 @@
 #define AIM_LOG_MODULE_NAME pipeline_lua
 #include <AIM/aim_log.h>
 
-AIM_LOG_STRUCT_DEFINE(AIM_LOG_OPTIONS_DEFAULT, AIM_LOG_BITS_DEFAULT, NULL, 0);
-
 #define MAX_UPLOAD_SIZE (2*1024*2014)
 
 /* Per-packet information shared with Lua */
@@ -373,13 +371,6 @@ message_listener(indigo_cxn_id_t cxn_id, of_object_t *msg)
     default:
         return INDIGO_CORE_LISTENER_RESULT_PASS;
     }
-}
-
-/* Called by Lua to log a message */
-void
-pipeline_lua_log(const char *str)
-{
-    AIM_LOG_VERBOSE("%s", str);
 }
 
 void

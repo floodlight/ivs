@@ -140,15 +140,36 @@ function sandbox.loadstring(s, name)
     return setfenv(loadstring(s, name), sandbox)
 end
 
+---- Logging
+
 ffi.cdef[[
-void pipeline_lua_log(const char *str);
+void pipeline_lua_log_verbose(const char *str);
+void pipeline_lua_log_info(const char *str);
+void pipeline_lua_log_warn(const char *str);
+void pipeline_lua_log_error(const char *str);
 ]]
 
-function log(...)
-    C.pipeline_lua_log(string.format(...))
+function log_verbose(...)
+    C.pipeline_lua_log_verbose(string.format(...))
 end
 
-sandbox.log = log
+function log_info(...)
+    C.pipeline_lua_log_info(string.format(...))
+end
+
+function log_warn(...)
+    C.pipeline_lua_log_warn(string.format(...))
+end
+
+function log_error(...)
+    C.pipeline_lua_log_error(string.format(...))
+end
+
+sandbox.log = log_verbose
+sandbox.log_verbose = log_verbose
+sandbox.log_info = log_info
+sandbox.log_warn = log_warn
+sandbox.log_error = log_error
 
 ---- Context
 
