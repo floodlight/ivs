@@ -747,8 +747,11 @@ queue_stats_fill(of_queue_stats_entry_t *list, struct nl_object *qdisc,
 {
     of_queue_stats_entry_t entry[1];
     of_queue_stats_entry_init(entry, list->version, -1, 1);
+
+    /* FIXME: This entry didn't fit, send out the current message and
+     * allocate a new one. */
     if (of_list_queue_stats_entry_append_bind(list, entry) < 0) {
-        AIM_DIE("unexpected error appending to queue_stats");
+        return;
     }
 
     of_queue_stats_entry_port_no_set(entry, port_no);
