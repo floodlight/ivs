@@ -75,12 +75,12 @@ register_table("vlan", {
 function ingress()
     local vlan_entry = vlan_table:lookup({ vlan=fields.vlan_vid })
     if not vlan_entry then
-        log("VLAN lookup failure, dropping")
+        trace("VLAN lookup failure, dropping")
         return
     end
 
     if not bit_check(vlan_entry.port_bitmap, fields.in_port) then
-        log("Port %u not allowed on VLAN %u, dropping", fields.in_port, fields.vlan_vid)
+        trace("Port %u not allowed on VLAN %u, dropping", fields.in_port, fields.vlan_vid)
         return
     end
 
@@ -88,15 +88,15 @@ function ingress()
                                            mac_hi=fields.eth_src_hi,
                                            mac_lo=fields.eth_src_lo })
     if not l2_src_entry then
-        log("L2 source lookup failure, dropping")
+        trace("L2 source lookup failure, dropping")
         return
     elseif l2_src_entry.port ~= fields.in_port then
-        log("Station move, dropping")
+        trace("Station move, dropping")
         return
     end
 
     if bit.band(fields.eth_dst_hi, 0x0100) ~= 0 then
-        log("Broadcast/multicast, flooding")
+        trace("Broadcast/multicast, flooding")
         return flood(vlan_entry)
     end
 
@@ -104,7 +104,7 @@ function ingress()
                                            mac_hi=fields.eth_dst_hi,
                                            mac_lo=fields.eth_dst_lo })
     if not l2_dst_entry then
-        log("L2 destination lookup failure, flooding")
+        trace("L2 destination lookup failure, flooding")
         return flood(vlan_entry)
     end
 
