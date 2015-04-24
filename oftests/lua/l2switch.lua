@@ -48,6 +48,11 @@ register_table("l2", {
         log("l2_delete %p: vlan=%u mac=%04x%08x", cookie, k.vlan, k.mac_hi, k.mac_lo)
         l2_table:remove(k)
     end,
+
+    get_stats=function(k, writer, cookie)
+        log("l2_get_stats %p: vlan=%u mac=%04x%08x", cookie, k.vlan, k.mac_hi, k.mac_lo)
+        writer.uint(10)
+    end
 })
 
 local vlan_table = hashtable.create({ "vlan" }, { "port_bitmap" })

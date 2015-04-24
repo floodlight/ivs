@@ -18,6 +18,7 @@ Testcases for the l2switch sample Lua code
 
 import time
 import ofp
+import logging
 
 from oftest.testutils import *
 from oftest.parse import parse_mac, parse_ip
@@ -152,3 +153,30 @@ class ManyPackets(lua_common.BaseTest):
             verify_packet(self, pkt, 2)
 
         verify_no_other_packets(self)
+
+class Stats(lua_common.BaseTest):
+    """
+    Verify the Lua pipeline can return stats
+    """
+
+    sources = ["l2switch_xdr", "l2switch"]
+
+    def runTest(self):
+        insert_vlan(self, vlan=1, ports=[1, 2])
+        insert_l2(self, vlan=1, mac="00:00:00:00:00:01", port=1)
+        insert_l2(self, vlan=1, mac="00:00:00:00:00:02", port=2)
+        do_barrier(self.controller)
+        verify_no_errors(self.controller)
+
+        # 1 -> 2
+        pkt = str(simple_tcp_packet(eth_src="00:00:00:00:00:01",
+                                    eth_dst="00:00:00:00:00:02",
+                                    dl_vlan_enable=True, vlan_vid=1))
+        self.dataplane.send(1, pkt)
+        verify_packets(self, pkt, [2])
+
+        request = ofp.message.bsn_gentable_entry_stats_request(table_id=self.gentable_ids['l2'])
+        stats = get_stats(self, request)
+        for entry in stats:
+            data = entry.stats[0].value
+            self.assertEqual(data, "\x00\x00\x00\x0a")
