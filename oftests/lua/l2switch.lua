@@ -26,23 +26,13 @@
 
 local fields = fields
 local bit_check, flood
+local xdr = require("l2switch_xdr")
 
 local l2_table = hashtable.create({ "vlan", "mac_hi", "mac_lo" }, { "port" })
 
 register_table("l2", {
-    parse_key=function(r)
-        return {
-            vlan=r.uint(),
-            mac_hi=r.uint(),
-            mac_lo=r.uint(),
-        }
-    end,
-
-    parse_value=function(r)
-        return {
-            port=r.uint(),
-        }
-    end,
+    parse_key=xdr.read_l2_key,
+    parse_value=xdr.read_l2_value,
 
     add=function(k, v)
         log("l2_add: vlan=%u mac=%04x%08x -> port %u", k.vlan, k.mac_hi, k.mac_lo, v.port)
@@ -63,17 +53,8 @@ register_table("l2", {
 local vlan_table = hashtable.create({ "vlan" }, { "port_bitmap" })
 
 register_table("vlan", {
-    parse_key=function(r)
-        return {
-            vlan=r.uint(),
-        }
-    end,
-
-    parse_value=function(r)
-        return {
-            port_bitmap=r.uint(),
-        }
-    end,
+    parse_key=xdr.read_vlan_key,
+    parse_value=xdr.read_vlan_value,
 
     add=function(k, v)
         log("vlan_add: vlan=%u -> port_bitmap %08x", k.vlan, v.port_bitmap)
