@@ -220,12 +220,15 @@ sandbox.fields = setmetatable({}, { __index=context.fields, __metatable=true })
 -- Wrap the unsafe register_table API exported by C (which uses raw pointers)
 -- with a safe version that wraps the pointers in Readers.
 --
--- The 'ops' argument should be a table with 'add', 'modify', and 'delete'
--- functions. Each of these functions is passed Readers for the key and
--- (except for delete) the value. If the optional 'parse_key' and 'parse_value'
--- functions are defined, they are called to transform the corresponding Reader
--- before calling the operation. This is often used to parse the binary stream
--- into a table.
+-- The 'ops' argument should be a table with 'add', 'modify', 'delete', and
+-- 'get_stats' functions. Each of these functions is passed Readers for the key
+-- and (except for delete and get_stats) the value. If the optional 'parse_key'
+-- and 'parse_value' functions are defined, they are called to transform the
+-- corresponding Reader before calling the operation. This is often used to
+-- parse the binary stream into a table.
+--
+-- The 'get_stats' function is also passed a Writer which it can use to send
+-- information back to the controller.
 local MAX_TABLES = 32
 local num_tables = 0
 function sandbox.register_table(name, ops)
@@ -233,11 +236,13 @@ function sandbox.register_table(name, ops)
     num_tables = num_tables + 1
 
     local new_reader = Reader.new
+    local new_writer = Writer.new
     local parse_key = ops.parse_key or function(x) return x end
     local parse_value = ops.parse_value or function(x) return x end
     local add = ops.add
     local modify = ops.modify
     local delete = ops.delete
+    local get_stats = ops.get_stats or function() return 0 end
 
     -- If no modify function was given fall back to delete+add. This is likely
     -- less efficient and doesn't maintain stats, but for many tables this is
@@ -263,5 +268,12 @@ function sandbox.register_table(name, ops)
         delete(parse_key(new_reader(key_data, key_len)), cookie)
     end
 
-    register_table(name, op_add, op_modify, op_delete)
+    local function op_get_stats(key_data, key_len, stats_data, stats_len, cookie)
+        local writer = new_writer(stats_data, stats_len)
+        get_stats(parse_key(new_reader(key_data, key_len)),
+                  writer, cookie)
+        return writer.offset()
+    end
+
+    register_table(name, op_add, op_modify, op_delete, op_get_stats)
 end
