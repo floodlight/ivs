@@ -130,6 +130,7 @@ struct ind_ovs_port {
 struct ind_ovs_kflow {
     struct list_links global_links; /* (global) kflows */
     struct list_links bucket_links; /* (global) kflow_buckets[] */
+    struct tcam_entry tcam_entry; /* (global) megaflow_tcam */
     struct stats stats; /* periodically synchronized with the kernel */
     uint16_t in_port;
     uint16_t num_stats_handles; /* size of stats_handles array */

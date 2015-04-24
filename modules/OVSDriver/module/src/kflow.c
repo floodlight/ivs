@@ -21,6 +21,7 @@
 #include "murmur/murmur.h"
 #include <pthread.h>
 #include <SocketManager/socketmanager.h>
+#include <tcam/tcam.h>
 
 #define IND_OVS_KFLOW_EXPIRATION_MS 2345
 #define NUM_KFLOW_BUCKETS 8192
@@ -38,6 +39,7 @@ static struct list_head ind_ovs_kflow_buckets[NUM_KFLOW_BUCKETS];
 static struct xbuf ind_ovs_kflow_stats_xbuf;
 static struct stats_writer *ind_ovs_kflow_stats_writer;
 static struct nl_sock *kflow_expire_socket;
+static struct tcam *megaflow_tcam;
 
 static bool kflow_expire_task_running;
 
@@ -91,6 +93,18 @@ kflow_lookup(const struct nlattr *key)
     return NULL;
 }
 
+/* Find the kflow that would match the given key */
+static struct ind_ovs_kflow *
+kflow_match(const struct ind_ovs_parsed_key *key)
+{
+    struct tcam_entry *tcam_entry = tcam_match(megaflow_tcam, key);
+    if (!tcam_entry) {
+        return NULL;
+    }
+
+    return container_of(tcam_entry, tcam_entry, struct ind_ovs_kflow);
+}
+
 indigo_error_t
 ind_ovs_kflow_add(const struct nlattr *key)
 {
@@ -113,19 +127,19 @@ ind_ovs_kflow_add(const struct nlattr *key)
         return INDIGO_ERROR_RESOURCE;
     }
 
+    struct ind_ovs_parsed_key pkey;
+    ind_ovs_parse_key((struct nlattr *)key, &pkey);
+
     /*
      * Check that the kernel flow table doesn't already include this flow.
      * In the time between the packet being queued to userspace and the kflow
      * being inserted many more packets matching this kflow could have been
      * enqueued.
      */
-    if (kflow_lookup(key) != NULL) {
+    if (kflow_match(&pkey) != NULL) {
         debug_counter_inc(&add_exists);
         return INDIGO_ERROR_NONE;
     }
-
-    struct ind_ovs_parsed_key pkey;
-    ind_ovs_parse_key((struct nlattr *)key, &pkey);
 
     struct ind_ovs_parsed_key mask;
     memset(&mask, 0, sizeof(mask));
@@ -191,6 +205,8 @@ ind_ovs_kflow_add(const struct nlattr *key)
 
     list_push(&ind_ovs_kflows, &kflow->global_links);
     list_push(bucket, &kflow->bucket_links);
+
+    tcam_insert(megaflow_tcam, &kflow->tcam_entry, &pkey, &mask, 0);
 
     port->num_kflows++;
 
@@ -284,6 +300,7 @@ ind_ovs_kflow_delete(struct ind_ovs_kflow *kflow)
 
     list_remove(&kflow->global_links);
     list_remove(&kflow->bucket_links);
+    tcam_remove(megaflow_tcam, &kflow->tcam_entry);
     aim_free(kflow->actions);
     aim_free(kflow->stats_handles);
     aim_free(kflow);
@@ -576,4 +593,6 @@ ind_ovs_kflow_module_init(void)
 
     kflow_expire_socket = ind_ovs_create_nlsock();
     AIM_ASSERT(kflow_expire_socket != NULL);
+
+    megaflow_tcam = tcam_create(sizeof(struct ind_ovs_parsed_key), ind_ovs_salt);
 }
