@@ -206,23 +206,25 @@ function sandbox.register_table(name, ops)
     -- If no modify function was given fall back to delete+add. This is likely
     -- less efficient and doesn't maintain stats, but for many tables this is
     -- acceptable.
-    modify = modify or function(k, v)
-        delete(k)
-        add(k, v)
+    modify = modify or function(k, v, cookie)
+        delete(k, cookie)
+        add(k, v, cookie)
     end
 
-    local function op_add(key_data, key_len, value_data, value_len)
+    local function op_add(key_data, key_len, value_data, value_len, cookie)
         add(parse_key(new_reader(key_data, key_len)),
-            parse_value(new_reader(value_data, value_len)))
+            parse_value(new_reader(value_data, value_len)),
+            cookie)
     end
 
-    local function op_modify(key_data, key_len, value_data, value_len)
+    local function op_modify(key_data, key_len, value_data, value_len, cookie)
         modify(parse_key(new_reader(key_data, key_len)),
-               parse_value(new_reader(value_data, value_len)))
+               parse_value(new_reader(value_data, value_len)),
+               cookie)
     end
 
-    local function op_delete(key_data, key_len)
-        delete(parse_key(new_reader(key_data, key_len)))
+    local function op_delete(key_data, key_len, cookie)
+        delete(parse_key(new_reader(key_data, key_len)), cookie)
     end
 
     register_table(name, op_add, op_modify, op_delete)

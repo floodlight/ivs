@@ -34,18 +34,18 @@ register_table("l2", {
     parse_key=xdr.read_l2_key,
     parse_value=xdr.read_l2_value,
 
-    add=function(k, v)
-        log("l2_add: vlan=%u mac=%04x%08x -> port %u", k.vlan, k.mac_hi, k.mac_lo, v.port)
+    add=function(k, v, cookie)
+        log("l2_add %p: vlan=%u mac=%04x%08x -> port %u", cookie, k.vlan, k.mac_hi, k.mac_lo, v.port)
         l2_table:insert(k, v)
     end,
 
-    modify=function(k, v)
-        log("l2_modify: vlan=%u mac=%04x%08x -> port %u", k.vlan, k.mac_hi, k.mac_lo, v.port)
+    modify=function(k, v, cookie)
+        log("l2_modify %p: vlan=%u mac=%04x%08x -> port %u", cookie, k.vlan, k.mac_hi, k.mac_lo, v.port)
         l2_table:insert(k, v)
     end,
 
-    delete=function(k)
-        log("l2_delete: vlan=%u mac=%04x%08x", k.vlan, k.mac_hi, k.mac_lo)
+    delete=function(k, cookie)
+        log("l2_delete %p: vlan=%u mac=%04x%08x", cookie, k.vlan, k.mac_hi, k.mac_lo)
         l2_table:remove(k)
     end,
 })
@@ -56,18 +56,18 @@ register_table("vlan", {
     parse_key=xdr.read_vlan_key,
     parse_value=xdr.read_vlan_value,
 
-    add=function(k, v)
-        log("vlan_add: vlan=%u -> port_bitmap %08x", k.vlan, v.port_bitmap)
+    add=function(k, v, cookie)
+        log("vlan_add %p: vlan=%u -> port_bitmap %08x", cookie, k.vlan, v.port_bitmap)
         vlan_table:insert(k, v)
     end,
 
-    modify=function(k, v)
-        log("vlan_modify: vlan=%u -> port_bitmap %08x", k.vlan, v.port_bitmap)
+    modify=function(k, v, cookie)
+        log("vlan_modify %p: vlan=%u -> port_bitmap %08x", cookie, k.vlan, v.port_bitmap)
         vlan_table:insert(k, v)
     end,
 
-    delete=function(k)
-        log("vlan_delete: vlan=%u", k.vlan)
+    delete=function(k, cookie)
+        log("vlan_delete %p: vlan=%u", cookie, k.vlan)
         vlan_table:remove(k)
     end,
 })
