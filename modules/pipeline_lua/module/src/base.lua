@@ -149,6 +149,9 @@ void pipeline_lua_log_warn(const char *str);
 void pipeline_lua_log_error(const char *str);
 
 bool pipeline_lua_log_verbose_enabled(void);
+
+extern bool packet_trace_enabled;
+void pipeline_lua_log_packet_trace(const char *str);
 ]]
 
 function log_verbose(...)
@@ -174,6 +177,14 @@ sandbox.log_verbose = log_verbose
 sandbox.log_info = log_info
 sandbox.log_warn = log_warn
 sandbox.log_error = log_error
+
+function trace(...)
+    if C.packet_trace_enabled then
+        C.pipeline_lua_log_packet_trace(string.format(...))
+    end
+end
+
+sandbox.trace = trace
 
 ---- Context
 

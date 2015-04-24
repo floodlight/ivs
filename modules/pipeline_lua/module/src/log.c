@@ -18,6 +18,7 @@
  ****************************************************************/
 
 #include "pipeline_lua_int.h"
+#include <packet_trace/packet_trace.h>
 
 #define AIM_LOG_MODULE_NAME pipeline_lua
 #include <AIM/aim_log.h>
@@ -52,4 +53,10 @@ bool
 pipeline_lua_log_verbose_enabled(void)
 {
     return AIM_LOG_ENABLED_FAST(VERBOSE);
+}
+
+void
+pipeline_lua_log_packet_trace(const char *str)
+{
+    packet_trace("%s", str);
 }
