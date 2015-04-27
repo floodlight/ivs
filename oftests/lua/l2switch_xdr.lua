@@ -115,6 +115,18 @@ function public.write_l2_value(writer, obj)
 write_uint(writer, obj.port)
 end
 
+function public.read_l2_stats(reader)
+    local obj = {}
+obj.packets = read_uint(reader)
+obj.bytes = read_uint(reader)
+    return obj
+end
+
+function public.write_l2_stats(writer, obj)
+write_uint(writer, obj.packets)
+write_uint(writer, obj.bytes)
+end
+
 function public.read_vlan_key(reader)
     local obj = {}
 obj.vlan = read_uint(reader)
