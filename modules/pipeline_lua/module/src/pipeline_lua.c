@@ -78,6 +78,7 @@ pipeline_lua_init(const char *name)
 {
     indigo_core_message_listener_register(message_listener);
     xbuf_init(&upload_chunks);
+    pipeline_lua_stats_init();
 
     reset_lua();
 }
@@ -87,6 +88,7 @@ reset_lua(void)
 {
     if (lua) {
         pipeline_lua_table_reset();
+        pipeline_lua_stats_reset();
         lua_close(lua);
     }
 
@@ -154,6 +156,7 @@ pipeline_lua_finish(void)
 {
     lua_close(lua);
     pipeline_lua_table_reset();
+    pipeline_lua_stats_finish();
     lua = NULL;
 
     indigo_core_message_listener_unregister(message_listener);

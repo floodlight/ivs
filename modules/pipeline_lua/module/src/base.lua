@@ -186,6 +186,45 @@ end
 
 sandbox.trace = trace
 
+---- Stats
+
+ffi.cdef[[
+struct stats {
+   uint64_t packets;
+   uint64_t bytes;
+};
+
+uint32_t pipeline_lua_stats_alloc(void);
+void pipeline_lua_stats_free(uint32_t slot);
+void pipeline_lua_stats_append(struct xbuf *xbuf, uint32_t slot);
+void pipeline_lua_stats_get(uint32_t slot, struct stats *stats);
+]]
+
+sandbox.stats = {}
+
+function sandbox.stats.alloc()
+    local slot = C.pipeline_lua_stats_alloc()
+    if slot == 0xffffffff then
+        error("Failed to allocate stats")
+    end
+    return slot
+end
+
+function sandbox.stats.free(slot)
+    C.pipeline_lua_stats_free(slot)
+end
+
+function sandbox.stats.add(slot)
+    assert(context.valid)
+    C.pipeline_lua_stats_append(context.stats, slot)
+end
+
+local stats_result = ffi.new("struct stats")
+function sandbox.stats.get(slot)
+    C.pipeline_lua_stats_get(slot, stats_result)
+    return tonumber(stats_result.packets), tonumber(stats_result.bytes)
+end
+
 ---- Context
 
 -- Create a struct declaration for the field names given to us by C
