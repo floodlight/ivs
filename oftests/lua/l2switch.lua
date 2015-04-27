@@ -55,8 +55,7 @@ register_table("l2", {
     get_stats=function(k, writer, cookie)
         log("l2_get_stats %p: vlan=%u mac=%04x%08x", cookie, k.vlan, k.mac_hi, k.mac_lo)
         local packets, bytes = stats.get(l2_stats[cookie])
-        writer.uint(packets)
-        writer.uint(bytes)
+        xdr.write_l2_stats(writer, { packets=packets, bytes=bytes })
     end
 })
 

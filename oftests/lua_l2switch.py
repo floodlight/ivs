@@ -53,14 +53,8 @@ def get_l2_stats(self):
     result = {}
     for entry in stats:
         key = l2switch_xdr.l2_key.unpack(entry.key[0].value)
-
-        # TODO replace with generated code
-        stats_data = entry.stats[0].value
-        unpacker = xdrlib.Unpacker(stats_data)
-        packets = unpacker.unpack_uint()
-        bytes = unpacker.unpack_uint()
-
-        result[(key.vlan, format_mac_words(key.mac_hi, key.mac_lo))] = (packets, bytes)
+        stats = l2switch_xdr.l2_stats.unpack(entry.stats[0].value)
+        result[(key.vlan, format_mac_words(key.mac_hi, key.mac_lo))] = (stats.packets, stats.bytes)
 
     return result
 
