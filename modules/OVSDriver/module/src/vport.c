@@ -1102,6 +1102,7 @@ alloc_port_counters(struct ind_ovs_port_counters *pcounters)
     stats_alloc(&pcounters->tx_broadcast_stats_handle);
     stats_alloc(&pcounters->rx_multicast_stats_handle);
     stats_alloc(&pcounters->tx_multicast_stats_handle);
+    stats_alloc(&pcounters->rx_bad_vlan_stats_handle);
 }
 
 static void
@@ -1113,6 +1114,7 @@ free_port_counters(struct ind_ovs_port_counters *pcounters)
     stats_free(&pcounters->tx_broadcast_stats_handle);
     stats_free(&pcounters->rx_multicast_stats_handle);
     stats_free(&pcounters->tx_multicast_stats_handle);
+    stats_free(&pcounters->rx_bad_vlan_stats_handle);
 }
 
 static uint64_t
