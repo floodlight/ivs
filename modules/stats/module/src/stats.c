@@ -65,15 +65,7 @@ stats_alloc(struct stats_handle *handle)
 {
     AIM_TRUE_OR_DIE(num_free > 0);
     handle->slot = free_stack[--num_free];
-
-    list_links_t *cur;
-    LIST_FOREACH(&stats_writers, cur) {
-        struct stats_writer *stats_writer = container_of(cur, links, struct stats_writer);
-        struct stats *stats = &stats_writer->stats[handle->slot];
-        stats->bytes = 0;
-        stats->packets = 0;
-    }
-
+    stats_clear(handle);
     AIM_LOG_TRACE("allocated stats slot %u", handle->slot);
 }
 
@@ -108,6 +100,18 @@ stats_get(const struct stats_handle *handle, struct stats *result)
         struct stats *stats = &stats_writer->stats[handle->slot];
         result->bytes += stats->bytes;
         result->packets += stats->packets;
+    }
+}
+
+void
+stats_clear(struct stats_handle *handle)
+{
+    list_links_t *cur;
+    LIST_FOREACH(&stats_writers, cur) {
+        struct stats_writer *stats_writer = container_of(cur, links, struct stats_writer);
+        struct stats *stats = &stats_writer->stats[handle->slot];
+        stats->bytes = 0;
+        stats->packets = 0;
     }
 }
 

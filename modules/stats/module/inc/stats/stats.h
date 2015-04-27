@@ -74,6 +74,11 @@ void stats_inc(const struct stats_writer *stats_writer,
 void stats_get(const struct stats_handle *handle, struct stats *result);
 
 /*
+ * Clear stats
+ */
+void stats_clear(struct stats_handle *handle);
+
+/*
  * Create a stats_writer
  */
 struct stats_writer *stats_writer_create(void);
