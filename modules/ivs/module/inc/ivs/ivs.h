@@ -130,6 +130,7 @@ struct ind_ovs_port_counters {
     struct stats_handle tx_broadcast_stats_handle;
     struct stats_handle rx_multicast_stats_handle;
     struct stats_handle tx_multicast_stats_handle;
+    struct stats_handle rx_bad_vlan_stats_handle;
 };
 
 typedef void (*ind_ovs_pktin_cb_f) (uint8_t *data, unsigned int len,
