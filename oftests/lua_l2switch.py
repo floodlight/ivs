@@ -19,6 +19,8 @@ Testcases for the l2switch sample Lua code
 import time
 import ofp
 import logging
+import xdrlib
+import struct
 
 from oftest.testutils import *
 from oftest.parse import parse_mac, parse_ip
@@ -29,6 +31,9 @@ import l2switch_xdr
 def parse_mac_words(mac):
     a = parse_mac(mac)
     return (a[0] << 8) | a[1], (a[2] << 24) | (a[3] << 16) | (a[4] << 8) | a[5]
+
+def format_mac_words(mac_hi, mac_lo):
+    return ':'.join("%02x" % ord(x) for x in struct.pack("!HL", mac_hi, mac_lo))
 
 def insert_l2(self, vlan, mac, port):
     mac_hi, mac_lo = parse_mac_words(mac)
@@ -41,6 +46,23 @@ def insert_l2(self, vlan, mac, port):
         key=[ofp.bsn_tlv.data(key.pack())],
         value=[ofp.bsn_tlv.data(value.pack())])
     self.controller.message_send(msg)
+
+def get_l2_stats(self):
+    request = ofp.message.bsn_gentable_entry_stats_request(table_id=self.gentable_ids['l2'])
+    stats = get_stats(self, request)
+    result = {}
+    for entry in stats:
+        key = l2switch_xdr.l2_key.unpack(entry.key[0].value)
+
+        # TODO replace with generated code
+        stats_data = entry.stats[0].value
+        unpacker = xdrlib.Unpacker(stats_data)
+        packets = unpacker.unpack_uint()
+        bytes = unpacker.unpack_uint()
+
+        result[(key.vlan, format_mac_words(key.mac_hi, key.mac_lo))] = (packets, bytes)
+
+    return result
 
 def insert_vlan(self, vlan, ports):
     port_bitmap = 0
@@ -175,8 +197,6 @@ class Stats(lua_common.BaseTest):
         self.dataplane.send(1, pkt)
         verify_packets(self, pkt, [2])
 
-        request = ofp.message.bsn_gentable_entry_stats_request(table_id=self.gentable_ids['l2'])
-        stats = get_stats(self, request)
-        for entry in stats:
-            data = entry.stats[0].value
-            self.assertEqual(data, "\x00\x00\x00\x0a")
+        l2_stats = get_l2_stats(self)
+        self.assertEqual(l2_stats[(1, '00:00:00:00:00:01')], (1, 100))
+        self.assertEqual(l2_stats[(1, '00:00:00:00:00:02')], (0, 0))

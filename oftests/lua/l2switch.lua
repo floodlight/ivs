@@ -20,7 +20,6 @@
 --
 -- TODO send packet-in instead of dropping
 -- TODO use a single "endpoint" OpenFlow table
--- TODO stats
 -- TODO remove limitation of 32 ports
 -- TODO send LLDPs to controller
 
@@ -28,7 +27,8 @@ local fields = fields
 local bit_check, flood
 local xdr = require("l2switch_xdr")
 
-local l2_table = hashtable.create({ "vlan", "mac_hi", "mac_lo" }, { "port" })
+local l2_table = hashtable.create({ "vlan", "mac_hi", "mac_lo" }, { "port", "stats" })
+local l2_stats = {}
 
 register_table("l2", {
     parse_key=xdr.read_l2_key,
@@ -36,22 +36,27 @@ register_table("l2", {
 
     add=function(k, v, cookie)
         log("l2_add %p: vlan=%u mac=%04x%08x -> port %u", cookie, k.vlan, k.mac_hi, k.mac_lo, v.port)
-        l2_table:insert(k, v)
+        l2_stats[cookie] = stats.alloc()
+        l2_table:insert(k, { port=v.port, stats=l2_stats[cookie] })
     end,
 
     modify=function(k, v, cookie)
         log("l2_modify %p: vlan=%u mac=%04x%08x -> port %u", cookie, k.vlan, k.mac_hi, k.mac_lo, v.port)
-        l2_table:insert(k, v)
+        l2_table:insert(k, { port=v.port, stats=l2_stats[cookie] })
     end,
 
     delete=function(k, cookie)
         log("l2_delete %p: vlan=%u mac=%04x%08x", cookie, k.vlan, k.mac_hi, k.mac_lo)
+        stats.free(l2_stats[cookie])
+        l2_stats[cookie] = nil
         l2_table:remove(k)
     end,
 
     get_stats=function(k, writer, cookie)
         log("l2_get_stats %p: vlan=%u mac=%04x%08x", cookie, k.vlan, k.mac_hi, k.mac_lo)
-        writer.uint(10)
+        local packets, bytes = stats.get(l2_stats[cookie])
+        writer.uint(packets)
+        writer.uint(bytes)
     end
 })
 
@@ -99,6 +104,8 @@ function ingress()
         trace("Station move, dropping")
         return
     end
+
+    stats.add(l2_src_entry.stats)
 
     if bit.band(fields.eth_dst_hi, 0x0100) ~= 0 then
         trace("Broadcast/multicast, flooding")
