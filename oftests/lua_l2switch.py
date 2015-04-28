@@ -88,6 +88,11 @@ class L2Forwarding(lua_common.BaseTest):
         do_barrier(self.controller)
         verify_no_errors(self.controller)
 
+        # lldp
+        pkt = str(simple_eth_packet())
+        self.dataplane.send(1, pkt)
+        verify_packet_in(self, pkt, 1, 0)
+
         # 1 -> 2
         pkt = str(simple_tcp_packet(eth_src="00:00:00:00:00:01",
                                     eth_dst="00:00:00:00:00:02",
@@ -143,6 +148,7 @@ class L2Forwarding(lua_common.BaseTest):
                                     dl_vlan_enable=True, vlan_vid=2))
         self.dataplane.send(1, pkt)
         verify_packets(self, pkt, [])
+        verify_packet_in(self, pkt, 1, 0)
 
 class ManyPackets(lua_common.BaseTest):
     """
