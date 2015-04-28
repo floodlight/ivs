@@ -50,6 +50,7 @@ struct table {
 
 static const indigo_core_gentable_ops_t table_ops;
 static LIST_DEFINE(tables); /* struct table */
+static bool resetting;
 
 int
 pipeline_lua_table_register(lua_State *lua)
@@ -84,6 +85,7 @@ pipeline_lua_table_register(lua_State *lua)
 void
 pipeline_lua_table_reset(void)
 {
+    resetting = true;
     list_links_t *cur, *next;
     LIST_FOREACH_SAFE(&tables, cur, next) {
         struct table *table = container_of(cur, links, struct table);
@@ -92,6 +94,7 @@ pipeline_lua_table_reset(void)
         aim_free(table->name);
         aim_free(table);
     }
+    resetting = false;
 }
 
 /* table operations */
@@ -215,6 +218,12 @@ table_delete(indigo_cxn_id_t cxn_id, void *table_priv, void *entry_priv, of_list
     of_octets_t key;
 
     AIM_LOG_VERBOSE("table %s delete entry %"PRIu64, table->name, cookie);
+
+    if (resetting) {
+        /* Don't call into Lua because we don't want this operation to be able
+         * to fail */
+        return INDIGO_ERROR_NONE;
+    }
 
     rv = parse_tlvs(key_tlvs, &key);
     if (rv < 0) {
