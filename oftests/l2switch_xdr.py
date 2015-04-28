@@ -166,6 +166,45 @@ class l2_value(XDRStruct):
         parts.append(')')
         return ''.join(parts)
 
+class l2_stats(XDRStruct):
+    __slots__ = ['packets', 'bytes']
+
+    def __init__(self, packets=None, bytes=None):
+        self.packets = packets
+        self.bytes = bytes
+
+    @classmethod
+    def pack_into(self, packer, obj):
+        packer.pack_uint(obj.packets)
+        packer.pack_uint(obj.bytes)
+
+    @classmethod
+    def unpack_from(cls, unpacker):
+        obj = l2_stats()
+        obj.packets = unpacker.unpack_uint()
+        obj.bytes = unpacker.unpack_uint()
+        return obj
+
+    def __eq__(self, other):
+        if type(self) != type(other):
+            return False
+        if self.packets != other.packets:
+            return False
+        if self.bytes != other.bytes:
+            return False
+        return True
+
+    def __repr__(self):
+        parts = []
+        parts.append('l2_stats(')
+        parts.append('packets=')
+        parts.append(repr(self.packets))
+        parts.append(", ")
+        parts.append('bytes=')
+        parts.append(repr(self.bytes))
+        parts.append(')')
+        return ''.join(parts)
+
 class vlan_key(XDRStruct):
     __slots__ = ['vlan']
 
@@ -228,4 +267,4 @@ class vlan_value(XDRStruct):
         parts.append(')')
         return ''.join(parts)
 
-__all__ = ['l2_key', 'l2_value', 'vlan_key', 'vlan_value']
+__all__ = ['l2_key', 'l2_value', 'l2_stats', 'vlan_key', 'vlan_value']

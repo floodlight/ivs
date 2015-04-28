@@ -20,7 +20,6 @@
 --
 -- TODO send packet-in instead of dropping
 -- TODO use a single "endpoint" OpenFlow table
--- TODO stats
 -- TODO remove limitation of 32 ports
 -- TODO send LLDPs to controller
 
@@ -28,26 +27,36 @@ local fields = fields
 local bit_check, flood
 local xdr = require("l2switch_xdr")
 
-local l2_table = hashtable.create({ "vlan", "mac_hi", "mac_lo" }, { "port" })
+local l2_table = hashtable.create({ "vlan", "mac_hi", "mac_lo" }, { "port", "stats" })
+local l2_stats = {}
 
 register_table("l2", {
     parse_key=xdr.read_l2_key,
     parse_value=xdr.read_l2_value,
 
-    add=function(k, v)
-        log("l2_add: vlan=%u mac=%04x%08x -> port %u", k.vlan, k.mac_hi, k.mac_lo, v.port)
-        l2_table:insert(k, v)
+    add=function(k, v, cookie)
+        log("l2_add %p: vlan=%u mac=%04x%08x -> port %u", cookie, k.vlan, k.mac_hi, k.mac_lo, v.port)
+        l2_stats[cookie] = stats.alloc()
+        l2_table:insert(k, { port=v.port, stats=l2_stats[cookie] })
     end,
 
-    modify=function(k, v)
-        log("l2_modify: vlan=%u mac=%04x%08x -> port %u", k.vlan, k.mac_hi, k.mac_lo, v.port)
-        l2_table:insert(k, v)
+    modify=function(k, v, cookie)
+        log("l2_modify %p: vlan=%u mac=%04x%08x -> port %u", cookie, k.vlan, k.mac_hi, k.mac_lo, v.port)
+        l2_table:insert(k, { port=v.port, stats=l2_stats[cookie] })
     end,
 
-    delete=function(k)
-        log("l2_delete: vlan=%u mac=%04x%08x", k.vlan, k.mac_hi, k.mac_lo)
+    delete=function(k, cookie)
+        log("l2_delete %p: vlan=%u mac=%04x%08x", cookie, k.vlan, k.mac_hi, k.mac_lo)
+        stats.free(l2_stats[cookie])
+        l2_stats[cookie] = nil
         l2_table:remove(k)
     end,
+
+    get_stats=function(k, writer, cookie)
+        log("l2_get_stats %p: vlan=%u mac=%04x%08x", cookie, k.vlan, k.mac_hi, k.mac_lo)
+        local packets, bytes = stats.get(l2_stats[cookie])
+        xdr.write_l2_stats(writer, { packets=packets, bytes=bytes })
+    end
 })
 
 local vlan_table = hashtable.create({ "vlan" }, { "port_bitmap" })
@@ -56,18 +65,18 @@ register_table("vlan", {
     parse_key=xdr.read_vlan_key,
     parse_value=xdr.read_vlan_value,
 
-    add=function(k, v)
-        log("vlan_add: vlan=%u -> port_bitmap %08x", k.vlan, v.port_bitmap)
+    add=function(k, v, cookie)
+        log("vlan_add %p: vlan=%u -> port_bitmap %08x", cookie, k.vlan, v.port_bitmap)
         vlan_table:insert(k, v)
     end,
 
-    modify=function(k, v)
-        log("vlan_modify: vlan=%u -> port_bitmap %08x", k.vlan, v.port_bitmap)
+    modify=function(k, v, cookie)
+        log("vlan_modify %p: vlan=%u -> port_bitmap %08x", cookie, k.vlan, v.port_bitmap)
         vlan_table:insert(k, v)
     end,
 
-    delete=function(k)
-        log("vlan_delete: vlan=%u", k.vlan)
+    delete=function(k, cookie)
+        log("vlan_delete %p: vlan=%u", cookie, k.vlan)
         vlan_table:remove(k)
     end,
 })
@@ -75,12 +84,12 @@ register_table("vlan", {
 function ingress()
     local vlan_entry = vlan_table:lookup({ vlan=fields.vlan_vid })
     if not vlan_entry then
-        log("VLAN lookup failure, dropping")
+        trace("VLAN lookup failure, dropping")
         return
     end
 
     if not bit_check(vlan_entry.port_bitmap, fields.in_port) then
-        log("Port %u not allowed on VLAN %u, dropping", fields.in_port, fields.vlan_vid)
+        trace("Port %u not allowed on VLAN %u, dropping", fields.in_port, fields.vlan_vid)
         return
     end
 
@@ -88,15 +97,17 @@ function ingress()
                                            mac_hi=fields.eth_src_hi,
                                            mac_lo=fields.eth_src_lo })
     if not l2_src_entry then
-        log("L2 source lookup failure, dropping")
+        trace("L2 source lookup failure, dropping")
         return
     elseif l2_src_entry.port ~= fields.in_port then
-        log("Station move, dropping")
+        trace("Station move, dropping")
         return
     end
 
+    stats.add(l2_src_entry.stats)
+
     if bit.band(fields.eth_dst_hi, 0x0100) ~= 0 then
-        log("Broadcast/multicast, flooding")
+        trace("Broadcast/multicast, flooding")
         return flood(vlan_entry)
     end
 
@@ -104,7 +115,7 @@ function ingress()
                                            mac_hi=fields.eth_dst_hi,
                                            mac_lo=fields.eth_dst_lo })
     if not l2_dst_entry then
-        log("L2 destination lookup failure, flooding")
+        trace("L2 destination lookup failure, flooding")
         return flood(vlan_entry)
     end
 

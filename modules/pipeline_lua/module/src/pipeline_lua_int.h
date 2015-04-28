@@ -66,4 +66,11 @@ void *pipeline_lua_allocator_alloc(uint32_t size);
 void *pipeline_lua_allocator_dup(void *src, uint32_t size);
 void pipeline_lua_allocator_reset(void);
 
+/* stats.c */
+void pipeline_lua_stats_init(void);
+void pipeline_lua_stats_finish(void);
+void pipeline_lua_stats_reset(void);
+uint32_t pipeline_lua_stats_alloc(void);
+void pipeline_lua_stats_free(uint32_t slot);
+
 #endif

@@ -43,7 +43,9 @@ struct table {
     int ref_add;
     int ref_modify;
     int ref_delete;
+    int ref_get_stats;
     indigo_core_gentable_t *gentable;
+    uintptr_t next_cookie; /* will roll over sooner on a 32-bit machine */
 };
 
 static const indigo_core_gentable_ops_t table_ops;
@@ -56,13 +58,16 @@ pipeline_lua_table_register(lua_State *lua)
     luaL_checktype(lua, 2, LUA_TFUNCTION);
     luaL_checktype(lua, 3, LUA_TFUNCTION);
     luaL_checktype(lua, 4, LUA_TFUNCTION);
+    luaL_checktype(lua, 5, LUA_TFUNCTION);
 
     struct table *table = aim_malloc(sizeof(*table));
     table->lua = lua;
     table->name = aim_strdup(name);
+    table->ref_get_stats = luaL_ref(lua, LUA_REGISTRYINDEX);
     table->ref_delete = luaL_ref(lua, LUA_REGISTRYINDEX);
     table->ref_modify = luaL_ref(lua, LUA_REGISTRYINDEX);
     table->ref_add = luaL_ref(lua, LUA_REGISTRYINDEX);
+    table->next_cookie = 1;
     list_push(&tables, &table->links);
 
     indigo_core_gentable_register(
@@ -124,7 +129,7 @@ table_add(indigo_cxn_id_t cxn_id, void *table_priv, of_list_bsn_tlv_t *key_tlvs,
     of_octets_t key;
     of_octets_t value;
 
-    AIM_LOG_VERBOSE("table %s add", table->name);
+    AIM_LOG_VERBOSE("table %s add entry %"PRIu64, table->name, table->next_cookie);
 
     rv = parse_tlvs(key_tlvs, &key);
     if (rv < 0) {
@@ -136,6 +141,11 @@ table_add(indigo_cxn_id_t cxn_id, void *table_priv, of_list_bsn_tlv_t *key_tlvs,
         return rv;
     }
 
+    uintptr_t cookie = table->next_cookie++;
+    if (cookie == UINTPTR_MAX) {
+        AIM_LOG_WARN("table entry cookie rolled over");
+    }
+
     pipeline_lua_allocator_reset();
     void *key_buf = pipeline_lua_allocator_dup(key.data, key.bytes);
     void *value_buf = pipeline_lua_allocator_dup(value.data, value.bytes);
@@ -145,12 +155,13 @@ table_add(indigo_cxn_id_t cxn_id, void *table_priv, of_list_bsn_tlv_t *key_tlvs,
     lua_pushinteger(table->lua, key.bytes);
     lua_pushlightuserdata(table->lua, value_buf);
     lua_pushinteger(table->lua, value.bytes);
-    if (lua_pcall(table->lua, 4, 0, 0) != 0) {
-        AIM_LOG_ERROR("Failed to execute table %s add: %s", table->name, lua_tostring(table->lua, -1));
+    lua_pushlightuserdata(table->lua, (void *)cookie);
+    if (lua_pcall(table->lua, 5, 0, 0) != 0) {
+        AIM_LOG_ERROR("Failed to execute table %s add of entry %"PRIu64": %s", table->name, cookie, lua_tostring(table->lua, -1));
         return INDIGO_ERROR_UNKNOWN;
     }
 
-    *entry_priv = NULL;
+    *entry_priv = (void *)cookie;
     ind_ovs_barrier_defer_revalidation(cxn_id);
     return INDIGO_ERROR_NONE;
 }
@@ -160,10 +171,11 @@ table_modify(indigo_cxn_id_t cxn_id, void *table_priv, void *entry_priv, of_list
 {
     indigo_error_t rv;
     struct table *table = table_priv;
+    uintptr_t cookie = (uintptr_t)entry_priv;
     of_octets_t key;
     of_octets_t value;
 
-    AIM_LOG_VERBOSE("table %s modify", table->name);
+    AIM_LOG_VERBOSE("table %s modify entry %"PRIu64, table->name, cookie);
 
     rv = parse_tlvs(key_tlvs, &key);
     if (rv < 0) {
@@ -184,8 +196,9 @@ table_modify(indigo_cxn_id_t cxn_id, void *table_priv, void *entry_priv, of_list
     lua_pushinteger(table->lua, key.bytes);
     lua_pushlightuserdata(table->lua, value_buf);
     lua_pushinteger(table->lua, value.bytes);
-    if (lua_pcall(table->lua, 4, 0, 0) != 0) {
-        AIM_LOG_ERROR("Failed to execute table %s modify: %s", table->name, lua_tostring(table->lua, -1));
+    lua_pushlightuserdata(table->lua, (void *)cookie);
+    if (lua_pcall(table->lua, 5, 0, 0) != 0) {
+        AIM_LOG_ERROR("Failed to execute table %s modify of entry %"PRIu64": %s", table->name, cookie, lua_tostring(table->lua, -1));
         return INDIGO_ERROR_UNKNOWN;
     }
 
@@ -198,9 +211,10 @@ table_delete(indigo_cxn_id_t cxn_id, void *table_priv, void *entry_priv, of_list
 {
     indigo_error_t rv;
     struct table *table = table_priv;
+    uintptr_t cookie = (uintptr_t)entry_priv;
     of_octets_t key;
 
-    AIM_LOG_VERBOSE("table %s delete", table->name);
+    AIM_LOG_VERBOSE("table %s delete entry %"PRIu64, table->name, cookie);
 
     rv = parse_tlvs(key_tlvs, &key);
     if (rv < 0) {
@@ -213,8 +227,9 @@ table_delete(indigo_cxn_id_t cxn_id, void *table_priv, void *entry_priv, of_list
     lua_rawgeti(table->lua, LUA_REGISTRYINDEX, table->ref_delete);
     lua_pushlightuserdata(table->lua, key_buf);
     lua_pushinteger(table->lua, key.bytes);
-    if (lua_pcall(table->lua, 2, 0, 0) != 0) {
-        AIM_LOG_ERROR("Failed to execute table %s delete: %s", table->name, lua_tostring(table->lua, -1));
+    lua_pushlightuserdata(table->lua, (void *)cookie);
+    if (lua_pcall(table->lua, 3, 0, 0) != 0) {
+        AIM_LOG_ERROR("Failed to execute table %s delete of entry %"PRIu64": %s", table->name, cookie, lua_tostring(table->lua, -1));
         return INDIGO_ERROR_UNKNOWN;
     }
 
@@ -223,9 +238,51 @@ table_delete(indigo_cxn_id_t cxn_id, void *table_priv, void *entry_priv, of_list
 }
 
 static void
-table_get_stats(void *table_priv, void *entry_priv, of_list_bsn_tlv_t *key, of_list_bsn_tlv_t *stats)
+table_get_stats(void *table_priv, void *entry_priv, of_list_bsn_tlv_t *key_tlvs, of_list_bsn_tlv_t *stats_tlvs)
 {
-    /* TODO */
+    indigo_error_t rv;
+    struct table *table = table_priv;
+    uintptr_t cookie = (uintptr_t)entry_priv;
+    of_octets_t key;
+    const int max_stats_size = 64;
+
+    AIM_LOG_VERBOSE("table %s get_stats entry %"PRIu64, table->name, cookie);
+
+    rv = parse_tlvs(key_tlvs, &key);
+    if (rv < 0) {
+        AIM_LOG_ERROR("Failed to parse key TLVs");
+        return;
+    }
+
+    pipeline_lua_allocator_reset();
+    void *key_buf = pipeline_lua_allocator_dup(key.data, key.bytes);
+    void *stats_buf = pipeline_lua_allocator_alloc(max_stats_size);
+
+    lua_rawgeti(table->lua, LUA_REGISTRYINDEX, table->ref_get_stats);
+    lua_pushlightuserdata(table->lua, key_buf);
+    lua_pushinteger(table->lua, key.bytes);
+    lua_pushlightuserdata(table->lua, stats_buf);
+    lua_pushinteger(table->lua, max_stats_size);
+    lua_pushlightuserdata(table->lua, (void *)cookie);
+    if (lua_pcall(table->lua, 5, 1, 0) != 0) {
+        AIM_LOG_ERROR("Failed to execute table %s get_stats of entry %"PRIu64": %s", table->name, cookie, lua_tostring(table->lua, -1));
+        return;
+    }
+
+    int stats_size = lua_tointeger(table->lua, 0);
+    AIM_TRUE_OR_DIE(stats_size >= 0 && stats_size < max_stats_size);
+    lua_settop(table->lua, 0);
+
+    of_octets_t stats_data = { .data = stats_buf, .bytes = stats_size };
+
+    of_bsn_tlv_t stats_tlv;
+    of_bsn_tlv_data_init(&stats_tlv, stats_tlvs->version, -1, 1);
+    if (of_list_bsn_tlv_append_bind(stats_tlvs, &stats_tlv)) {
+        AIM_LOG_ERROR("Failed to append table entry stats");
+    }
+    if (of_bsn_tlv_data_value_set(&stats_tlv, &stats_data) < 0) {
+        AIM_LOG_ERROR("Failed to set table entry stats");
+    }
 }
 
 static const indigo_core_gentable_ops_t table_ops = {
