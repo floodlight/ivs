@@ -73,12 +73,23 @@ uint32_t last_uploaded_chunk_offset;
 /* Hash of the currently running code */
 uint32_t checksum;
 
+/* Overall minimum average interval between packet-ins (in us) */
+#define PKTIN_INTERVAL 3000
+
+/* Overall packet-in burstiness tolerance. */
+#define PKTIN_BURST_SIZE 32
+
+static struct ind_ovs_pktin_socket pktin_soc;
+
 static void
 pipeline_lua_init(const char *name)
 {
     indigo_core_message_listener_register(message_listener);
     xbuf_init(&upload_chunks);
     pipeline_lua_stats_init();
+
+    ind_ovs_pktin_socket_register(&pktin_soc, NULL, PKTIN_INTERVAL,
+                                  PKTIN_BURST_SIZE);
 
     reset_lua();
 }
@@ -149,6 +160,9 @@ reset_lua(void)
     lua_getglobal(lua, "command");
     AIM_ASSERT(lua_isfunction(lua, -1));
     command_ref = luaL_ref(lua, LUA_REGISTRYINDEX);
+
+    lua_pushinteger(lua, ind_ovs_pktin_socket_netlink_port(&pktin_soc));
+    lua_setglobal(lua, "netlink_port");
 }
 
 static void
@@ -162,6 +176,7 @@ pipeline_lua_finish(void)
     indigo_core_message_listener_unregister(message_listener);
     cleanup_lua_upload();
     xbuf_cleanup(&upload_chunks);
+    ind_ovs_pktin_socket_unregister(&pktin_soc);
 }
 
 indigo_error_t
