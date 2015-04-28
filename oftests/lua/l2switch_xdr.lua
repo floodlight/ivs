@@ -91,7 +91,7 @@ local function write_string(writer, x, max)
     writer.fstring(x)
 end
 
-function public.read_l2_key(reader)
+function public.read_endpoint_key(reader)
     local obj = {}
 obj.vlan = read_uint(reader)
 obj.mac_hi = read_uint(reader)
@@ -99,52 +99,32 @@ obj.mac_lo = read_uint(reader)
     return obj
 end
 
-function public.write_l2_key(writer, obj)
+function public.write_endpoint_key(writer, obj)
 write_uint(writer, obj.vlan)
 write_uint(writer, obj.mac_hi)
 write_uint(writer, obj.mac_lo)
 end
 
-function public.read_l2_value(reader)
+function public.read_endpoint_value(reader)
     local obj = {}
 obj.port = read_uint(reader)
     return obj
 end
 
-function public.write_l2_value(writer, obj)
+function public.write_endpoint_value(writer, obj)
 write_uint(writer, obj.port)
 end
 
-function public.read_l2_stats(reader)
+function public.read_endpoint_stats(reader)
     local obj = {}
 obj.packets = read_uint(reader)
 obj.bytes = read_uint(reader)
     return obj
 end
 
-function public.write_l2_stats(writer, obj)
+function public.write_endpoint_stats(writer, obj)
 write_uint(writer, obj.packets)
 write_uint(writer, obj.bytes)
-end
-
-function public.read_vlan_key(reader)
-    local obj = {}
-obj.vlan = read_uint(reader)
-    return obj
-end
-
-function public.write_vlan_key(writer, obj)
-write_uint(writer, obj.vlan)
-end
-
-function public.read_vlan_value(reader)
-    local obj = {}
-obj.port_bitmap = read_uint(reader)
-    return obj
-end
-
-function public.write_vlan_value(writer, obj)
-write_uint(writer, obj.port_bitmap)
 end
 
 return public
