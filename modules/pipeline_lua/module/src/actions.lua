@@ -16,6 +16,7 @@
 local ffi = require("ffi")
 local C = ffi.C
 local context = context
+local userdata = ffi.new("uint64_t[1]", 0)
 
 ffi.cdef[[
 typedef struct of_ipv6_s {
@@ -24,10 +25,10 @@ typedef struct of_ipv6_s {
 
 /* Output */
 
-void action_controller(struct action_context *ctx, uint64_t userdata);
 void action_output(struct action_context *ctx, uint32_t port_no);
 void action_output_local(struct action_context *ctx);
 void action_output_in_port(struct action_context *ctx);
+void action_userspace(struct action_context *ctx, void *userdata, int datalen, uint32_t netlink_port);
 
 /* Ethernet */
 
@@ -74,7 +75,7 @@ void action_set_priority(struct action_context *ctx, uint32_t priority);
 ]]
 
 local simple_actions = {
-    "controller", "output", "output_local", "output_in_port",
+    "output", "output_local", "output_in_port",
     "set_vlan_vid", "set_vlan_pcp", "pop_vlan", "push_vlan",
     "set_ipv4_dst", "set_ipv4_src", "set_ipv4_dscp", "set_ipv4_ecn", "set_ipv4_ttl",
     "set_ipv6_dscp", "set_ipv6_ecn", "set_ipv6_ttl", "set_ipv6_flabel",
@@ -98,6 +99,11 @@ end
 function sandbox.set_eth_src(mac_lo, mac_hi)
     assert(context.valid)
     C.action_set_eth_src_scalar(context.actx, mac_lo, mac_hi)
+end
+
+function sandbox.userspace(reason)
+    userdata[0] = reason
+    C.action_userspace(context.actx, userdata, 8, netlink_port)
 end
 
 -- TODO set_ipv6_dst

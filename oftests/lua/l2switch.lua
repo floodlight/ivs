@@ -17,9 +17,6 @@
 --
 -- This isn't intended to be a full featured switch, but just enough to run
 -- OFTests against.
---
--- TODO send packet-in instead of dropping
--- TODO send LLDPs to controller
 
 local fields = fields
 local bit_check, flood
@@ -87,10 +84,22 @@ register_table("endpoint", {
 })
 
 function ingress()
+    if fields.eth_type == 0x88cc then
+        trace("sending pdu to controller")
+        userspace(0)
+        return
+    end
+
     local vlan_entry = vlan_table[fields.vlan_vid]
+    if not vlan_entry then
+        trace("VLAN lookup failure, dropping")
+        userspace(0)
+        return
+    end
 
     if not vlan_entry[fields.in_port] then
         trace("Port %u not allowed on VLAN %u, dropping", fields.in_port, fields.vlan_vid)
+        userspace(0)
         return
     end
 
@@ -99,9 +108,11 @@ function ingress()
                                            mac_lo=fields.eth_src_lo })
     if not l2_src_entry then
         trace("L2 source lookup failure, dropping")
+        userspace(0)
         return
     elseif l2_src_entry.port ~= fields.in_port then
         trace("Station move, dropping")
+        userspace(0)
         return
     end
 
