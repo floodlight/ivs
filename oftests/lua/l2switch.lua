@@ -81,7 +81,7 @@ register_table("vlan", {
 
 function ingress()
     if fields.eth_type == 0x88cc then
-        log("sending pdu to controller")
+        trace("sending pdu to controller")
         userspace(0)
         return
     end
