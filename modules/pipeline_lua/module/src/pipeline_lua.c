@@ -88,13 +88,21 @@ process_pktin(uint8_t *data, unsigned int len,
               struct ind_ovs_parsed_key *pkey)
 {
     lua_rawgeti(lua, LUA_REGISTRYINDEX, pktin_ref);
+    lua_pushlightuserdata(lua, data);
+    lua_pushinteger(lua, len);
+    lua_pushinteger(lua, reason);
+    lua_pushinteger(lua, metadata);
 
-    /* Todo: Pass arguments to pktin function */
-    if (lua_pcall(lua, 0, 0, 0) != 0) {
+    if (lua_pcall(lua, 4, 1, 0) != 0) {
         AIM_LOG_ERROR("Failed to execute script: %s", lua_tostring(lua, -1));
     }
 
-    ind_ovs_pktin(pkey->in_port, data, len, reason, metadata, pkey);
+    bool send_to_controller = lua_toboolean(lua, 0);
+    lua_settop(lua, 0);
+
+    if (send_to_controller) {
+        ind_ovs_pktin(pkey->in_port, data, len, reason, metadata, pkey);
+    }
 }
 
 static void
