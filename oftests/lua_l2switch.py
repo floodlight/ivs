@@ -63,7 +63,7 @@ class L2Forwarding(lua_common.BaseTest):
     Test various forwarding cases
     """
 
-    sources = ["l2switch_xdr", "l2switch"]
+    sources = ["l2switch_xdr", "l2switch", "pktin"]
 
     def runTest(self):
         insert_endpoint(self, vlan=1, mac="00:00:00:00:00:01", port=1)
