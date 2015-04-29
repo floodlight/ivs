@@ -63,6 +63,7 @@ static lua_State *lua;
 static struct context context;
 static int process_ref;
 static int command_ref;
+static int pktin_ref;
 
 /* List of struct upload_chunk */
 struct xbuf upload_chunks;
@@ -82,13 +83,28 @@ uint32_t checksum;
 static struct ind_ovs_pktin_socket pktin_soc;
 
 static void
+process_pktin(uint8_t *data, unsigned int len,
+              uint8_t reason, uint64_t metadata,
+              struct ind_ovs_parsed_key *pkey)
+{
+    lua_rawgeti(lua, LUA_REGISTRYINDEX, pktin_ref);
+
+    /* Todo: Pass arguments to pktin function */
+    if (lua_pcall(lua, 0, 0, 0) != 0) {
+        AIM_LOG_ERROR("Failed to execute script: %s", lua_tostring(lua, -1));
+    }
+
+    ind_ovs_pktin(pkey->in_port, data, len, reason, metadata, pkey);
+}
+
+static void
 pipeline_lua_init(const char *name)
 {
     indigo_core_message_listener_register(message_listener);
     xbuf_init(&upload_chunks);
     pipeline_lua_stats_init();
 
-    ind_ovs_pktin_socket_register(&pktin_soc, NULL, PKTIN_INTERVAL,
+    ind_ovs_pktin_socket_register(&pktin_soc, process_pktin, PKTIN_INTERVAL,
                                   PKTIN_BURST_SIZE);
 
     reset_lua();
@@ -160,6 +176,11 @@ reset_lua(void)
     lua_getglobal(lua, "command");
     AIM_ASSERT(lua_isfunction(lua, -1));
     command_ref = luaL_ref(lua, LUA_REGISTRYINDEX);
+
+    /* Store a reference to pktin() so we can efficiently retrieve it */
+    lua_getglobal(lua, "pktin");
+    AIM_ASSERT(lua_isfunction(lua, -1));
+    pktin_ref = luaL_ref(lua, LUA_REGISTRYINDEX);
 
     lua_pushinteger(lua, ind_ovs_pktin_socket_netlink_port(&pktin_soc));
     lua_setglobal(lua, "netlink_port");
