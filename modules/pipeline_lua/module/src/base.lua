@@ -16,7 +16,7 @@
 local bit = require("bit")
 local ffi = require("ffi")
 local C = ffi.C
-local result = ffi.new("uint32_t[1]", 0)
+local result = ffi.new("bool[1]", 0)
 
 local sandbox = {
     assert=assert,
@@ -137,7 +137,7 @@ function pktin(data, len, reason, metadata)
     local reader = Reader.new(data, len)
     local writer = Writer.new(result, 4)
     sandbox.pktin(reader, writer, reason, metadata)
-    return writer
+    return result
 end
 
 -- Map from filename to return value from module initialization
