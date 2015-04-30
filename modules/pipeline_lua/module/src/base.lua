@@ -128,6 +128,15 @@ function command(request_data, request_data_length, reply_data, reply_data_lengt
     return writer.offset()
 end
 
+-- To be overridden by uploaded code
+function sandbox.pktin(reader, reason, metadata) end
+
+-- Entrypoint for pktin processing
+function pktin(data, len, reason, metadata)
+    local reader = Reader.new(data, len)
+    return sandbox.pktin(reader, reason, metadata)
+end
+
 -- Map from filename to return value from module initialization
 modules = {}
 sandbox.modules = modules
