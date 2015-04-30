@@ -16,7 +16,6 @@
 local bit = require("bit")
 local ffi = require("ffi")
 local C = ffi.C
-local result = ffi.new("bool[1]", 0)
 
 local sandbox = {
     assert=assert,
@@ -130,14 +129,12 @@ function command(request_data, request_data_length, reply_data, reply_data_lengt
 end
 
 -- To be overridden by uploaded code
-function sandbox.pktin(reader, writer, reason, metadata) end
+function sandbox.pktin(reader, reason, metadata) end
 
 -- Entrypoint for pktin processing
 function pktin(data, len, reason, metadata)
     local reader = Reader.new(data, len)
-    local writer = Writer.new(result, 4)
-    sandbox.pktin(reader, writer, reason, metadata)
-    return result
+    return sandbox.pktin(reader, reason, metadata)
 end
 
 -- Map from filename to return value from module initialization

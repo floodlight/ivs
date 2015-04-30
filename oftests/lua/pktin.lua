@@ -17,7 +17,7 @@
 -- by the switch or it needs to be sent to the controller
 -- Todo: Add packet parsing
 
-function pktin(reader, writer, reason, metadata)
+function pktin(reader, reason, metadata)
     log("Received pktin with reason: %u, metadata: %u", reason, metadata)
-    writer.bool(1)
+    return 1
 end
