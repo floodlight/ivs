@@ -104,6 +104,18 @@ static char *config_filename = NULL;
 static char *openflow_version = NULL;
 static char *pipeline = NULL;
 
+static int count_char(const char *str, char c)
+{
+    int r = 0;
+    while (*str) {
+        if (*str == c) {
+            r++;
+        }
+        str++;
+    }
+    return r;
+}
+
 static int
 parse_controller(const char *str,
                  indigo_cxn_protocol_params_t *_proto,
@@ -112,12 +124,21 @@ parse_controller(const char *str,
     char buf[128];
     char *strtok_state = NULL;
     char *ip, *port_str;
-    indigo_cxn_params_tcp_over_ipv4_t *proto = &_proto->tcp_over_ipv4;
     struct sockaddr_in sa;
+
+    if (count_char(str, ':') > 1) {
+        /* IPv6 */
+        indigo_cxn_params_tcp_over_ipv6_t *proto = &_proto->tcp_over_ipv6;
+        proto->protocol = INDIGO_CXN_PROTO_TCP_OVER_IPV6;
+        strncpy(proto->controller_ip, str, sizeof(proto->controller_ip));
+        proto->controller_port = default_port;
+        return 0;
+    }
 
     strncpy(buf, str, sizeof(buf));
     strtok_state = buf;
 
+    indigo_cxn_params_tcp_over_ipv4_t *proto = &_proto->tcp_over_ipv4;
     proto->protocol = INDIGO_CXN_PROTO_TCP_OVER_IPV4;
 
     ip = strtok_r(NULL, ":/", &strtok_state);
