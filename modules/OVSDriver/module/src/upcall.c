@@ -124,6 +124,7 @@ DEBUG_COUNTER(respawn_time, "ovsdriver.upcall.respawn_time", "Total time in micr
 SHARED_DEBUG_COUNTER(upcall, "ovsdriver.upcall", "Upcall from the kernel");
 SHARED_DEBUG_COUNTER(wakeup, "ovsdriver.upcall.wakeup", "Upcall process woken up");
 SHARED_DEBUG_COUNTER(upcall_time, "ovsdriver.upcall.time", "Total time in microseconds spent handling upcalls");
+SHARED_DEBUG_COUNTER(kflow_socket_full, "ovsdriver.upcall.kflow_socket_full", "Kernel flow socket full");
 
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC optimize (4)
@@ -390,6 +391,7 @@ ind_ovs_upcall_request_kflow(struct ind_ovs_upcall_thread *thread,
     if (written < 0) {
         if (errno == EAGAIN) {
             AIM_LOG_VERBOSE("kflow socket buffer full");
+            debug_counter_inc(&kflow_socket_full);
         } else {
             AIM_LOG_ERROR("Failed to write to kflow socket: %s", strerror(errno));
         }

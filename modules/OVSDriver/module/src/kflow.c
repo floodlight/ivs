@@ -68,6 +68,11 @@ DEBUG_COUNTER(revalidate_kernel_failed, "ovsdriver.kflow.revalidate_kernel_faile
               "Revalidating a kernel flow add failed due an error from the kernel");
 DEBUG_COUNTER(revalidate_time, "ovsdriver.kflow.revalidate_time",
               "Time in microseconds spent revalidating kernel flows");
+DEBUG_COUNTER(hit, "ovsdriver.kflow.hit", "Packet hit in the kernel flow table");
+DEBUG_COUNTER(missed, "ovsdriver.kflow.missed", "Packet missed in the kernel flow table");
+DEBUG_COUNTER(lost, "ovsdriver.kflow.lost", "Packet lost due to full upcall socket");
+DEBUG_COUNTER(mask_hit, "ovsdriver.kflow.mask_hit", "Mask used for flow lookup");
+DEBUG_COUNTER(masks, "ovsdriver.kflow.masks", "Number of kernel flow masks");
 
 static inline uint32_t
 key_hash(const struct nlattr *key)
@@ -475,6 +480,41 @@ kflow_expire_task(void *cookie)
     return IND_SOC_TASK_FINISHED;
 }
 
+static void
+update_datapath_stats(void)
+{
+    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_datapath_family, OVS_DP_CMD_GET);
+
+    struct nlmsghdr *reply;
+    if (ind_ovs_transact_reply(msg, &reply) < 0) {
+        LOG_WARN("failed to get datapath stats");
+        return;
+    }
+
+    struct nlattr *attrs[OVS_DP_ATTR_MAX+1];
+    if (genlmsg_parse(reply, sizeof(struct ovs_header),
+                      attrs, OVS_DP_ATTR_MAX,
+                      NULL) < 0) {
+        LOG_ERROR("failed to parse datapath message");
+        abort();
+    }
+
+    if (attrs[OVS_DP_ATTR_STATS]) {
+        struct ovs_dp_stats *stats = nla_data(attrs[OVS_DP_ATTR_STATS]);
+        hit.value = stats->n_hit;
+        missed.value = stats->n_missed;
+        lost.value = stats->n_lost;
+    }
+
+    if (attrs[OVS_DP_ATTR_MEGAFLOW_STATS]) {
+        struct ovs_dp_megaflow_stats *megaflow_stats = nla_data(attrs[OVS_DP_ATTR_MEGAFLOW_STATS]);
+        mask_hit.value = megaflow_stats->n_mask_hit;
+        masks.value = megaflow_stats->n_masks;
+    }
+
+    aim_free(reply);
+}
+
 /*
  * Register a long running task to delete expired kflows.
  */
@@ -485,6 +525,8 @@ ind_ovs_kflow_expire(void)
     if (kflow_expire_task_running) {
         return;
     }
+
+    update_datapath_stats();
 
     if (ind_soc_task_register(kflow_expire_task, NULL, IND_SOC_NORMAL_PRIORITY) < 0) {
         AIM_DIE("Failed to create long running task for kflow expiration");
