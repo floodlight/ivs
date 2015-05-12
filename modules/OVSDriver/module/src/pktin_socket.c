@@ -23,6 +23,8 @@
 
 DEBUG_COUNTER(pktin_ratelimited, "ovsdriver.pktin.ratelimited",
               "Dropped packet-in because of the ratelimiter");
+DEBUG_COUNTER(pktin_socket_ready, "ovsdriver.pktin.socket_ready",
+              "Packet-in socket ready for reading");
 
 static int
 ind_ovs_pktin_socket_recv(struct nl_msg *msg, void *arg)
@@ -78,6 +80,7 @@ ind_ovs_pktin_socket_ready(int socket_id, void *cookie,
                            int read_ready, int write_ready, int error_seen)
 {
     struct ind_ovs_pktin_socket *soc = cookie;
+    debug_counter_inc(&pktin_socket_ready);
     nl_recvmsgs_default(soc->pktin_socket);
 }
 
