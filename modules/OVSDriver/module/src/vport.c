@@ -1124,3 +1124,10 @@ get_packet_stats(struct stats_handle *handle)
     stats_get(handle, &stats);
     return stats.packets;
 }
+
+bool
+ind_ovs_port_running(of_port_no_t port_no)
+{
+    struct ind_ovs_port *port = ind_ovs_port_lookup(port_no);
+    return port && port->ifflags & IFF_RUNNING;
+}
