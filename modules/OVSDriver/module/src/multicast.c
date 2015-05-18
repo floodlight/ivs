@@ -138,16 +138,29 @@ ind_ovs_handle_multicast(void)
 void
 ind_ovs_multicast_resync(void)
 {
+    int ret;
+    struct nl_sock *sk = ind_ovs_create_nlsock();
+    if (sk == NULL) {
+        AIM_LOG_ERROR("Failed to allocate netlink socket for vport dump");
+        return;
+    }
+
+    if ((ret = nl_socket_modify_cb(sk, NL_CB_VALID, NL_CB_CUSTOM,
+                                   ind_ovs_recv_multicast, NULL)) < 0) {
+        AIM_DIE("Failed to set netlink callback: %s", nl_geterror(ret));
+    }
+
     /* Request dump of vports */
     struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_GET);
     nlmsg_hdr(msg)->nlmsg_flags |= NLM_F_DUMP;
-    if (nl_send_auto(ind_ovs_multicast_socket, msg) < 0) {
-        AIM_LOG_ERROR("Failed to request vport dump");
+    if ((ret = nl_send_auto(sk, msg)) < 0) {
+        AIM_LOG_ERROR("Failed to request vport dump: %s", nl_geterror(ret));
+    } else if ((ret = nl_recvmsgs_default(sk)) < 0) {
+        AIM_LOG_ERROR("Failed to receive vport dump: %s", nl_geterror(ret));
     }
     ind_ovs_nlmsg_freelist_free(msg);
-    if (nl_recvmsgs_default(ind_ovs_multicast_socket) < 0) {
-        AIM_LOG_ERROR("Failed to receive vport dump");
-    }
+
+    nl_socket_free(sk);
 }
 
 void
