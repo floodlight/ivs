@@ -27,6 +27,7 @@
 #include <netlink/cache.h>
 #include <netlink/route/link.h>
 #include <netlink/route/qdisc.h>
+#include <linux/ethtool.h>
 
 #ifndef _LINUX_IF_H
 /* Some versions of libnetlink include linux/if.h, which conflicts with net/if.h. */
@@ -322,6 +323,13 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname,
     } else {
         /* Not a netdev, fake the interface flags */
         port->ifflags = IFF_UP;
+    }
+
+    if (type == OVS_VPORT_TYPE_NETDEV) {
+        /* Disable LRO */
+        if (ind_ovs_set_ethtool_flags(port->ifname, 0, ETH_FLAG_LRO) < 0) {
+            AIM_LOG_WARN("Failed to disable LRO on interface %s", port->ifname);
+        }
     }
 
     port->is_uplink = ind_ovs_uplink_check_by_name(port->ifname);

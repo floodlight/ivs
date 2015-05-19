@@ -439,7 +439,7 @@ ind_ovs_interface_ioctl(long cmd, struct ifreq *req)
  * 'cmd' req will be read from or written to.
  */
 static indigo_error_t
-ind_ovs_ethtool_ioctl(const char *ifname, struct ethtool_cmd *ecmd)
+ind_ovs_ethtool_ioctl(const char *ifname, void *ecmd)
 {
     struct ifreq req;
     strncpy(req.ifr_name, ifname, sizeof(req.ifr_name));
@@ -530,6 +530,34 @@ ind_ovs_get_interface_features(const char *ifname,
     }
 
     /* TODO advertised, supported, peer */
+}
+
+indigo_error_t
+ind_ovs_set_ethtool_flags(const char *ifname, uint32_t flags, uint32_t mask)
+{
+    struct ethtool_value eval = { 0 };
+    eval.cmd = ETHTOOL_GFLAGS;
+    indigo_error_t err = ind_ovs_ethtool_ioctl(ifname, &eval);
+    if (err < 0) {
+        LOG_ERROR("failed to read ethtool flags: %s", indigo_strerror(err));
+        return err;
+    }
+
+    uint32_t new_flags = (eval.data & ~mask) | flags;
+
+    if (new_flags == eval.data) {
+        return INDIGO_ERROR_NONE;
+    }
+
+    eval.cmd = ETHTOOL_SFLAGS;
+    eval.data = new_flags;
+    err = ind_ovs_ethtool_ioctl(ifname, &eval);
+    if (err < 0) {
+        LOG_ERROR("failed to set ethtool flags: %s", indigo_strerror(err));
+        return err;
+    }
+
+    return INDIGO_ERROR_NONE;
 }
 
 indigo_error_t
