@@ -1,7 +1,6 @@
 standard
 
 # Extensions we support
-nicira_role
 nicira_dec_ttl
 
 # Indigo respects priority of exact match flows

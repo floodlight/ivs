@@ -40,7 +40,7 @@ include $(BUILDER)/lib.mk
 #
 # Set the modules we want to automatically build for this binary
 #
-DEPENDMODULES := SocketManager OFConnectionManager OFStateManager OVSDriver \
+DEPENDMODULES := SocketManager OFConnectionManager2 OFStateManager OVSDriver \
                  Configuration loci indigo BigList BigHash ivs_common pipeline pipeline_standard tcam xbuf \
                  PPE IOF \
                  AIM murmur cjson OS uCli debug_counter timer_wheel bloom_filter BigRing minimatch action \
