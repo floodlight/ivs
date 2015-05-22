@@ -103,6 +103,7 @@ static char *datapath_name = "ivs";
 static char *config_filename = NULL;
 static char *openflow_version = NULL;
 static char *pipeline = NULL;
+static char pidfile_path[PATH_MAX];
 
 static int count_char(const char *str, char c)
 {
@@ -459,6 +460,45 @@ crash_handler(int signum)
     _exit(0);
 }
 
+static void
+delete_pidfile(void)
+{
+    unlink(pidfile_path);
+}
+
+static void
+create_pidfile(void)
+{
+    snprintf(pidfile_path, sizeof(pidfile_path), "/var/run/ivs.%s.pid", datapath_name);
+    FILE *pidfile = fopen(pidfile_path, "wx");
+    if (pidfile == NULL && errno == EEXIST) {
+        pidfile = fopen(pidfile_path, "r");
+        if (pidfile == NULL) {
+            AIM_DIE("Failed to open pidfile %s: %s", pidfile_path, strerror(errno));
+        }
+        int old_pid;
+        if (fscanf(pidfile, "%d", &old_pid) != 1) {
+            AIM_DIE("Failed to parse pidfile");
+        }
+        if (kill(old_pid, 0) == 0) {
+            AIM_LOG_ERROR("IVS pid %d is still running", old_pid);
+            exit(1);
+        }
+        unlink(pidfile_path);
+        pidfile = freopen(pidfile_path, "wx", pidfile);
+        if (pidfile == NULL) {
+            AIM_DIE("Failed to open pidfile %s: %s", pidfile_path, strerror(errno));
+        }
+    } else if (pidfile == NULL) {
+        AIM_DIE("Failed to create pidfile: %s", strerror(errno));
+    }
+
+    fprintf(pidfile, "%d\n", getpid());
+    fclose(pidfile);
+
+    atexit(delete_pidfile);
+}
+
 int
 aim_main(int argc, char* argv[])
 {
@@ -505,6 +545,8 @@ aim_main(int argc, char* argv[])
     if (use_syslog) {
         aim_log_pvs_set_all(aim_pvs_syslog_open("ivs", LOG_NDELAY, LOG_DAEMON));
     }
+
+    create_pidfile();
 
     AIM_LOG_MSG("Starting %s (%s %s) pid %d", program_version, AIM_STRINGIFY(BUILD_ID), AIM_STRINGIFY(BUILD_OS), getpid());
 
