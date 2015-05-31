@@ -5,3 +5,4 @@ RUN yum install -y libnl3-devel
 RUN yum install -y epel-release
 RUN yum install -y ccache
 RUN yum install -y libcap-devel
+RUN yum install -y libpcap-devel
