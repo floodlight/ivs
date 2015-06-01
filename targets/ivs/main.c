@@ -746,7 +746,8 @@ aim_main(int argc, char* argv[])
     ind_core_mfr_desc_set(mfr_desc);
 
     of_desc_str_t sw_desc = "";
-    snprintf(sw_desc, sizeof(sw_desc), "%s", program_version);
+    snprintf(sw_desc, sizeof(sw_desc), "%s %s %s", program_version,
+             AIM_STRINGIFY(BUILD_ID), AIM_STRINGIFY(BUILD_OS));
     ind_core_sw_desc_set(sw_desc);
 
     of_desc_str_t hw_desc = "";
