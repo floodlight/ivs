@@ -499,6 +499,41 @@ create_pidfile(void)
     atexit(delete_pidfile);
 }
 
+void
+read_hardware_version(of_desc_str_t hw_desc)
+{
+    FILE *f;
+
+    of_desc_str_t sys_vendor;
+    f = fopen("/sys/devices/virtual/dmi/id/sys_vendor", "r");
+    if (f) {
+        if (fgets(sys_vendor, sizeof(sys_vendor), f) == NULL) {
+            AIM_LOG_ERROR("Failed to read sys_vendor: %s", strerror(errno));
+            strcpy(sys_vendor, "(unknown vendor)");
+        }
+        *strchrnul(sys_vendor, '\n') = '\0';
+        fclose(f);
+    } else {
+        strcpy(sys_vendor, "(unknown vendor)");
+    }
+
+    of_desc_str_t product_name;
+    f = fopen("/sys/devices/virtual/dmi/id/product_name", "r");
+    if (f) {
+        if (fgets(product_name, sizeof(product_name), f) == NULL) {
+            AIM_LOG_ERROR("Failed to read product_name: %s", strerror(errno));
+            strcpy(product_name, "(unknown product)");
+        }
+        *strchrnul(product_name, '\n') = '\0';
+        fclose(f);
+    } else {
+        strcpy(product_name, "(unknown product)");
+    }
+
+    memset(hw_desc, 0, sizeof(of_desc_str_t));
+    snprintf(hw_desc, sizeof(of_desc_str_t), "%s %s", sys_vendor, product_name);
+}
+
 int
 aim_main(int argc, char* argv[])
 {
@@ -746,11 +781,12 @@ aim_main(int argc, char* argv[])
     ind_core_mfr_desc_set(mfr_desc);
 
     of_desc_str_t sw_desc = "";
-    snprintf(sw_desc, sizeof(sw_desc), "%s", program_version);
+    snprintf(sw_desc, sizeof(sw_desc), "%s %s %s", program_version,
+             AIM_STRINGIFY(BUILD_ID), AIM_STRINGIFY(BUILD_OS));
     ind_core_sw_desc_set(sw_desc);
 
     of_desc_str_t hw_desc = "";
-    snprintf(hw_desc, sizeof(hw_desc), "%s", program_version);
+    read_hardware_version(hw_desc);
     ind_core_hw_desc_set(hw_desc);
 
     of_desc_str_t dp_desc = "";
