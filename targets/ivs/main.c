@@ -777,6 +777,28 @@ aim_main(int argc, char* argv[])
         }
     }
 
+    /* Listen on a unix domain socket */
+    {
+        indigo_cxn_protocol_params_t proto;
+        proto.unx.protocol = INDIGO_CXN_PROTO_UNIX;
+        snprintf(proto.unx.unix_path, sizeof(proto.unx.unix_path),
+                 "/var/run/ivs-openflow.%s.sock", datapath_name);
+
+        indigo_cxn_config_params_t config = {
+            .version = OF_VERSION_1_4,
+            .cxn_priority = 0,
+            .local = 1,
+            .listen = 1,
+            .periodic_echo_ms = 0,
+            .reset_echo_count = 0,
+        };
+
+        indigo_controller_id_t id;
+        if (indigo_controller_add(&proto, &config, &id) < 0) {
+            AIM_LOG_ERROR("Failed to listen on %s", proto.unx.unix_path);
+        }
+    }
+
     of_desc_str_t mfr_desc = "Big Switch Networks";
     ind_core_mfr_desc_set(mfr_desc);
 
