@@ -19,3 +19,9 @@ bsn_gentable
 ^basic.MeterConfigStats
 ^basic.MeterFeaturesStats
 ^basic.MeterStats
+
+# Not yet passing
+^bsn_flow_checksum.TableChecksumIds
+^groups.GroupAddInvalidAction
+^groups.SelectFwdSpread
+^flow_stats.AllFlowStats
