@@ -209,6 +209,13 @@ sys2indigoerr(int err)
     }
 }
 
+#ifndef NL_CAPABILITY_NL_CONNECT_RETRY_GENERATE_PORT_ON_ADDRINUSE
+#define NL_CAPABILITY_NL_CONNECT_RETRY_GENERATE_PORT_ON_ADDRINUSE 4
+#endif
+
+int AIM_COMPILER_ATTR_WEAK
+nl_has_capability(int capability);
+
 struct nl_sock *
 ind_ovs_create_nlsock(void)
 {
@@ -226,8 +233,10 @@ ind_ovs_create_nlsock(void)
         return NULL;
     }
 
-    /* See HACK below. This marks the PID as being allocated by us */
-    nl_socket_set_local_port(sk, nl_socket_get_local_port(sk));
+    if (!nl_has_capability || !nl_has_capability(NL_CAPABILITY_NL_CONNECT_RETRY_GENERATE_PORT_ON_ADDRINUSE)) {
+        /* See HACK below. This marks the PID as being allocated by us */
+        nl_socket_set_local_port(sk, nl_socket_get_local_port(sk));
+    }
 
     nl_socket_disable_auto_ack(sk);
 
@@ -251,9 +260,11 @@ ind_ovs_create_nlsock(void)
 int
 bind(int fd, __CONST_SOCKADDR_ARG addr, socklen_t len)
 {
-    if (addr.__sockaddr__->sa_family == AF_NETLINK) {
-        struct sockaddr_nl *sa = (struct sockaddr_nl *)addr.__sockaddr__;
-        sa->nl_pid = 0;
+    if (!nl_has_capability || !nl_has_capability(NL_CAPABILITY_NL_CONNECT_RETRY_GENERATE_PORT_ON_ADDRINUSE)) {
+        if (addr.__sockaddr__->sa_family == AF_NETLINK) {
+            struct sockaddr_nl *sa = (struct sockaddr_nl *)addr.__sockaddr__;
+            sa->nl_pid = 0;
+        }
     }
     typedef int (*bind_f)(int fd, __CONST_SOCKADDR_ARG addr, socklen_t len);
     static bind_f real_bind = NULL;
