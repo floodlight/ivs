@@ -49,6 +49,7 @@ bool ind_ovs_disable_kflows = false;
 bool ind_ovs_disable_megaflows = false;
 uint32_t ind_ovs_salt;
 uint16_t ind_ovs_inband_vlan = VLAN_INVALID;
+bool ind_ovs_hitless;
 
 struct ind_ovs_pktin_socket ind_ovs_pktout_soc;
 
@@ -64,10 +65,8 @@ ind_ovs_create_datapath(const char *name)
     if (ind_ovs_dp_ifindex != 0) {
         LOG_INFO("Reusing kernel datapath %s", name);
 
-        /* Remove existing flows from the datapath */
-        struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_DEL);
-        if (ind_ovs_transact(msg)) {
-            LOG_ERROR("Failed to delete existing flows from datapath");
+        if (!ind_ovs_hitless) {
+            ind_ovs_kflow_flush();
         }
     } else {
         LOG_INFO("Creating kernel datapath %s", name);
@@ -188,10 +187,15 @@ indigo_fwd_expiration_enable_get(int *is_enabled)
 }
 
 indigo_error_t
-ind_ovs_init(const char *datapath_name)
+ind_ovs_init(const char *datapath_name, bool hitless)
 {
     int ret;
     char *env_str;
+
+    ind_ovs_hitless = hitless;
+    if (hitless) {
+        AIM_LOG_INFO("Enabling hitless restart");
+    }
 
     env_str = getenv("INDIGO_BENCHMARK");
     if (env_str != NULL && atoi(env_str) == 1) {
@@ -242,6 +246,7 @@ ind_ovs_init(const char *datapath_name)
     ind_ovs_port_init();
     ind_ovs_vlan_stats_init();
     ind_ovs_barrier_init();
+    ind_ovs_hitless_init();
     ind_ovs_pktin_socket_register(&ind_ovs_pktout_soc, NULL, PKTIN_INTERVAL,
                                   PKTIN_BURST_SIZE);
 

@@ -113,6 +113,11 @@ kflow_match(const struct ind_ovs_parsed_key *key)
 indigo_error_t
 ind_ovs_kflow_add(const struct nlattr *key)
 {
+    if (ind_ovs_hitless) {
+        AIM_LOG_VERBOSE("Skipping kflow add during hitless restart");
+        return INDIGO_ERROR_NONE;
+    }
+
     debug_counter_inc(&add);
 
     /* Check input port accounting */
@@ -407,6 +412,11 @@ ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow)
 void
 ind_ovs_kflow_invalidate_all(void)
 {
+    if (ind_ovs_hitless) {
+        AIM_LOG_VERBOSE("Skipping kflow revalidation during hitless restart");
+        return;
+    }
+
     if (list_empty(&ind_ovs_kflows)) {
         return;
     }
@@ -528,6 +538,11 @@ ind_ovs_kflow_expire(void)
 
     update_datapath_stats();
 
+    if (ind_ovs_hitless) {
+        AIM_LOG_VERBOSE("Skipping kflow expiration during hitless restart");
+        return;
+    }
+
     if (ind_soc_task_register(kflow_expire_task, NULL, IND_SOC_NORMAL_PRIORITY) < 0) {
         AIM_DIE("Failed to create long running task for kflow expiration");
     }
@@ -616,6 +631,17 @@ test_kflow_mask(struct ind_ovs_kflow *kflow)
         assert(!memcmp(xbuf_data(stats), kflow->stats_handles, xbuf_length(stats)));
 
         ind_ovs_nlmsg_freelist_free(msg);
+    }
+}
+
+/* Delete all flows from the kernel datapath */
+void
+ind_ovs_kflow_flush(void)
+{
+    AIM_ASSERT(list_empty(&ind_ovs_kflows));
+    struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_flow_family, OVS_FLOW_CMD_DEL);
+    if (ind_ovs_transact(msg)) {
+        LOG_ERROR("Failed to delete existing flows from datapath");
     }
 }
 
