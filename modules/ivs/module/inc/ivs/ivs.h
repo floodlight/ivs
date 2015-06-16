@@ -166,4 +166,6 @@ indigo_error_t ind_ovs_pktin(of_port_no_t in_port, uint8_t *data,
 void ind_ovs_handle_multicast(void);
 bool ind_ovs_port_running(of_port_no_t port_no);
 
+const char *ivs_version, *ivs_build_id, *ivs_build_os;
+
 #endif

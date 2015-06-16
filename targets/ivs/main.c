@@ -75,7 +75,9 @@ ivs_loci_logger(loci_log_level_t level,
                 const char *fname, const char *file, int line,
                 const char *format, ...);
 
-static const char *program_version = "ivs 0.5";
+const char *ivs_version = "0.5";
+const char *ivs_build_id = AIM_STRINGIFY(BUILD_ID);
+const char *ivs_build_os = AIM_STRINGIFY(BUILD_OS);
 
 static ind_soc_config_t soc_cfg;
 static ind_cxn_config_t cxn_cfg;
@@ -267,7 +269,7 @@ parse_options(int argc, char **argv)
             break;
 
         case OPT_VERSION:
-            printf("%s (%s %s)\n", program_version, AIM_STRINGIFY(BUILD_ID), AIM_STRINGIFY(BUILD_OS));
+            printf("ivs %s (%s %s)\n", ivs_version, ivs_build_id, ivs_build_os);
             exit(0);
             break;
 
@@ -396,7 +398,7 @@ crash_handler(int signum)
     char name[16] = { 0 };
     prctl(PR_GET_NAME, name);
     AIM_LOG_ERROR("%.16s %s %s killed by signal %d (%s)",
-                  name, AIM_STRINGIFY(BUILD_ID), AIM_STRINGIFY(BUILD_OS),
+                  name, ivs_build_id, ivs_build_os,
                   signum, strsignal(signum));
 
     /*
@@ -583,7 +585,7 @@ aim_main(int argc, char* argv[])
 
     create_pidfile();
 
-    AIM_LOG_MSG("Starting %s (%s %s) pid %d", program_version, AIM_STRINGIFY(BUILD_ID), AIM_STRINGIFY(BUILD_OS), getpid());
+    AIM_LOG_MSG("Starting ivs %s (%s %s) pid %d", ivs_version, ivs_build_id, ivs_build_os, getpid());
 
     shared_debug_counter_init();
 
@@ -803,8 +805,8 @@ aim_main(int argc, char* argv[])
     ind_core_mfr_desc_set(mfr_desc);
 
     of_desc_str_t sw_desc = "";
-    snprintf(sw_desc, sizeof(sw_desc), "%s %s %s", program_version,
-             AIM_STRINGIFY(BUILD_ID), AIM_STRINGIFY(BUILD_OS));
+    snprintf(sw_desc, sizeof(sw_desc), "ivs %s %s %s", ivs_version,
+             ivs_build_id, ivs_build_os);
     ind_core_sw_desc_set(sw_desc);
 
     of_desc_str_t hw_desc = "";
@@ -862,7 +864,7 @@ aim_main(int argc, char* argv[])
 
     ind_soc_select_and_run(-1);
 
-    AIM_LOG_MSG("Stopping %s", program_version);
+    AIM_LOG_MSG("Stopping ivs %s", ivs_version);
 
     ind_core_finish();
     ind_ovs_finish();
