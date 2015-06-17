@@ -174,6 +174,7 @@ void ind_ovs_kflow_sync_stats(struct ind_ovs_kflow *kflow);
 void ind_ovs_kflow_invalidate(struct ind_ovs_kflow *kflow);
 void ind_ovs_kflow_invalidate_all(void);
 void ind_ovs_kflow_expire(void);
+void ind_ovs_kflow_flush(void);
 void ind_ovs_kflow_module_init(void);
 
 /* Management of the port set */
@@ -217,6 +218,9 @@ void ind_ovs_vlan_stats_init(void);
 /* Interface of the barrier submodule */
 void ind_ovs_barrier_init(void);
 void ind_ovs_barrier_defer_revalidation_internal(void);
+
+/* Interface of the hitless submodule */
+void ind_ovs_hitless_init(void);
 
 /* Log Netlink attributes in human readable form */
 void ind_ovs_dump_nested(const struct nlattr *nla, void (*cb)(const struct nlattr *attr));
@@ -306,5 +310,11 @@ extern uint32_t ind_ovs_salt;
  * pktout path.
  */
 extern struct ind_ovs_pktin_socket ind_ovs_pktout_soc;
+
+/*
+ * Enable hitless restart. Kernel flow revalidation is disabled
+ * until a takeover message is received from the controller.
+ */
+extern bool ind_ovs_hitless;
 
 #endif

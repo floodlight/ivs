@@ -106,6 +106,7 @@ static char *config_filename = NULL;
 static char *openflow_version = NULL;
 static char *pipeline = NULL;
 static char pidfile_path[PATH_MAX];
+static bool hitless;
 
 static int count_char(const char *str, char c)
 {
@@ -192,6 +193,7 @@ parse_options(int argc, char **argv)
             OPT_PIPELINE,
             OPT_INBAND_VLAN,
             OPT_INTERNAL_PORT,
+            OPT_HITLESS,
         };
 
         static struct option long_options[] = {
@@ -206,6 +208,7 @@ parse_options(int argc, char **argv)
             {"uplink",      required_argument, 0,  'u' },
             {"inband-vlan", required_argument, 0,  OPT_INBAND_VLAN },
             {"internal-port", required_argument, 0, OPT_INTERNAL_PORT },
+            {"hitless",     no_argument,       0, OPT_HITLESS },
             {"help",        no_argument,       0,  'h' },
             {"version",     no_argument,       0,  OPT_VERSION },
             /* Undocumented options */
@@ -289,6 +292,10 @@ parse_options(int argc, char **argv)
             internal_ports = biglist_append(internal_ports, optarg);
             break;
 
+        case OPT_HITLESS:
+            hitless = true;
+            break;
+
         case 'h':
         case '?':
             printf("ivs: Indigo Virtual Switch\n");
@@ -306,6 +313,7 @@ parse_options(int argc, char **argv)
             printf("  --syslog                    Log to syslog instead of stderr\n");
             printf("  --inband-vlan=VLAN          Enable in-band management on the specified VLAN\n");
             printf("  --internal-port=NAME        Create a port with the given name connected to the datapath\n");
+            printf("  --hitless                   Preserve kernel flows until controller pushes configuration\n");
             printf("  -h,--help                   Display this help message and exit\n");
             printf("  --version                   Display version information and exit\n");
             exit(c == 'h' ? 0 : 1);
@@ -624,7 +632,7 @@ aim_main(int argc, char* argv[])
         return 1;
     }
 
-    if (ind_ovs_init(datapath_name) < 0) {
+    if (ind_ovs_init(datapath_name, hitless) < 0) {
         AIM_LOG_FATAL("Failed to initialize OVSDriver module");
         return 1;
     }

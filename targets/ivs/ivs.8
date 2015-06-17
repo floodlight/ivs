@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH IVS 8 "June 27, 2013"
+.TH IVS 8 "June 16, 2015"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -56,6 +56,9 @@ Write log messages to syslog instead of stderr.
 .TP
 \fB--internal-port \fIname\fR
 Add an internal port. This creates a netdev to which you can assign an IP address.
+.TP
+\fB--hitless\fR
+Enable hitless restart. Requires a compatible controller.
 .TP
 \fB--help\fR
 Print usage information.

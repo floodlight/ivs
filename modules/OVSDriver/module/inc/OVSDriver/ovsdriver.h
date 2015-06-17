@@ -22,7 +22,7 @@
 
 struct xbuf;
 
-indigo_error_t ind_ovs_init(const char *datapath_name);
+indigo_error_t ind_ovs_init(const char *datapath_name, bool hitless);
 void ind_ovs_finish(void);
 void ind_ovs_enable(void);
 
