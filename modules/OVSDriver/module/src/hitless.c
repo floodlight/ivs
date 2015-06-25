@@ -40,8 +40,8 @@
 static void
 handle_takeover(indigo_cxn_id_t cxn_id, of_object_t *msg)
 {
-    AIM_LOG_INFO("Received takeover message");
     if (ind_ovs_hitless) {
+        AIM_LOG_INFO("Received takeover message");
         ind_ovs_kflow_flush();
         ind_ovs_hitless = false;
     } else {
