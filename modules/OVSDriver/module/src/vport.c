@@ -1002,14 +1002,6 @@ link_change_cb(struct nl_cache *cache,
         return;
     }
 
-    /*
-     * Ignore additions/deletions, already handled by
-     * ind_ovs_handle_vport_multicast.
-     */
-    if (action != 5 /* NL_ACT_CHANGE */) {
-        return;
-    }
-
     /* Ignore interfaces not connected to our datapath. */
     struct ind_ovs_port *port = ind_ovs_port_lookup_by_name(ifname);
     if (port == NULL) {
