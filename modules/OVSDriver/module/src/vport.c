@@ -288,6 +288,9 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname,
 
     debug_counter_inc(&add);
 
+    /* Ensure link cache is up to date before looking up new link */
+    nl_cache_mngr_poll(route_cache_mngr, 0);
+
     of_mac_addr_t mac_addr = of_mac_addr_all_zeros;
     struct rtnl_link *link = rtnl_link_get_by_name(link_cache, ifname);
     if (link) {
