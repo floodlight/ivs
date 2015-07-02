@@ -37,6 +37,7 @@
 struct ind_ovs_port *ind_ovs_ports[IND_OVS_MAX_PORTS];  /**< Table of all ports */
 
 static struct nl_sock *route_cache_sock;
+static struct nl_sock *route_cache_refill_sock;
 static struct nl_cache_mngr *route_cache_mngr;
 static struct nl_cache *link_cache;
 static struct nl_cb *netlink_callbacks;
@@ -82,7 +83,7 @@ ind_ovs_update_link_stats()
 {
     if (aim_ratelimiter_limit(&nl_cache_refill_limiter, monotonic_us()) == 0) {
         /* Refresh statistics */
-        nl_cache_refill(route_cache_sock, link_cache);
+        nl_cache_refill(route_cache_refill_sock, link_cache);
     }
 }
 
@@ -1089,6 +1090,15 @@ ind_ovs_port_init(void)
     if (netlink_callbacks == NULL) {
         LOG_ERROR("failed to allocate netlink callbacks");
         abort();
+    }
+
+    route_cache_refill_sock = nl_socket_alloc();
+    if (route_cache_refill_sock == NULL) {
+        AIM_DIE("nl_socket_alloc failed");
+    }
+
+    if ((nlerr = nl_connect(route_cache_refill_sock, NETLINK_ROUTE)) < 0) {
+        AIM_DIE("nl_connect failed: %s", nl_geterror(nlerr));
     }
 
     aim_ratelimiter_init(&nl_cache_refill_limiter, 1000*1000, 0, NULL);
