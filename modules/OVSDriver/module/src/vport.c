@@ -40,7 +40,6 @@ static struct nl_sock *route_cache_sock;
 static struct nl_sock *route_cache_refill_sock;
 static struct nl_cache_mngr *route_cache_mngr;
 static struct nl_cache *link_cache;
-static struct nl_cb *netlink_callbacks;
 
 static indigo_error_t port_status_notify(uint32_t port_no, unsigned reason);
 static void port_desc_set(of_port_desc_t *of_port_desc, of_port_no_t of_port_num);
@@ -633,6 +632,7 @@ indigo_port_stats_get(
 {
     of_port_no_t req_of_port_num;
     of_port_stats_reply_t *port_stats_reply;
+    struct nl_sock *sk = NULL;
     indigo_error_t err = INDIGO_ERROR_NONE;
 
     port_stats_reply = of_port_stats_reply_new(port_stats_request->version);
@@ -656,17 +656,19 @@ indigo_port_stats_get(
         nla_put_u32(msg, OVS_VPORT_ATTR_PORT_NO, req_of_port_num);
     }
 
+    sk = ind_ovs_create_nlsock();
+
     /* Ask kernel to send us one or more OVS_VPORT_CMD_NEW messages */
-    if (nl_send_auto(ind_ovs_socket, msg) < 0) {
+    if (nl_send_auto(sk, msg) < 0) {
         err = INDIGO_ERROR_UNKNOWN;
         goto out;
     }
     ind_ovs_nlmsg_freelist_free(msg);
 
     /* Handle OVS_VPORT_CMD_NEW messages */
-    nl_cb_set(netlink_callbacks, NL_CB_VALID, NL_CB_CUSTOM,
-              port_stats_iterator, &list);
-    if (nl_recvmsgs(ind_ovs_socket, netlink_callbacks) < 0) {
+    nl_socket_modify_cb(sk, NL_CB_VALID, NL_CB_CUSTOM,
+                        port_stats_iterator, &list);
+    if (nl_recvmsgs_default(sk) < 0) {
         err = INDIGO_ERROR_UNKNOWN;
         goto out;
     }
@@ -676,6 +678,8 @@ out:
         of_port_stats_reply_delete(port_stats_reply);
         port_stats_reply = NULL;
     }
+
+    nl_socket_free(sk);
 
     *port_stats_reply_ptr = port_stats_reply;
     return err;
@@ -1083,12 +1087,6 @@ ind_ovs_port_init(void)
                                 (ind_soc_socket_ready_callback_f)route_cache_mngr_socket_cb,
                                 NULL) < 0) {
         LOG_ERROR("failed to register socket");
-        abort();
-    }
-
-    netlink_callbacks = nl_cb_alloc(NL_CB_DEFAULT);
-    if (netlink_callbacks == NULL) {
-        LOG_ERROR("failed to allocate netlink callbacks");
         abort();
     }
 
