@@ -37,9 +37,9 @@
 struct ind_ovs_port *ind_ovs_ports[IND_OVS_MAX_PORTS];  /**< Table of all ports */
 
 static struct nl_sock *route_cache_sock;
+static struct nl_sock *route_cache_refill_sock;
 static struct nl_cache_mngr *route_cache_mngr;
 static struct nl_cache *link_cache;
-static struct nl_cb *netlink_callbacks;
 
 static indigo_error_t port_status_notify(uint32_t port_no, unsigned reason);
 static void port_desc_set(of_port_desc_t *of_port_desc, of_port_no_t of_port_num);
@@ -55,6 +55,7 @@ DEBUG_COUNTER(add_redundant, "ovsdriver.vport.add_redundant", "Received port add
 DEBUG_COUNTER(add, "ovsdriver.vport.add", "Received port add notification for a new port");
 DEBUG_COUNTER(add_notify_failed, "ovsdriver.vport.add_notify_failed", "Failed to notify controller of new port");
 DEBUG_COUNTER(add_failed, "ovsdriver.vport.add_failed", "Failed to add port");
+DEBUG_COUNTER(add_out_of_range, "ovsdriver.vport.add_out_of_range", "Failed to add port due to too-high port number");
 DEBUG_COUNTER(delete_redundant, "ovsdriver.vport.delete_redundant", "Received port delete notification for nonexistent port");
 DEBUG_COUNTER(delete, "ovsdriver.vport.delete", "Received port delete notification");
 DEBUG_COUNTER(delete_notify_failed, "ovsdriver.vport.delete_notify_failed", "Failed to notify controller of deleted port");
@@ -81,7 +82,7 @@ ind_ovs_update_link_stats()
 {
     if (aim_ratelimiter_limit(&nl_cache_refill_limiter, monotonic_us()) == 0) {
         /* Refresh statistics */
-        nl_cache_refill(route_cache_sock, link_cache);
+        nl_cache_refill(route_cache_refill_sock, link_cache);
     }
 }
 
@@ -268,12 +269,27 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname,
 {
     indigo_error_t err;
 
+    if (port_no >= IND_OVS_MAX_PORTS) {
+        AIM_LOG_WARN("Attempted to add port number %u (%s) >= %u", port_no, ifname, IND_OVS_MAX_PORTS);
+        debug_counter_inc(&add_out_of_range);
+
+        /* Remove port from kernel datapath */
+        struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_DEL);
+        nla_put_u32(msg, OVS_VPORT_ATTR_PORT_NO, port_no);
+        ind_ovs_transact(msg);
+
+        return;
+    }
+
     if (ind_ovs_ports[port_no]) {
         debug_counter_inc(&add_redundant);
         return;
     }
 
     debug_counter_inc(&add);
+
+    /* Ensure link cache is up to date before looking up new link */
+    nl_cache_mngr_poll(route_cache_mngr, 0);
 
     of_mac_addr_t mac_addr = of_mac_addr_all_zeros;
     struct rtnl_link *link = rtnl_link_get_by_name(link_cache, ifname);
@@ -379,7 +395,11 @@ indigo_error_t indigo_port_interface_remove(
 void
 ind_ovs_port_deleted(uint32_t port_no)
 {
-    assert(port_no < IND_OVS_MAX_PORTS);
+    if (port_no >= IND_OVS_MAX_PORTS) {
+        /* Already failed to add this port, nothing to clean up */
+        return;
+    }
+
     struct ind_ovs_port *port = ind_ovs_ports[port_no];
     if (port == NULL) {
         debug_counter_inc(&delete_redundant);
@@ -612,6 +632,7 @@ indigo_port_stats_get(
 {
     of_port_no_t req_of_port_num;
     of_port_stats_reply_t *port_stats_reply;
+    struct nl_sock *sk = NULL;
     indigo_error_t err = INDIGO_ERROR_NONE;
 
     port_stats_reply = of_port_stats_reply_new(port_stats_request->version);
@@ -635,17 +656,19 @@ indigo_port_stats_get(
         nla_put_u32(msg, OVS_VPORT_ATTR_PORT_NO, req_of_port_num);
     }
 
+    sk = ind_ovs_create_nlsock();
+
     /* Ask kernel to send us one or more OVS_VPORT_CMD_NEW messages */
-    if (nl_send_auto(ind_ovs_socket, msg) < 0) {
+    if (nl_send_auto(sk, msg) < 0) {
         err = INDIGO_ERROR_UNKNOWN;
         goto out;
     }
     ind_ovs_nlmsg_freelist_free(msg);
 
     /* Handle OVS_VPORT_CMD_NEW messages */
-    nl_cb_set(netlink_callbacks, NL_CB_VALID, NL_CB_CUSTOM,
-              port_stats_iterator, &list);
-    if (nl_recvmsgs(ind_ovs_socket, netlink_callbacks) < 0) {
+    nl_socket_modify_cb(sk, NL_CB_VALID, NL_CB_CUSTOM,
+                        port_stats_iterator, &list);
+    if (nl_recvmsgs_default(sk) < 0) {
         err = INDIGO_ERROR_UNKNOWN;
         goto out;
     }
@@ -655,6 +678,8 @@ out:
         of_port_stats_reply_delete(port_stats_reply);
         port_stats_reply = NULL;
     }
+
+    nl_socket_free(sk);
 
     *port_stats_reply_ptr = port_stats_reply;
     return err;
@@ -1065,10 +1090,13 @@ ind_ovs_port_init(void)
         abort();
     }
 
-    netlink_callbacks = nl_cb_alloc(NL_CB_DEFAULT);
-    if (netlink_callbacks == NULL) {
-        LOG_ERROR("failed to allocate netlink callbacks");
-        abort();
+    route_cache_refill_sock = nl_socket_alloc();
+    if (route_cache_refill_sock == NULL) {
+        AIM_DIE("nl_socket_alloc failed");
+    }
+
+    if ((nlerr = nl_connect(route_cache_refill_sock, NETLINK_ROUTE)) < 0) {
+        AIM_DIE("nl_connect failed: %s", nl_geterror(nlerr));
     }
 
     aim_ratelimiter_init(&nl_cache_refill_limiter, 1000*1000, 0, NULL);
