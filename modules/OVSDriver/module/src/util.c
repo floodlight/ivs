@@ -174,7 +174,7 @@ ind_ovs_transact_reply(struct nl_msg *msg, struct nlmsghdr **reply)
 
     struct sockaddr_nl nla;
     err = nl_recv(ind_ovs_socket, &nla, (unsigned char **)reply, NULL);
-    if (err < 0) {
+    if (err <= 0) {
         debug_counter_inc(&netlink_recv_failed);
         LOG_ERROR("nl_recv failed: %s", nl_geterror(err));
         return INDIGO_ERROR_UNKNOWN;
