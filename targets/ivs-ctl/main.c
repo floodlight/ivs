@@ -120,16 +120,16 @@ show_vport__(struct nl_msg *msg, void *arg)
         abort();
     }
 
-    fprintf(stderr, "    %d %s %s\n",
+    fprintf(stdout, "    %d %s %s\n",
             nla_get_u32(attrs[OVS_VPORT_ATTR_PORT_NO]),
             (char *)nla_data(attrs[OVS_VPORT_ATTR_NAME]),
             vport_type_str__(nla_get_u32(attrs[OVS_VPORT_ATTR_TYPE])));
 
     struct ovs_vport_stats *stats = nla_data(attrs[OVS_VPORT_ATTR_STATS]);
-    fprintf(stderr, "      rx: packets=%"PRIu64" bytes=%"PRIu64" errors=%"PRIu64" dropped=%"PRIu64"\n",
+    fprintf(stdout, "      rx: packets=%"PRIu64" bytes=%"PRIu64" errors=%"PRIu64" dropped=%"PRIu64"\n",
             (uint64_t)stats->rx_packets, (uint64_t)stats->rx_bytes,
             (uint64_t)stats->rx_errors, (uint64_t)stats->rx_dropped);
-    fprintf(stderr, "      tx: packets=%"PRIu64" bytes=%"PRIu64" errors=%"PRIu64" dropped=%"PRIu64"\n",
+    fprintf(stdout, "      tx: packets=%"PRIu64" bytes=%"PRIu64" errors=%"PRIu64" dropped=%"PRIu64"\n",
             (uint64_t)stats->tx_packets, (uint64_t)stats->tx_bytes,
             (uint64_t)stats->tx_errors, (uint64_t)stats->tx_dropped);
 
@@ -169,12 +169,12 @@ show_datapath__(struct nl_msg *msg, void *arg)
 
     struct ovs_dp_stats *stats = nla_data(attrs[OVS_DP_ATTR_STATS]);
 
-    fprintf(stderr, "%s:\n", (char *)nla_data(attrs[OVS_DP_ATTR_NAME]));
-    fprintf(stderr, "  kernel lookups: hit=%"PRIu64" missed=%"PRIu64" lost=%"PRIu64"\n",
+    fprintf(stdout, "%s:\n", (char *)nla_data(attrs[OVS_DP_ATTR_NAME]));
+    fprintf(stdout, "  kernel lookups: hit=%"PRIu64" missed=%"PRIu64" lost=%"PRIu64"\n",
             (uint64_t)stats->n_hit, (uint64_t)stats->n_missed,
             (uint64_t)stats->n_lost);
-    fprintf(stderr, "  kernel flows=%"PRIu64"\n", (uint64_t)stats->n_flows);
-    fprintf(stderr, "  ports:\n");
+    fprintf(stdout, "  kernel flows=%"PRIu64"\n", (uint64_t)stats->n_flows);
+    fprintf(stdout, "  ports:\n");
     show_vports__(hdr->dp_ifindex);
 
     return NL_OK;
