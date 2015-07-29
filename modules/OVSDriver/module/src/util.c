@@ -572,6 +572,24 @@ ind_ovs_set_ethtool_flags(const char *ifname, uint32_t flags, uint32_t mask)
 }
 
 indigo_error_t
+ind_ovs_set_ethtool_gro(const char *ifname, bool enabled)
+{
+    struct ethtool_value eval = {
+        .cmd = ETHTOOL_SGRO,
+        .data = enabled,
+    };
+
+    indigo_error_t err = ind_ovs_ethtool_ioctl(ifname, &eval);
+    if (err < 0) {
+        LOG_ERROR("failed to %s GRO on %s: %s",
+                  enabled ? "enable" : "disable", ifname, strerror(errno));
+        return err;
+    }
+
+    return INDIGO_ERROR_NONE;
+}
+
+indigo_error_t
 write_file(const char *filename, const char *str)
 {
     int fd = open(filename, O_WRONLY);

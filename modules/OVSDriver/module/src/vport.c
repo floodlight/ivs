@@ -320,6 +320,8 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname,
         goto cleanup_port;
     }
 
+    port->is_uplink = ind_ovs_uplink_check_by_name(port->ifname);
+
     struct nl_msg *msg = ind_ovs_create_nlmsg(ovs_vport_family, OVS_VPORT_CMD_SET);
     nla_put_u32(msg, OVS_VPORT_ATTR_PORT_NO, port_no);
     nla_put_u32(msg, OVS_VPORT_ATTR_UPCALL_PID,
@@ -346,9 +348,12 @@ ind_ovs_port_added(uint32_t port_no, const char *ifname,
         if (ind_ovs_set_ethtool_flags(port->ifname, 0, ETH_FLAG_LRO) < 0) {
             AIM_LOG_WARN("Failed to disable LRO on interface %s", port->ifname);
         }
-    }
 
-    port->is_uplink = ind_ovs_uplink_check_by_name(port->ifname);
+        /* Enable GRO on uplinks */
+        if (port->is_uplink) {
+            (void) ind_ovs_set_ethtool_gro(port->ifname, true);
+        }
+    }
 
     ind_ovs_ports[port_no] = port;
 
