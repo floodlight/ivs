@@ -40,6 +40,7 @@ static struct nl_sock *route_cache_sock;
 static struct nl_sock *route_cache_refill_sock;
 static struct nl_cache_mngr *route_cache_mngr;
 static struct nl_cache *link_cache;
+static struct nl_cache *link_stats_cache;
 
 static indigo_error_t port_status_notify(uint32_t port_no, unsigned reason);
 static void port_desc_set(of_port_desc_t *of_port_desc, of_port_no_t of_port_num);
@@ -82,7 +83,7 @@ ind_ovs_update_link_stats()
 {
     if (aim_ratelimiter_limit(&nl_cache_refill_limiter, monotonic_us()) == 0) {
         /* Refresh statistics */
-        nl_cache_refill(route_cache_refill_sock, link_cache);
+        nl_cache_refill(route_cache_refill_sock, link_stats_cache);
     }
 }
 
@@ -516,7 +517,7 @@ port_stats_iterator(struct nl_msg *msg, void *arg)
     struct rtnl_link *link;
     if ((vport_type == OVS_VPORT_TYPE_NETDEV
         || vport_type == OVS_VPORT_TYPE_INTERNAL)
-        && (link = rtnl_link_get_by_name(link_cache, ifname))) {
+        && (link = rtnl_link_get_by_name(link_stats_cache, ifname))) {
         /* Get interface stats from NETLINK_ROUTE */
         of_port_stats_entry_rx_packets_set(entry,
             rtnl_link_get_stat(link, RTNL_LINK_RX_PACKETS));
@@ -603,7 +604,7 @@ indigo_port_extended_stats_get(
     ind_ovs_update_link_stats();
 
     struct rtnl_link *link;
-    if ((link = rtnl_link_get_by_name(link_cache, port->ifname))) {
+    if ((link = rtnl_link_get_by_name(link_stats_cache, port->ifname))) {
         port_stats->rx_bytes = rtnl_link_get_stat(link, RTNL_LINK_RX_BYTES);
         port_stats->rx_dropped = rtnl_link_get_stat(link, RTNL_LINK_RX_DROPPED);
         port_stats->rx_errors = rtnl_link_get_stat(link, RTNL_LINK_RX_ERRORS);
@@ -1105,6 +1106,10 @@ ind_ovs_port_init(void)
     }
 
     aim_ratelimiter_init(&nl_cache_refill_limiter, 1000*1000, 0, NULL);
+
+    if ((nlerr = rtnl_link_alloc_cache(route_cache_refill_sock, AF_UNSPEC, &link_stats_cache)) < 0) {
+        AIM_DIE("rtnl_link_alloc_cache failed: %s", nl_geterror(nlerr));
+    }
 }
 
 void
