@@ -243,7 +243,11 @@ indigo_port_interface_list(indigo_port_info_t** list)
         if(port != NULL) {
             indigo_port_info_t* pi = aim_zmalloc(sizeof(*pi));
             strncpy(pi->port_name, port->ifname, sizeof(port->ifname));
-            pi->of_port = i;
+            if (i == OVSP_LOCAL) {
+                pi->of_port = OF_PORT_DEST_LOCAL;
+            } else {
+                pi->of_port = i;
+            }
             pi->next = head;
             head = pi;
         }
