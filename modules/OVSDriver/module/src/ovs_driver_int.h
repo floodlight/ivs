@@ -119,6 +119,8 @@ struct ind_ovs_port {
     aim_ratelimiter_t pktin_limiter;
     struct ind_ovs_upcall_thread *upcall_thread;
     struct ind_ovs_port_counters pcounters;
+    uint64_t link_up_count;
+    uint64_t link_down_count;
 };
 
 /*
