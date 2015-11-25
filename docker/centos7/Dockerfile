@@ -6,3 +6,4 @@ RUN yum install -y epel-release
 RUN yum install -y ccache
 RUN yum install -y libcap-devel
 RUN yum install -y libpcap-devel
+RUN yum install -y openssl-devel

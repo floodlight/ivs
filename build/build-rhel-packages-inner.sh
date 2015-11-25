@@ -8,4 +8,5 @@ trap "chown -R $OUTER_UID:$OUTER_GID /rpmbuild" EXIT
 export PATH=/usr/lib64/ccache:$PATH
 chown -R root:root /rpmbuild
 
+ln -s /rpmbuild /root/rpmbuild
 rpmbuild -bb $SPEC
