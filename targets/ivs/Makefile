@@ -146,6 +146,11 @@ LIBNL_LIBS += $(shell pkg-config --libs --silence-errors libnl-route-3.0)
 GLOBAL_CFLAGS += $(LIBNL_CFLAGS)
 GLOBAL_LINK_LIBS += $(LIBNL_LIBS)
 
+OPENSSL_CFLAGS := $(shell pkg-config --cflags openssl)
+OPENSSL_LIBS := $(shell pkg-config --libs openssl)
+GLOBAL_CFLAGS += $(OPENSSL_CFLAGS)
+GLOBAL_LINK_LIBS += $(OPENSSL_LIBS)
+
 ifdef BUILD_ID
 GLOBAL_CFLAGS += "-DBUILD_ID=$(BUILD_ID)"
 endif
