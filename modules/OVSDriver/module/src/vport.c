@@ -632,6 +632,9 @@ indigo_port_extended_stats_get(
         port_stats->tx_packets_unicast = get_packet_stats(&port->pcounters.tx_unicast_stats_handle);
         port_stats->tx_packets_broadcast = get_packet_stats(&port->pcounters.tx_broadcast_stats_handle);
         port_stats->tx_packets_multicast = get_packet_stats(&port->pcounters.tx_multicast_stats_handle);
+
+        port_stats->link_up_count = port->link_up_count;
+        port_stats->link_down_count = port->link_down_count;
     }
 }
 
@@ -1048,8 +1051,10 @@ link_change_cb(struct nl_cache *cache,
     /* Log at INFO only if the interface transitioned between up/down */
     if ((ifflags & IFF_RUNNING) && !(port->ifflags & IFF_RUNNING)) {
         LOG_INFO("Interface %s state changed to up", ifname);
+        port->link_up_count++;
     } else if (!(ifflags & IFF_RUNNING) && (port->ifflags & IFF_RUNNING)) {
         LOG_INFO("Interface %s state changed to down", ifname);
+        port->link_down_count++;
     }
 
     LOG_VERBOSE("Sending port status change notification for interface %s", ifname);
